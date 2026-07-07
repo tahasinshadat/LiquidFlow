@@ -293,14 +293,20 @@ public sealed class OverlayWindow : Window
 
     private void AnimateTick()
     {
-        const double minH = 3, maxH = 15;
+        const double minH = 3;
+        double maxH = Math.Min(_layout.WaveH, 22);
         if (_state == OverlayState.Recording)
         {
+            // Perceptual boost: normalized speech levels sit ~0.2-0.5, which looked nearly
+            // flat. Compress upward so normal talking visibly moves the bars.
+            double boosted = Math.Pow(Math.Min(1.0, _level * 2.2), 0.55);
+            double mid = (_bars.Count - 1) / 2.0;
             for (int i = 0; i < _bars.Count; i++)
             {
-                // per-bar random walk scaled by mic level (mac bars: 3..15px, 0.1s ease)
-                double target = minH + (maxH - minH) * _level * (0.45 + 0.55 * _rng.NextDouble());
-                _barHeights[i] += (target - _barHeights[i]) * 0.45;
+                // center-weighted like the mac waveform: middle bars swing tallest
+                double centerWeight = 0.45 + 0.55 * (1.0 - Math.Abs(i - mid) / Math.Max(1.0, mid));
+                double target = minH + (maxH - minH) * boosted * centerWeight * (0.7 + 0.3 * _rng.NextDouble());
+                _barHeights[i] += (target - _barHeights[i]) * 0.5;
                 var h = Math.Max(minH, Math.Min(maxH, _barHeights[i]));
                 _bars[i].Height = h;
                 Canvas.SetTop(_bars[i], (_layout.WaveH - h) / 2);

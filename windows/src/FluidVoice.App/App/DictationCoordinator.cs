@@ -134,7 +134,7 @@ public sealed class DictationCoordinator : IDictationControl
         RecordingStateChanged?.Invoke(true);
 
         var engine = CurrentEngine;
-        if (Settings.Current.EnableStreamingPreview && engine.IsReady)
+        if (Settings.Current.EnableStreamingPreview && engine.IsReady && SpeechModels.Selected().SupportsLivePreview)
             StartPartialLoop(engine, _sessionId);
 
         // lazily prepare the model while the user is speaking (mac: ensureAsrReady at stop)

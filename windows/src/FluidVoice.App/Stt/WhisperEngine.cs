@@ -44,7 +44,7 @@ public sealed class WhisperEngine : ISpeechEngine
             {
                 _factory = WhisperFactory.FromPath(model.LocalPath);
                 var builder = _factory.CreateBuilder()
-                    .WithThreads(Math.Clamp(Environment.ProcessorCount - 2, 2, 8));
+                    .WithThreads(Math.Clamp(Environment.ProcessorCount - 2, 4, 10)); // X Elite: use 10 of 12 cores
                 builder = language is null ? builder.WithLanguageDetection() : builder.WithLanguage(language);
                 _processor = builder.Build();
             }, ct);

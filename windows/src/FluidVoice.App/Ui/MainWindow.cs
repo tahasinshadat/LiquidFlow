@@ -85,6 +85,7 @@ public sealed class MainWindow : Window
         root.Children.Add(_content);
 
         Content = root;
+        SmoothScroll.Attach(_content);
         Navigate("Welcome");
         Settings.Changed += _ => Dispatcher.BeginInvoke(() => Background = new SolidColorBrush(Theme.Bg));
     }

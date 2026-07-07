@@ -122,9 +122,10 @@ public static class ModelDownloader
             {
                 if (!sniffed && total == 0 && read >= 2)
                 {
-                    // Reject HTML/proxy block pages masquerading as model files
-                    if (buffer[0] == (byte)'<' && (buffer[1] is (byte)'!' or (byte)'?' or (byte)'/' ||
-                        char.IsAsciiLetter((char)buffer[1])))
+                    // Reject HTML/proxy block pages masquerading as model files. Must be
+                    // specific: legit files can start with '<' too (sherpa tokens.txt
+                    // begins with "<blk>"), so only match actual markup preambles.
+                    if (StartsWithMarkupPreamble(buffer, read))
                         throw new InvalidOperationException("Server returned a web page instead of the model file");
                     sniffed = true;
                 }
@@ -146,6 +147,13 @@ public static class ModelDownloader
 
         File.Move(tempPath, destinationPath, overwrite: true);
         progress?.Report(new(ModelPreparationPhase.Downloading, 1.0));
+    }
+
+    private static bool StartsWithMarkupPreamble(byte[] buffer, int length)
+    {
+        var head = System.Text.Encoding.ASCII.GetString(buffer, 0, Math.Min(length, 16)).ToLowerInvariant();
+        return head.StartsWith("<!doctype") || head.StartsWith("<html") || head.StartsWith("<?xml") ||
+               head.StartsWith("<head") || head.StartsWith("<body") || head.StartsWith("<!--");
     }
 
     private static void CleanupPartial(string destinationPath)

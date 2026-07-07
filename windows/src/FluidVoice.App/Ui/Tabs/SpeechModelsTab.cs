@@ -93,17 +93,30 @@ public sealed class SpeechModelsTab : StackPanel
         actionBtn.Click += async (_, _) => await OnAction(model);
         buttons.Children.Add(actionBtn);
 
-        if (model.IsDownloaded && !selected)
+        if (model.IsDownloaded)
         {
-            var delBtn = new Button { Content = "Delete", Padding = new Thickness(12, 5, 12, 5) };
+            var delBtn = new Button { Content = "Uninstall", Padding = new Thickness(12, 5, 12, 5) };
             delBtn.Click += (_, _) =>
             {
+                var note = selected
+                    ? $"Uninstall {model.DisplayName}?\n\nIt is your selected model — FluidVoice will switch back to {SpeechModels.ById(SpeechModels.DefaultModelId)!.DisplayName}."
+                    : $"Uninstall {model.DisplayName} and free {model.SizeDisplay}?";
+                if (MessageBox.Show(note, "FluidVoice", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                    return;
                 try
                 {
                     if (Directory.Exists(model.LocalPath)) Directory.Delete(model.LocalPath, recursive: true);
                     else File.Delete(model.LocalPath);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Log.Warn("models", $"Uninstall failed: {ex.Message}");
+                }
+                if (selected)
+                {
+                    Settings.Current.SelectedSpeechModel = SpeechModels.DefaultModelId;
+                    Settings.Current.Save("model");
+                }
                 Build();
             };
             buttons.Children.Add(delBtn);

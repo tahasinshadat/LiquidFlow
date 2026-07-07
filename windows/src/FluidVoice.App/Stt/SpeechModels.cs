@@ -32,6 +32,14 @@ public sealed record SpeechModelInfo(
     /// <summary>Multi-file models: every file that must exist under LocalPath (a directory). Null for single-file Whisper models.</summary>
     public IReadOnlyList<ModelFile>? Files { get; init; }
 
+    /// <summary>
+    /// Whisper partials are periodic full re-decodes; on big models one pass takes far longer
+    /// than the tick, and the stop path must wait for the in-flight decode — which made
+    /// Large/Medium feel "very slow". Disabled there: recording stays free, stop = one decode.
+    /// (Parakeet streams natively and ignores this flag.)
+    /// </summary>
+    public bool SupportsLivePreview { get; init; } = true;
+
     /// <summary>Whisper: the GGML file. Parakeet: the model directory (FileName is the directory name).</summary>
     public string LocalPath => Engine == SpeechEngineKind.Whisper
         ? Path.Combine(AppPaths.WhisperModelDir, FileName)
@@ -103,13 +111,19 @@ public static class SpeechModels
             487_601_967, "ggml-small.bin", "99 Languages", 0.60, 0.70, "FluidVoice Pick"),
         new("whisper-medium", "Whisper Medium", "Medium Quality",
             "High accuracy for demanding tasks. Requires more memory.",
-            1_533_763_059, "ggml-medium.bin", "99 Languages", 0.40, 0.80, null),
-        new("whisper-large-turbo", "Whisper Large Turbo", "Higher Quality but Faster",
-            "Near-maximum accuracy with optimized speed.",
-            1_624_555_275, "ggml-large-v3-turbo.bin", "99 Languages", 0.65, 0.95, "New"),
+            1_533_763_059, "ggml-medium.bin", "99 Languages", 0.40, 0.80, null)
+        { SupportsLivePreview = false },
+        // NOTE: measured on Snapdragon X Elite — q5-quantized turbo decodes SLOWER than f16
+        // (38s vs 26s for a 6.4s clip; the q5 kernels aren't NEON-optimized), so no quantized
+        // variant is offered. For near-instant dictation use Parakeet; Small/Base for Whisper.
+        new("whisper-large-turbo", "Whisper Large Turbo", "Accuracy over Speed",
+            "Near-maximum accuracy, but heavy for CPU decoding (roughly 4x slower than real time on this class of device). For fast dictation use Parakeet or Whisper Small.",
+            1_624_555_275, "ggml-large-v3-turbo.bin", "99 Languages", 0.25, 0.95, null)
+        { SupportsLivePreview = false },
         new("whisper-large", "Whisper Large", "Maximum Accuracy",
-            "Best possible accuracy. Large download and memory usage.",
-            3_095_033_483, "ggml-large-v3.bin", "99 Languages", 0.20, 1.00, null),
+            "Best possible accuracy. Very slow on CPU — best for File Transcription rather than live dictation.",
+            3_095_033_483, "ggml-large-v3.bin", "99 Languages", 0.10, 1.00, null)
+        { SupportsLivePreview = false },
     };
 
     public static SpeechModelInfo? ById(string id) => All.FirstOrDefault(m => m.Id == id);
