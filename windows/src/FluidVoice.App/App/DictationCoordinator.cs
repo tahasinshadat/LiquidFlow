@@ -177,6 +177,7 @@ public sealed class DictationCoordinator : IDictationControl
     private async Task RunStreamingPartialsAsync(IStreamingPartialSession stream, long session, CancellationToken ct)
     {
         int cursor = 0;
+        float sessionGain = 0; // AGC for whispered speech: fixed once we've heard ~1s
         while (!ct.IsCancellationRequested && _activeMode != RecordingMode.None && session == _sessionId)
         {
             await Task.Delay(TimeSpan.FromSeconds(0.2), ct).ContinueWith(_ => { });
@@ -184,6 +185,10 @@ public sealed class DictationCoordinator : IDictationControl
             var fresh = _recorder.SnapshotFrom(cursor);
             if (fresh.Length == 0) continue;
             cursor += fresh.Length;
+            if (sessionGain == 0 && cursor >= AudioRecorder.TargetSampleRate)
+                sessionGain = Dsp.GainFor(_recorder.SnapshotAll());
+            if (sessionGain > 1f)
+                Dsp.Scale(fresh, fresh, sessionGain);
             var partial = stream.Feed(fresh);
             if (ct.IsCancellationRequested) break;
             EmitPartial(partial);
@@ -203,7 +208,7 @@ public sealed class DictationCoordinator : IDictationControl
             const int maxPreviewSamples = 25 * AudioRecorder.TargetSampleRate;
             if (samples.Length > maxPreviewSamples)
                 samples = samples[^maxPreviewSamples..];
-            var partial = await engine.TryTranscribePartialAsync(samples, ct);
+            var partial = await engine.TryTranscribePartialAsync(Dsp.Normalize(samples), ct);
             if (partial is null || ct.IsCancellationRequested) continue;
             EmitPartial(partial);
         }
@@ -288,7 +293,8 @@ public sealed class DictationCoordinator : IDictationControl
             }
 
             // 5) final transcription + local formatting pipeline
-            var raw = await engine.TranscribeAsync(pcm, CancellationToken.None);
+            // (AGC so whispered/quiet dictation reaches the model at speech level)
+            var raw = await engine.TranscribeAsync(Dsp.Normalize(pcm), CancellationToken.None);
             var formatted = TranscriptFormatter.Process(raw, focus?.ProcessName, focus?.WindowTitle);
 
             if (string.IsNullOrWhiteSpace(formatted))
@@ -343,11 +349,17 @@ public sealed class DictationCoordinator : IDictationControl
             try
             {
                 var enhanced = await EnhancementService.EnhanceDictationAsync(formatted, focus?.ProcessName, CancellationToken.None);
-                if (!string.IsNullOrWhiteSpace(enhanced))
+                if (!string.IsNullOrWhiteSpace(enhanced) && !EnhancementService.LooksLikeBadEnhancement(formatted, enhanced))
                 {
                     finalText = TranscriptFormatter.ApplyGaavFormatting(enhanced.Trim());
                     aiProcessed = true;
                     aiModel = EnhancementService.LastUsedModelDescription;
+                }
+                else if (!string.IsNullOrWhiteSpace(enhanced))
+                {
+                    // small local models occasionally answer/refuse instead of cleaning —
+                    // silently type the raw transcript rather than the model's chatter
+                    Log.Warn("coordinator", $"AI enhancement rejected (refusal/divergence); typing raw. Output was: {enhanced[..Math.Min(120, enhanced.Length)]}");
                 }
             }
             catch (Exception ex)
@@ -415,7 +427,7 @@ public sealed class DictationCoordinator : IDictationControl
                 var model = SpeechModels.Selected();
                 if (!model.IsDownloaded) return;
                 var engine = await EnsureEngineReadyAsync(model, null, CancellationToken.None);
-                var raw = await engine.TranscribeAsync(pcm, CancellationToken.None);
+                var raw = await engine.TranscribeAsync(Dsp.Normalize(pcm), CancellationToken.None);
                 var formatted = Text.TranscriptFormatter.Process(raw, focus?.ProcessName, focus?.WindowTitle);
                 if (string.IsNullOrWhiteSpace(formatted)) return;
                 HistoryStore.AddEntry(new TranscriptionHistoryEntry

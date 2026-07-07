@@ -473,7 +473,7 @@ public sealed class MainWindow : Window
                 pcm = padded;
             }
             _tryoutStatus.Text = "Transcribing…";
-            var text = await engine.TranscribeAsync(pcm, CancellationToken.None);
+            var text = await engine.TranscribeAsync(Dsp.Normalize(pcm), CancellationToken.None);
             var formatted = Text.TranscriptFormatter.Process(text);
             if (string.IsNullOrWhiteSpace(formatted))
             {
@@ -608,7 +608,7 @@ public sealed class MainWindow : Window
                 var pcm = await Task.Run(() => AudioFileLoader.Load16kMono(dlg.FileName));
                 status.Text = $"Transcribing {pcm.Length / 16000.0 / 60:0.0} min of audio… (stays on this PC)";
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                var text = await engine.TranscribeAsync(pcm, CancellationToken.None);
+                var text = await engine.TranscribeAsync(Dsp.Normalize(pcm), CancellationToken.None);
                 status.Text = $"✓ Done in {sw.Elapsed.TotalSeconds:0.0}s";
                 result.Text = Text.TranscriptFormatter.Process(text);
                 result.Visibility = Visibility.Visible;

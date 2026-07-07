@@ -70,7 +70,9 @@ public sealed record SpeechModelInfo(
 public static class SpeechModels
 {
     public const string HuggingFaceBase = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/";
-    public const string DefaultModelId = "whisper-base";
+    // Parakeet is the default: measured 1.4s vs whisper-base ~3s / large-turbo 26s for a
+    // 6.4s clip on Snapdragon X Elite, with higher English accuracy (0.96 vs 0.60).
+    public const string DefaultModelId = "parakeet-tdt-0.6b-v2";
     public const string ParakeetModelId = "parakeet-tdt-0.6b-v2";
 
     // k2-fsa ONNX export of nvidia/parakeet-tdt-0.6b-v2 (int8), offline transducer for final decodes.
@@ -94,8 +96,8 @@ public static class SpeechModels
     public static readonly IReadOnlyList<SpeechModelInfo> All = new List<SpeechModelInfo>
     {
         new(ParakeetModelId, "Parakeet TDT 0.6B v2", "Fastest + Live Streaming",
-            "NVIDIA Parakeet (ONNX int8, sherpa-onnx). Near-instant finals with true live streaming preview.",
-            733_845_295, "parakeet-tdt-0.6b-v2-int8", "English", 0.95, 0.93, "New")
+            "NVIDIA Parakeet (ONNX int8, sherpa-onnx). Near-instant finals with true live streaming preview. The engine behind the mac app's speed — English only.",
+            733_845_295, "parakeet-tdt-0.6b-v2-int8", "English", 0.95, 0.96, "Recommended")
         {
             Engine = SpeechEngineKind.Parakeet,
             Files = ParakeetFiles,

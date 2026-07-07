@@ -10,6 +10,39 @@ public static class EnhancementService
 {
     public static string? LastUsedModelDescription { get; private set; }
 
+    private static readonly string[] RefusalMarkers =
+    {
+        "i can't", "i cannot", "i can not", "i'm sorry", "i am sorry", "i apologize",
+        "as an ai", "i'm unable", "i am unable", "cannot assist", "can't assist",
+        "cannot help with", "can't help with", "i won't", "i will not",
+    };
+
+    /// <summary>
+    /// Sanity gate for enhanced output (small local models sometimes answer or refuse
+    /// instead of cleaning). Rejects refusal-style openings and wild length divergence
+    /// so chatter never gets typed into the user's document.
+    /// </summary>
+    public static bool LooksLikeBadEnhancement(string input, string output)
+    {
+        var trimmed = output.Trim();
+        if (trimmed.Length == 0) return true;
+
+        var head = trimmed.Length > 60 ? trimmed[..60].ToLowerInvariant() : trimmed.ToLowerInvariant();
+        if (RefusalMarkers.Any(head.Contains))
+        {
+            // ...unless the user actually dictated a refusal-ish sentence themselves
+            var inputHead = input.Length > 60 ? input[..60].ToLowerInvariant() : input.ToLowerInvariant();
+            if (!RefusalMarkers.Any(inputHead.Contains)) return true;
+        }
+
+        // length divergence: cleaning shortens a little; it doesn't rewrite 8 words into an essay
+        int inWords = input.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+        int outWords = trimmed.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+        if (inWords >= 5 && (outWords < inWords * 0.25 || outWords > inWords * 3.0)) return true;
+
+        return false;
+    }
+
     /// <summary>Gate: AI runs iff a provider is selected+configured and routing allows this app.</summary>
     public static bool IsConfiguredForDictation(string? appId)
     {
@@ -46,7 +79,9 @@ public static class EnhancementService
             ProviderId = providerId,
             Model = model,
             Messages = messages,
-            Temperature = 0.2,           // dictation temperature (AIProvider.swift)
+            // dictation temperature 0.2 (AIProvider.swift); 0 for the small local models,
+            // which drift into answering/refusing at any temperature above greedy
+            Temperature = providerId == ProviderCatalog.FluidLocalId ? 0.0 : 0.2,
             TimeoutSeconds = 120,        // dictation override (DictationPostProcessingService.swift:129)
         }, ct);
 

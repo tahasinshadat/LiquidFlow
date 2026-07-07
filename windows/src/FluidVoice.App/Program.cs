@@ -39,6 +39,21 @@ public static class Program
             return 0;
         }
 
+        // rev 2 migration: Parakeet became the default engine (18x faster, higher accuracy).
+        // Move whisper users over once it's on disk; they can switch back for non-English.
+        if (Settings.Current.SettingsRevision < 2)
+        {
+            var parakeet = SpeechModels.ById(SpeechModels.ParakeetModelId);
+            if (parakeet is { IsDownloaded: true } &&
+                Settings.Current.SelectedSpeechModel.StartsWith("whisper", StringComparison.OrdinalIgnoreCase))
+            {
+                Log.Info("app", $"Migrating speech model {Settings.Current.SelectedSpeechModel} -> {parakeet.Id}");
+                Settings.Current.SelectedSpeechModel = parakeet.Id;
+            }
+            Settings.Current.SettingsRevision = 2;
+            Settings.Current.Save("migration");
+        }
+
         var app = new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
         Styles.Apply(app);
 
@@ -204,7 +219,7 @@ public static class Program
         }
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var raw = await engine.TranscribeAsync(pcm, CancellationToken.None);
+        var raw = await engine.TranscribeAsync(Audio.Dsp.Normalize(pcm), CancellationToken.None);
         sw.Stop();
         Console.WriteLine($"[selftest] transcribed in {sw.ElapsedMilliseconds}ms");
         Console.WriteLine($"[selftest] RAW: {raw}");

@@ -35,7 +35,7 @@ public static class LocalAiServer
             "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
             "qwen2.5-1.5b-instruct-q4_k_m.gguf", 1_117_320_736),
         new("qwen2.5-0.5b-instruct-q4", "Qwen2.5 0.5B Instruct (light)",
-            "Smallest and fastest; lower quality. Apache-2.0. ~0.4 GB.",
+            "Smallest and fastest, but often misbehaves on dictation cleanup (refusals/odd rewrites are auto-discarded). Prefer 1.5B. ~0.4 GB.",
             "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf",
             "qwen2.5-0.5b-instruct-q4_k_m.gguf", 0),
         new("qwen2.5-3b-instruct-q4", "Qwen2.5 3B Instruct (quality)",
