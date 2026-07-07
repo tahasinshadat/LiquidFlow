@@ -49,10 +49,18 @@ public static class Program
 
         // Command + Rewrite (Edit) modes
         var commandService = new CommandModeService();
-        var mainWindow = new MainWindow(commandService);
+        var mainWindow = new MainWindow(commandService, coordinator);
         var commandWindow = new CommandWindow(commandService);
         var rewriteService = new RewriteModeService();
         var rewriteWindow = new RewriteWindow(rewriteService);
+        WindowFx.Apply(commandWindow);
+        WindowFx.Apply(rewriteWindow);
+        mainWindow.OpenCommandWindow = () => commandWindow.OpenWindow();
+        mainWindow.OpenRewriteWindow = () =>
+        {
+            rewriteService.BeginSession(FocusTracker.Capture());
+            rewriteWindow.OpenForSession();
+        };
 
         // When a Command-mode dictation finishes, drop the transcript into the chat and run it.
         coordinator.CommandModeHandler = async text =>
@@ -98,10 +106,10 @@ public static class Program
         coordinator.WarmUpModelInBackground();
         StartupManager.Apply(Settings.Current.LaunchAtStartup);
 
-        // First run: show the main window; afterwards start in the tray like the mac menu-bar app.
+        // Show the main window on launch (like the mac app); closing hides to tray.
+        mainWindow.Show();
         if (!Settings.Current.OnboardingCompleted)
         {
-            mainWindow.Show();
             Settings.Current.OnboardingCompleted = true;
             Settings.Current.Save();
         }

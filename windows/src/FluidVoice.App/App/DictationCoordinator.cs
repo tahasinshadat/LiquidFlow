@@ -109,6 +109,7 @@ public sealed class DictationCoordinator : IDictationControl
         SoundCues.PlayStart();
         MediaPauseService.PauseIfPlaying();
         _overlay.ShowRecording(mode);
+        if (_focusAtStart is not null) _overlay.SetTargetApp(_focusAtStart.ProcessId);
         RecordingStateChanged?.Invoke(true);
 
         if (Settings.Current.EnableStreamingPreview && _whisper.IsReady)

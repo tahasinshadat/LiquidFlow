@@ -157,6 +157,8 @@ public sealed class Settings
     public bool AutoUpdateCheckEnabled { get; set; } = true;
     public bool BetaReleasesEnabled { get; set; }
     public bool OnboardingCompleted { get; set; }
+    /// <summary>Welcome-page "Setup Tested Successfully" checkmark.</summary>
+    public bool SetupTested { get; set; }
 
     // ------------------------------------------------------------------
 

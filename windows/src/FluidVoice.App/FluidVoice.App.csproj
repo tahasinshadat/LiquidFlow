@@ -22,7 +22,12 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>Assets\fluidvoice.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\fluidvoice.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- keep WPF types unambiguous; WinForms/System.Drawing are used fully-qualified -->

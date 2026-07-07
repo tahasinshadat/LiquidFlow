@@ -29,11 +29,13 @@ public sealed class OverlayWindow : Window
     private readonly Canvas _barsCanvas = new();
     private readonly TextBlock _statusText = new();
     private readonly TextBlock _previewText = new();
+    private readonly Image _appIcon = new() { Width = 16, Height = 16, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
     private readonly Border _root;
     private readonly List<Rectangle> _bars = new();
     private readonly DispatcherTimer _animTimer;
     private readonly Random _rng = new();
 
+    private StackPanel? _topRow;
     private OverlayState _state = OverlayState.Hidden;
     private RecordingMode _mode = RecordingMode.Dictation;
     private float _level;
@@ -68,7 +70,7 @@ public sealed class OverlayWindow : Window
 
         _statusText.Foreground = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255));
         _statusText.FontWeight = FontWeights.Medium;
-        _statusText.HorizontalAlignment = HorizontalAlignment.Center;
+        _statusText.VerticalAlignment = VerticalAlignment.Center;
 
         _previewText.Foreground = new SolidColorBrush(Color.FromArgb(191, 255, 255, 255)); // white@0.75
         _previewText.TextWrapping = TextWrapping.Wrap;
@@ -76,17 +78,28 @@ public sealed class OverlayWindow : Window
         _previewText.FontWeight = FontWeights.Medium;
         _previewText.VerticalAlignment = VerticalAlignment.Bottom;
 
+        // top row: active-app icon + mode label (mac bottom overlay shows the target app)
+        var topRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 0, 0, 2),
+        };
+        topRow.Children.Add(_appIcon);
+        topRow.Children.Add(_statusText);
+
         var stack = new Grid();
         stack.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         stack.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         stack.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        Grid.SetRow(_statusText, 0);
+        Grid.SetRow(topRow, 0);
         Grid.SetRow(_barsCanvas, 1);
         Grid.SetRow(_previewText, 2);
         _barsCanvas.HorizontalAlignment = HorizontalAlignment.Center;
-        stack.Children.Add(_statusText);
+        stack.Children.Add(topRow);
         stack.Children.Add(_barsCanvas);
         stack.Children.Add(_previewText);
+        _topRow = topRow;
 
         _root = new Border
         {
@@ -127,7 +140,8 @@ public sealed class OverlayWindow : Window
             ? new Thickness(12, 8, 12, 8)
             : new Thickness(18, 12, 18, 12);
         _statusText.FontSize = _layout.FontSize + 1;
-        _statusText.Visibility = _layout.ShowStatus ? Visibility.Visible : Visibility.Collapsed;
+        if (_topRow is not null)
+            _topRow.Visibility = _layout.ShowStatus ? Visibility.Visible : Visibility.Collapsed;
         _previewText.FontSize = _layout.FontSize;
         _previewText.Visibility = _layout.ShowPreview ? Visibility.Visible : Visibility.Collapsed;
 
@@ -210,6 +224,26 @@ public sealed class OverlayWindow : Window
     }
 
     public void SetLevel(float level) => _level = level;
+
+    /// <summary>Shows the focused app's icon next to the mode label (like the mac overlay).</summary>
+    public void SetTargetApp(uint processId)
+    {
+        try
+        {
+            using var proc = System.Diagnostics.Process.GetProcessById((int)processId);
+            var path = proc.MainModule?.FileName;
+            if (path is null) { _appIcon.Source = null; return; }
+            using var icon = System.Drawing.Icon.ExtractAssociatedIcon(path);
+            if (icon is null) { _appIcon.Source = null; return; }
+            _appIcon.Source = System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(
+                icon.Handle, Int32Rect.Empty,
+                System.Windows.Media.Imaging.BitmapSizeOptions.FromWidthAndHeight(16, 16));
+        }
+        catch
+        {
+            _appIcon.Source = null; // elevated/system process — just skip the icon
+        }
+    }
 
     public void SetPreviewText(string text)
     {

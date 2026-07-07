@@ -15,13 +15,19 @@ public static class Theme
         _ => SystemUsesDarkMode(),
     };
 
-    public static Color Bg => IsDark ? Color.FromRgb(24, 24, 27) : Color.FromRgb(245, 245, 247);
-    public static Color Card => IsDark ? Color.FromRgb(32, 32, 36) : Color.FromRgb(255, 255, 255);
-    public static Color CardBorder => IsDark ? Color.FromRgb(52, 52, 58) : Color.FromRgb(222, 222, 226);
+    // palette tuned to the mac app's dark look (near-black bg, soft cards, green success)
+    public static Color Bg => IsDark ? Color.FromRgb(23, 24, 27) : Color.FromRgb(245, 245, 247);
+    public static Color Sidebar => IsDark ? Color.FromRgb(30, 31, 35) : Color.FromRgb(236, 236, 240);
+    public static Color SidebarSelected => IsDark ? Color.FromRgb(58, 60, 66) : Color.FromRgb(215, 215, 222);
+    public static Color Card => IsDark ? Color.FromRgb(35, 37, 41) : Color.FromRgb(255, 255, 255);
+    public static Color CardInner => IsDark ? Color.FromRgb(42, 44, 49) : Color.FromRgb(248, 248, 250);
+    public static Color CardBorder => IsDark ? Color.FromRgb(51, 54, 59) : Color.FromRgb(222, 222, 226);
     public static Color Text => IsDark ? Color.FromRgb(240, 240, 244) : Color.FromRgb(24, 24, 27);
-    public static Color SubtleText => IsDark ? Color.FromRgb(160, 160, 168) : Color.FromRgb(110, 110, 118);
-    public static Color Field => IsDark ? Color.FromRgb(39, 39, 42) : Color.FromRgb(250, 250, 252);
+    public static Color SubtleText => IsDark ? Color.FromRgb(155, 160, 166) : Color.FromRgb(110, 110, 118);
+    public static Color Field => IsDark ? Color.FromRgb(44, 46, 51) : Color.FromRgb(250, 250, 252);
+    public static Color Green => Color.FromRgb(48, 209, 88); // macOS systemGreen
     public static Color Accent => (Color)ColorConverter.ConvertFromString(Settings.Current.AccentColor);
+    public static SolidColorBrush GreenBrush => new(Green);
 
     public static SolidColorBrush BgBrush => new(Bg);
     public static SolidColorBrush CardBrush => new(Card);
