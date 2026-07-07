@@ -2,8 +2,10 @@ using System.IO;
 using FluidVoice.App;
 using FluidVoice.Core;
 using FluidVoice.Input;
+using FluidVoice.Modes;
 using FluidVoice.Stt;
 using FluidVoice.Text;
+using FluidVoice.Typing;
 using FluidVoice.Ui;
 
 namespace FluidVoice;
@@ -24,6 +26,8 @@ public static class Program
         }
         if (args.Contains("--selftest-stt"))
             return SelfTestStt(args).GetAwaiter().GetResult();
+        if (args.Contains("--selftest-llm"))
+            return SelfTestLlm(args).GetAwaiter().GetResult();
 
         using var singleInstance = new Mutex(true, @"Local\FluidVoice.SingleInstance", out var isFirst);
         if (!isFirst)
@@ -41,6 +45,29 @@ public static class Program
         var tray = new TrayIcon();
         var hook = new KeyboardHook();
         var hotkeys = new HotkeyManager(hook, coordinator);
+
+        // Command + Rewrite (Edit) modes
+        var commandService = new CommandModeService();
+        var commandWindow = new CommandWindow(commandService);
+        var rewriteService = new RewriteModeService();
+        var rewriteWindow = new RewriteWindow(rewriteService);
+
+        // When a Command-mode dictation finishes, drop the transcript into the chat and run it.
+        coordinator.CommandModeHandler = async text =>
+            await app.Dispatcher.InvokeAsync(async () =>
+            {
+                commandWindow.OpenWindow();
+                await commandService.ProcessUserCommandAsync(text);
+            }).Task.Unwrap();
+
+        // When a Rewrite-mode dictation finishes, its transcript is the instruction.
+        coordinator.RewriteModeHandler = async (text, focus) =>
+            await app.Dispatcher.InvokeAsync(async () =>
+            {
+                rewriteService.BeginSession(focus);
+                rewriteWindow.OpenForSession();
+                await rewriteService.ApplyInstructionAsync(text, CancellationToken.None);
+            }).Task.Unwrap();
 
         Notifications.ShowHandler = (title, body) => tray.ShowBalloon(title, body);
         coordinator.RecordingStateChanged += recording =>
@@ -130,6 +157,62 @@ public static class Program
         var formatted = TranscriptFormatter.Process(raw);
         Console.WriteLine($"[selftest] FORMATTED: {formatted}");
         return string.IsNullOrWhiteSpace(raw) ? 1 : 0;
+    }
+
+    /// <summary>
+    /// Exercises LlmClient against a local OpenAI-compatible endpoint (the mock server):
+    /// registers a custom provider at 127.0.0.1:8899, runs non-streaming, streaming, and
+    /// a tool-call round, and prints the results.
+    /// </summary>
+    private static async Task<int> SelfTestLlm(string[] args)
+    {
+        var idx = Array.IndexOf(args, "--selftest-llm");
+        var baseUrl = args.Length > idx + 1 && !args[idx + 1].StartsWith("--") ? args[idx + 1] : "http://127.0.0.1:8899/v1";
+
+        var provider = new Core.CustomProvider { Id = "mock", Name = "Mock", BaseUrl = baseUrl };
+        Settings.Current.CustomProviders.Add(provider);
+        Settings.Current.SelectedProviderID = "mock";
+        Settings.Current.SelectedModelByProvider["mock"] = "mock-gpt";
+
+        Console.WriteLine("[llm] models: " + string.Join(", ", await Ai.LlmClient.ListModelsAsync("mock", CancellationToken.None)));
+
+        var messages = new List<Ai.LlmMessage>
+        {
+            new("system", Ai.PromptStore.CombineBasePrompt(PromptMode.Dictate, Ai.PromptStore.DictateDefaultBody)),
+            new("user", "hello world this is a test of fluid voice dictation it works great"),
+        };
+
+        var nonStream = await Ai.LlmClient.CallAsync(new Ai.LlmRequest
+        {
+            ProviderId = "mock", Model = "mock-gpt", Messages = messages, Temperature = 0.2, Stream = false,
+        }, CancellationToken.None);
+        Console.WriteLine($"[llm] non-stream content: {nonStream.Content}");
+
+        var streamed = new System.Text.StringBuilder();
+        var stream = await Ai.LlmClient.CallAsync(new Ai.LlmRequest
+        {
+            ProviderId = "mock", Model = "mock-gpt", Messages = messages, Temperature = 0.2, Stream = true,
+            OnContentDelta = s => streamed.Append(s),
+        }, CancellationToken.None);
+        Console.WriteLine($"[llm] streamed deltas: {streamed}");
+        Console.WriteLine($"[llm] streamed final:  {stream.Content}");
+
+        var toolResp = await Ai.LlmClient.CallAsync(new Ai.LlmRequest
+        {
+            ProviderId = "mock", Model = "mock-gpt",
+            Messages = new List<Ai.LlmMessage> { new("system", CommandModeService.SystemPrompt), new("user", "what time is it") },
+            Temperature = 0.1, Stream = false,
+            Tools = new List<Ai.LlmTool>
+            {
+                new("execute_terminal_command", "Run a PowerShell command",
+                    System.Text.Json.Nodes.JsonNode.Parse("""{"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}""")!.AsObject()),
+            },
+        }, CancellationToken.None);
+        Console.WriteLine($"[llm] tool calls: {toolResp.ToolCalls.Count} → {(toolResp.ToolCalls.Count > 0 ? toolResp.ToolCalls[0].Name + " " + toolResp.ToolCalls[0].ArgumentsJson : "none")}");
+
+        var ok = !string.IsNullOrWhiteSpace(nonStream.Content) && streamed.Length > 0 && toolResp.ToolCalls.Count > 0;
+        Console.WriteLine($"[llm] RESULT: {(ok ? "PASS" : "FAIL")}");
+        return ok ? 0 : 1;
     }
 
     private static float[] LoadWavAs16kMono(string path)
