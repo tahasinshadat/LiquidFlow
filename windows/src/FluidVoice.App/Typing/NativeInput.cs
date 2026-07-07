@@ -5,13 +5,17 @@ namespace FluidVoice.Typing;
 /// <summary>SendInput helpers: Unicode text injection and virtual-key combos.</summary>
 public static class NativeInput
 {
-    public const int UnicodeChunkSize = 200; // UTF-16 units, parity with TypingService.swift:461
+    // Small batches with a short delay: modern apps (Windows 11 Notepad, WinUI/RichEdit,
+    // some Electron) drop or garble characters when a large KEYEVENTF_UNICODE burst is
+    // posted all at once. 8 units + ~4ms per batch types ~2000 cps yet stays reliable.
+    public const int UnicodeChunkSize = 8;
+    public const int DefaultInterChunkDelayMs = 4;
 
     /// <summary>
     /// Types text via KEYEVENTF_UNICODE in surrogate-safe chunks. Newlines are sent as
     /// VK_RETURN and tabs as VK_TAB so editors treat them as real keys.
     /// </summary>
-    public static bool SendUnicodeText(string text, int interChunkDelayMs = 0)
+    public static bool SendUnicodeText(string text, int interChunkDelayMs = DefaultInterChunkDelayMs)
     {
         foreach (var run in SplitRuns(text))
         {

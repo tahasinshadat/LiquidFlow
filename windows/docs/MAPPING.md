@@ -6,7 +6,7 @@ File references point into the Swift sources (the spec) and the C# port.
 | Capability | macOS (Swift) | Windows (this port) | Where |
 | --- | --- | --- | --- |
 | **Global hotkey** | CGEvent tap (`GlobalHotkeyManager.swift`) | `WH_KEYBOARD_LL` + `WH_MOUSE_LL` low‑level hooks on a dedicated message‑loop thread | `Input/KeyboardHook.cs`, `Input/HotkeyManager.cs` |
-| **Type into any app (Smart Typing)** | AX API / CGEvent unicode / clipboard paste (`TypingService.swift`) | `SendInput` `KEYEVENTF_UNICODE` (200‑unit surrogate‑safe chunks) → clipboard `Ctrl+V` → char‑by‑char | `Typing/NativeInput.cs`, `Typing/TypingService.cs` |
+| **Type into any app (Smart Typing)** | AX API / CGEvent unicode / clipboard paste (`TypingService.swift`) | clipboard `Ctrl+V` (default, snapshot/restore) → `SendInput` `KEYEVENTF_UNICODE` (surrogate‑safe chunks + micro‑delay) → char‑by‑char. Clipboard is the default because modern apps drop bulk unicode bursts. | `Typing/NativeInput.cs`, `Typing/TypingService.cs` |
 | **Read selection (Write/Edit)** | AX `kAXSelectedText` / `Cmd+C` (`TextSelectionService.swift`) | UI Automation `TextPattern.GetSelection()` → `Ctrl+C` with clipboard save/restore | `Typing/SelectionReader.cs` |
 | **Clipboard save/restore** | `NSPasteboard` snapshot (`ClipboardService.swift`) | Win32 clipboard, all‑format snapshot, restore after 5 s unless changed externally | `Typing/ClipboardService.cs` |
 | **Foreground app + focus restore** | `NSWorkspace` + AX raise (`ActiveAppMonitor.swift`) | `GetForegroundWindow` + `AttachThreadInput` + `SetForegroundWindow` (40 ms + 3×50 ms retries) | `Typing/FocusTracker.cs` |

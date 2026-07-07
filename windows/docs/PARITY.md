@@ -12,7 +12,7 @@ replacement with equivalent behavior) · **⛔ Not possible on Windows ARM** (wi
 | Mouse‑button shortcuts | ✅ Matched | Middle / X1 / X2, with modifiers. |
 | Cancel recording (Esc) | ✅ Matched | Stops without transcribing. |
 | Paste last transcription | ✅ Matched | Opt‑in shortcut. |
-| Smart Typing into any focused app | ✅ Matched | SendInput unicode → clipboard paste → char‑by‑char fallback. |
+| Smart Typing into any focused app | ✅ Matched | **Default is clipboard paste** (Ctrl+V, clipboard snapshot/restored after 5 s): reliable and instant into every app tested. "Clipboard‑free" SendInput‑unicode is offered as an option but modern Windows apps (Win11 Notepad, WinUI/RichEdit) drop bulk unicode bursts, so it isn't the default. mac defaults to clipboard‑free because CGEvent unicode is reliable on macOS — same *reliability* goal, different mechanism. |
 | Live transcription overlay | ✅ Matched | Pill / Small / Medium / Large; mode‑colored waveform; live text. Notch variants **dropped** (mac‑only hardware). |
 | Start/stop sounds | 🔄 Substituted | Synthesized chirps (mac ships proprietary m4a chimes; not bundled). |
 | Media pause/resume while dictating | ✅ Matched | WinRT system media session. |

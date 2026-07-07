@@ -84,7 +84,11 @@ public sealed class Settings
     public string? PreferredInputDeviceId { get; set; }
 
     // ----- Typing -----
-    public TextInsertionMode TextInsertionMode { get; set; } = TextInsertionMode.Standard;
+    // Windows default is clipboard paste: SendInput-unicode bursts are dropped/garbled by
+    // modern apps (Win11 Notepad, WinUI/RichEdit, some Electron), whereas Ctrl+V is instant
+    // and reliable everywhere. "Clipboard-free" remains selectable for apps that need it.
+    // (mac defaults to .standard because CGEvent unicode is reliable there — see PARITY.md.)
+    public TextInsertionMode TextInsertionMode { get; set; } = TextInsertionMode.ReliablePaste;
     public bool CopyTranscriptionToClipboard { get; set; }
 
     // ----- Formatting pipeline (defaults verified true in SettingsStore.swift:3571,3579) -----

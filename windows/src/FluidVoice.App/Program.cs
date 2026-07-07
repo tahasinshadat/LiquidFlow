@@ -28,6 +28,8 @@ public static class Program
             return SelfTestStt(args).GetAwaiter().GetResult();
         if (args.Contains("--selftest-llm"))
             return SelfTestLlm(args).GetAwaiter().GetResult();
+        if (args.Contains("--selftest-type"))
+            return SelfTestType(args);
 
         using var singleInstance = new Mutex(true, @"Local\FluidVoice.SingleInstance", out var isFirst);
         if (!isFirst)
@@ -240,6 +242,26 @@ public static class Program
 
         var ok = !string.IsNullOrWhiteSpace(nonStream.Content) && streamed.Length > 0 && toolResp.ToolCalls.Count > 0;
         Console.WriteLine($"[llm] RESULT: {(ok ? "PASS" : "FAIL")}");
+        return ok ? 0 : 1;
+    }
+
+    /// <summary>
+    /// Types a fixed string after a countdown so you can focus a target window and see exactly
+    /// what SendInput produces. --selftest-type [seconds] [text]
+    /// </summary>
+    private static int SelfTestType(string[] args)
+    {
+        var idx = Array.IndexOf(args, "--selftest-type");
+        int seconds = args.Length > idx + 1 && int.TryParse(args[idx + 1], out var s) ? s : 4;
+        if (args.Contains("--direct")) Settings.Current.TextInsertionMode = TextInsertionMode.Standard;
+        var text = "Hello World, this is a test of fluid voice dictation. It works great!";
+        Console.WriteLine($"[type] focus your target window; typing in {seconds}s…");
+        Thread.Sleep(seconds * 1000);
+        var target = FocusTracker.Capture();
+        Console.WriteLine($"[type] target: {target?.ProcessName} — '{target?.WindowTitle}'");
+        var ok = TypingService.TypeTextInstantly(text, target);
+        Console.WriteLine($"[type] TypeTextInstantly returned {ok}; typed {text.Length} chars");
+        Thread.Sleep(500);
         return ok ? 0 : 1;
     }
 

@@ -19,8 +19,8 @@ $dist = Join-Path $root "windows\dist"
 New-Item -ItemType Directory -Force $dist | Out-Null
 
 # locate dotnet + ISCC
-$dotnet = (Get-Command dotnet -ErrorAction SilentlyContinue)?.Source
-if (-not $dotnet) { $dotnet = Join-Path $env:USERPROFILE "dotnet\dotnet.exe" }
+$dotnetCmd = Get-Command dotnet -ErrorAction SilentlyContinue
+$dotnet = if ($dotnetCmd) { $dotnetCmd.Source } else { Join-Path $env:USERPROFILE "dotnet\dotnet.exe" }
 $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") |
         Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $iscc) { throw "ISCC.exe (Inno Setup) not found. Install from https://jrsoftware.org/isdl.php" }
