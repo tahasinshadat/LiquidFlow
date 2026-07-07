@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -30,7 +30,7 @@ public sealed class RewriteWindow : Window
         var root = new StackPanel { Margin = new Thickness(18) };
         root.Children.Add(new TextBlock
         {
-            Text = "✏️  Edit Mode", FontSize = 18, FontWeight = FontWeights.SemiBold,
+            Text = "Edit Mode", FontSize = 18, FontWeight = FontWeights.SemiBold,
             Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 12),
         });
 
@@ -115,7 +115,7 @@ public sealed class RewriteWindow : Window
     private void Refresh()
     {
         _originalBlock.Text = _service.IsWriteMode
-            ? "✍️  Write mode — no text selected. Describe what to write."
+            ? "Write mode — no text selected. Describe what to write."
             : $"Selected:\n{_service.OriginalText}";
         var hasResult = _service.RewrittenText.Length > 0;
         _resultBlock.Text = _service.RewrittenText;

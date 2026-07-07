@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
@@ -400,6 +400,8 @@ public sealed class MainWindow : Window
 
     private UIElement BuildHomeHero(SpeechModelInfo model, bool setupDone)
     {
+        // brand-teal hero: deep charcoal sweeping into the app's teal, with a soft glow —
+        // reads on-brand in both themes (the old gold/brown gradient clashed with everything)
         var hero = new Grid { Height = 190, ClipToBounds = true };
         hero.Children.Add(new Border
         {
@@ -407,29 +409,28 @@ public sealed class MainWindow : Window
             Background = new LinearGradientBrush(
                 new GradientStopCollection
                 {
-                    new(Color.FromRgb(10, 10, 10), 0),
-                    new(Color.FromRgb(37, 27, 24), 0.43),
-                    new(Color.FromRgb(144, 96, 51), 1),
+                    new(Color.FromRgb(14, 18, 19), 0),
+                    new(Color.FromRgb(16, 42, 43), 0.55),
+                    new(Color.FromRgb(24, 94, 91), 1),
                 },
-                new Point(0, 0.5),
-                new Point(1, 0.5)),
+                new Point(0, 0.3),
+                new Point(1, 0.9)),
         });
         hero.Children.Add(new Border
         {
-            Width = 260,
+            Width = 320,
             Height = 190,
             HorizontalAlignment = HorizontalAlignment.Right,
             CornerRadius = new CornerRadius(18),
-            Opacity = 0.66,
-            Background = new LinearGradientBrush(
-                new GradientStopCollection
-                {
-                    new(Color.FromRgb(227, 183, 112), 0),
-                    new(Color.FromRgb(83, 56, 42), 0.58),
-                    new(Color.FromRgb(17, 17, 18), 1),
-                },
-                new Point(0, 0),
-                new Point(1, 1)),
+            Opacity = 0.5,
+            Background = new RadialGradientBrush(
+                Color.FromArgb(150, 74, 214, 196), Color.FromArgb(0, 74, 214, 196))
+            {
+                Center = new Point(0.75, 0.35),
+                GradientOrigin = new Point(0.75, 0.35),
+                RadiusX = 0.7,
+                RadiusY = 0.9,
+            },
         });
 
         var content = new StackPanel
@@ -462,7 +463,7 @@ public sealed class MainWindow : Window
             Margin = new Thickness(0, 0, 0, 18),
         });
         var cta = Theme.SecondaryButton(setupDone ? "Open dictionary" : "Finish setup");
-        cta.Click += (_, _) => Navigate(setupDone ? "Dictionary" : "AI Settings");
+        cta.Click += (_, _) => Navigate(setupDone ? "Dictionary" : "Models");
         content.Children.Add(cta);
         hero.Children.Add(content);
 
@@ -780,7 +781,7 @@ public sealed class MainWindow : Window
         setup.Children.Add(SetupRow(
             "Voice Model Ready", "Speech recognition model is loaded and ready",
             model.IsDownloaded,
-            model.IsDownloaded ? null : ("Download", () => Navigate("AI Settings"))));
+            model.IsDownloaded ? null : ("Download", () => Navigate("Models"))));
 
         bool micOk = AudioRecorder.ListInputDevices().Count > 0;
         setup.Children.Add(SetupRow(
@@ -797,7 +798,7 @@ public sealed class MainWindow : Window
         setup.Children.Add(SetupRow(
             "AI Enhancement Configured", aiOk ? "AI-powered text enhancement is ready to use" : "Optional — cloud provider or local AI",
             aiOk,
-            aiOk ? null : ("Configure", () => Navigate("AI Settings"))));
+            aiOk ? null : ("Configure", () => Navigate("Models"))));
 
         setup.Children.Add(SetupRow(
             "Setup Tested Successfully", "You've successfully tested voice transcription",
@@ -834,7 +835,7 @@ public sealed class MainWindow : Window
         {
             _tryoutStatus.Text = "Preparing model…";
             var engine = await _coordinator.EnsureEngineReadyAsync(model, null, CancellationToken.None);
-            _tryoutStatus.Text = "🎙 Listening for 5 seconds — say something!";
+            _tryoutStatus.Text = "Listening for 5 seconds — say something…";
             var recorder = new AudioRecorder();
             recorder.Start(Settings.Current.PreferredInputDeviceId);
             await Task.Delay(5000);
@@ -1247,8 +1248,8 @@ public sealed class MainWindow : Window
         Grid.SetColumn(check, 0);
         grid.Children.Add(check);
 
-        var textCol = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        textCol.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 13.5, Foreground = new SolidColorBrush(Theme.Text) });
+        var textCol = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        textCol.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 13.5, Foreground = new SolidColorBrush(Theme.Text), TextWrapping = TextWrapping.Wrap });
         textCol.Children.Add(new TextBlock { Text = subtitle, FontSize = 11.5, Foreground = new SolidColorBrush(Theme.SubtleText), TextWrapping = TextWrapping.Wrap });
         Grid.SetColumn(textCol, 1);
         grid.Children.Add(textCol);

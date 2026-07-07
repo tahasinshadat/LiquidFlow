@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -31,22 +31,12 @@ public sealed class SettingsModal : Window
 
         _sections = new List<SettingsSection>
         {
-            new("îœ“", "General", () => new GeneralTab()),
-            new("î¥…", "Speech Models", () => new SpeechModelsTab()),
-            new("îœœ", "AI Enhancement", () => new AiTab()),
-            new("î¶", "Formatting", () => new FormattingTab()),
-            new("î»", "Account", () => new AccountSettingsTab()),
+            new(((char)0xE713).ToString(), "General", () => new GeneralTab()),
+            new(((char)0xE720).ToString(), "Speech Models", () => new SpeechModelsTab()),
+            new(((char)0xE945).ToString(), "AI Enhancement", () => new AiTab()),
+            new(((char)0xE790).ToString(), "Formatting", () => new FormattingTab()),
+            new(((char)0xE77B).ToString(), "Account", () => new AccountSettingsTab()),
         };
-
-        _sections.Clear();
-        _sections.AddRange(new[]
-        {
-            new SettingsSection("G", "General", () => new GeneralTab()),
-            new SettingsSection("M", "Speech Models", () => new SpeechModelsTab()),
-            new SettingsSection("AI", "AI Enhancement", () => new AiTab()),
-            new SettingsSection("F", "Formatting", () => new FormattingTab()),
-            new SettingsSection("A", "Account", () => new AccountSettingsTab()),
-        });
 
         var shell = new Border
         {
@@ -79,7 +69,12 @@ public sealed class SettingsModal : Window
 
         var close = new Button
         {
-            Content = "X",
+            Content = new TextBlock
+            {
+                Text = ((char)0xE8BB).ToString(), // MDL2 ChromeClose
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 11,
+            },
             Width = 34,
             Height = 34,
             Padding = new Thickness(0),
@@ -100,7 +95,24 @@ public sealed class SettingsModal : Window
         {
             if (e.Key == Key.Escape) Close();
         };
+
+        // Live theme/font swap: recolor the chrome + rebuild the open section so the
+        // modal never shows mixed light/dark surfaces.
+        FontFamily = Theme.UiFont;
+        Action<string> onSettingsChanged = hint => Dispatcher.BeginInvoke(() =>
+        {
+            if (hint is not ("theme" or "font")) return;
+            FontFamily = Theme.UiFont;
+            shell.Background = Theme.SurfaceBrush;
+            shell.BorderBrush = new SolidColorBrush(Theme.CardBorder);
+            if (sidebar is Panel sp) sp.Background = new SolidColorBrush(Theme.Card);
+            Select(_currentSection);
+        });
+        Settings.Changed += onSettingsChanged;
+        Closed += (_, _) => Settings.Changed -= onSettingsChanged;
     }
+
+    private string _currentSection = "General";
 
     private UIElement BuildSidebar()
     {
@@ -145,8 +157,8 @@ public sealed class SettingsModal : Window
         row.Children.Add(new TextBlock
         {
             Text = section.Glyph,
-            FontSize = 16,
-            FontWeight = FontWeights.SemiBold,
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+            FontSize = 15,
             Foreground = Theme.TextBrush,
             Width = 28,
             VerticalAlignment = VerticalAlignment.Center,
@@ -176,6 +188,7 @@ public sealed class SettingsModal : Window
     private void Select(string title)
     {
         var section = _sections.FirstOrDefault(s => s.Title == title) ?? _sections[0];
+        _currentSection = section.Title;
         foreach (var (name, item) in _items)
             item.Background = name == section.Title ? new SolidColorBrush(Theme.SidebarSelected) : Brushes.Transparent;
 

@@ -8,8 +8,8 @@ namespace FluidVoice.Ui;
 
 /// <summary>
 /// System tray icon + menu (MenuBarManager.swift / MenuBarIconGenerator.swift):
-/// an "F" glyph, tinted red while recording; menu with status line, Open,
-/// Settings, Custom Dictionary, Microphone device submenu, Check for Updates, Quit.
+/// the app icon, with a red recording badge while dictating; menu with status line,
+/// Open, Settings, Custom Dictionary, Microphone submenu, Check for Updates, Quit.
 /// </summary>
 public sealed class TrayIcon : IDisposable
 {
@@ -27,8 +27,8 @@ public sealed class TrayIcon : IDisposable
 
     public TrayIcon()
     {
-        _idleIcon = CreateFIcon(Color.White);
-        _recordingIcon = CreateFIcon(Color.FromArgb(255, 89, 89));
+        _idleIcon = CreateTrayIcon(recording: false);
+        _recordingIcon = CreateTrayIcon(recording: true);
 
         var menu = new ContextMenuStrip();
         _statusItem = new ToolStripMenuItem("Ready to Record") { Enabled = false };
@@ -103,23 +103,40 @@ public sealed class TrayIcon : IDisposable
             _micMenu.DropDownItems.Add(new ToolStripMenuItem("No microphones found") { Enabled = false });
     }
 
-    /// <summary>Draws the "F" glyph icon at runtime (like MenuBarIconGenerator.swift).</summary>
-    private static Icon CreateFIcon(Color color)
+    /// <summary>App icon in the tray; a red dot badge overlays it while recording.</summary>
+    private static Icon CreateTrayIcon(bool recording)
     {
         using var bmp = new Bitmap(32, 32);
         using (var g = Graphics.FromImage(bmp))
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             g.Clear(Color.Transparent);
-            using var font = new Font("Segoe UI", 20, System.Drawing.FontStyle.Bold, GraphicsUnit.Pixel);
-            using var brush = new SolidBrush(color);
-            using var shadow = new SolidBrush(Color.FromArgb(90, 0, 0, 0));
-            var size = g.MeasureString("F", font);
-            var x = (32 - size.Width) / 2;
-            var y = (32 - size.Height) / 2;
-            g.DrawString("F", font, shadow, x + 1, y + 1);
-            g.DrawString("F", font, brush, x, y);
+
+            Icon? app = null;
+            try { app = Icon.ExtractAssociatedIcon(Environment.ProcessPath ?? ""); }
+            catch { }
+            if (app is not null)
+            {
+                using var sized = new Icon(app, 32, 32);
+                g.DrawIcon(sized, new Rectangle(0, 0, 32, 32));
+                app.Dispose();
+            }
+            else
+            {
+                // dev fallback (dotnet run host exe has no icon): teal disc + waveform dot
+                using var bg = new SolidBrush(Color.FromArgb(255, 34, 148, 138));
+                g.FillEllipse(bg, 2, 2, 28, 28);
+            }
+
+            if (recording)
+            {
+                // bottom-right recording badge with a dark ring so it reads on any taskbar
+                using var ring = new SolidBrush(Color.FromArgb(230, 20, 20, 22));
+                using var dot = new SolidBrush(Color.FromArgb(255, 236, 84, 84));
+                g.FillEllipse(ring, 17, 17, 15, 15);
+                g.FillEllipse(dot, 19, 19, 11, 11);
+            }
         }
         var handle = bmp.GetHicon();
         return Icon.FromHandle(handle);
