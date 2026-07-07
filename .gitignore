@@ -1,4 +1,4 @@
-# Xcode
+﻿# Xcode
 #
 # gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
 
@@ -223,3 +223,12 @@ sample/
 .codex
 AGENTS.md
 builds/
+
+
+# --- Windows port: re-include everything under windows/ (upstream rules *.app and docs/ would swallow it) ---
+!windows/
+!windows/**
+# build artifacts stay ignored (these must come after the re-includes)
+windows/**/bin/
+windows/**/obj/
+windows/**/*.user
