@@ -76,8 +76,7 @@ public static class Program
         tray.OpenRequested += () => app.Dispatcher.BeginInvoke(() => ShowMain(mainWindow, "Home"));
         tray.SettingsRequested += () => app.Dispatcher.BeginInvoke(() => ShowMain(mainWindow, "General"));
         tray.DictionaryRequested += () => app.Dispatcher.BeginInvoke(() => ShowMain(mainWindow, "Dictionary"));
-        tray.CheckUpdatesRequested += () => app.Dispatcher.BeginInvoke(() =>
-            Notifications.Show("Updates", "Update checking arrives with the installer build."));
+        tray.CheckUpdatesRequested += () => _ = CheckForUpdatesAsync(interactive: true);
         tray.QuitRequested += () => app.Dispatcher.BeginInvoke(() =>
         {
             tray.Dispose();
@@ -95,14 +94,42 @@ public static class Program
 
         hook.Start();
         coordinator.WarmUpModelInBackground();
+        StartupManager.Apply(Settings.Current.LaunchAtStartup);
 
         // First run: show the main window; afterwards start in the tray like the mac menu-bar app.
         if (!Settings.Current.OnboardingCompleted)
+        {
             mainWindow.Show();
+            Settings.Current.OnboardingCompleted = true;
+            Settings.Current.Save();
+        }
+
+        if (Settings.Current.AutoUpdateCheckEnabled)
+            _ = CheckForUpdatesAsync(interactive: false);
 
         Log.Info("app", $"FluidVoice started (hotkey: {Settings.Current.PrimaryDictationShortcuts.FirstOrDefault()?.DisplayString})");
         app.Run();
         return 0;
+    }
+
+    private static async Task CheckForUpdatesAsync(bool interactive)
+    {
+        try
+        {
+            var update = await App.Updater.CheckAsync(CancellationToken.None);
+            if (update is null)
+            {
+                if (interactive) Notifications.Show("FluidVoice", "You're on the latest version.");
+                return;
+            }
+            Notifications.Show("Update available",
+                $"FluidVoice {update.Version} is available. Opening download…");
+            await App.Updater.DownloadAndRunAsync(update, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("app", $"Update check failed: {ex.Message}");
+        }
     }
 
     private static void ShowMain(MainWindow window, string? tab = null)

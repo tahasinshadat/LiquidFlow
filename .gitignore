@@ -232,3 +232,5 @@ builds/
 windows/**/bin/
 windows/**/obj/
 windows/**/*.user
+windows/publish/
+windows/dist/

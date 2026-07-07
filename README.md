@@ -19,6 +19,14 @@ Open source voice-to-text dictation app for macOS with on-device AI enhancement.
 > [!NOTE]
 > FluidVoice is on macOS today. **iOS and Windows are on the way** — join the waitlist to get notified when we launch: **[altic.dev/fluid/waitlist](https://www.altic.dev/fluid/waitlist)**
 
+> [!TIP]
+> **Windows port (this fork):** a native **Windows on ARM (ARM64)** reimplementation lives in
+> [`windows/`](windows/) — C#/.NET 9 + WPF, whisper.cpp for on‑device STT, and an open local‑LLM
+> substitute for Fluid Intelligence. Same core loop, overlay, Write/Command modes, history, and
+> prompt logic. See [`windows/README.md`](windows/README.md),
+> [`windows/docs/PARITY.md`](windows/docs/PARITY.md), and
+> [`windows/docs/MAPPING.md`](windows/docs/MAPPING.md).
+
 
 > [!IMPORTANT]
 > This project is free and open source under GPLv3. If FluidVoice is useful to you, please star the repository — it helps visibility and keeps development going.
