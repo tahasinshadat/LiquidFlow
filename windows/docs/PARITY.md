@@ -23,11 +23,11 @@ replacement with equivalent behavior) · **⛔ Not possible on Windows ARM** (wi
 | --- | --- | --- |
 | Whisper Tiny/Base/Small/Medium/Large(+Turbo) | ✅ Matched | whisper.cpp ARM64‑native; 99 languages; on‑demand download w/ byte‑exact validation, 3× retry, HTML‑page rejection. Parity baseline. |
 | Model picker w/ size/speed/accuracy + language | ✅ Matched | Speech Models tab. |
-| Parakeet TDT v2/v3, Parakeet Flash | ⛔ Not possible | Ships as Apple‑Silicon CoreML; no Windows‑ARM runtime. ONNX/NeMo path is possible future work (documented, not implemented). |
+| Parakeet TDT v2/v3, Parakeet Flash | 🔄 Substituted | mac ships Apple‑Silicon CoreML; the port runs the k2‑fsa **ONNX export of `nvidia/parakeet-tdt-0.6b-v2` (int8) on sherpa‑onnx** (win‑arm64‑native NuGet runtime). English, punctuation+casing, near‑instant finals. v3/Flash have no maintained ONNX export yet. Encoder runs on CPU; ONNX Runtime QNN (Hexagon NPU offload) is possible future work — sherpa's bundled ORT is CPU‑only. |
 | Nemotron Speech 3.5 (streaming/offline) | ⛔ Not possible | Apple‑Silicon CoreML only. |
 | Cohere Transcribe | ⛔ Not possible | Apple‑Silicon CoreML only. |
 | Apple Speech / Apple Speech Analyzer | ⛔ Not possible | Apple OS speech APIs; no Windows equivalent shipped. Windows has its own on‑device SR, but it is not wired in — Whisper covers the languages. |
-| Live partial transcription | 🔄 Substituted | Whisper is batch; the port simulates live partials by periodically re‑decoding the buffer tail (the mac streaming providers do true streaming). |
+| Live partial transcription | 🔄 Substituted | **Parakeet: true streaming** — a companion streaming transducer (k2 zipformer int8, bundled in the Parakeet download) runs under sherpa‑onnx's online recognizer; new mic samples are fed incrementally so preview latency is constant (~0.2 s) regardless of recording length, and the Parakeet final decode replaces the preview at stop (parakeet‑tdt itself is offline‑only in sherpa‑onnx — true streaming TDT is an open upstream request). Whisper: batch — live partials are simulated by periodically re‑decoding the buffer tail. |
 
 ## AI enhancement
 
@@ -77,7 +77,8 @@ replacement with equivalent behavior) · **⛔ Not possible on Windows ARM** (wi
 The **entire core loop and behavior** — hotkey, capture, on‑device STT, the full formatting
 pipeline, smart typing, overlay, AI enhancement (cloud + local substitute), Write and Command modes,
 history, stats, per‑app config, tray, theming, updater, installer — is **matched or substituted with
-a working open/native equivalent**. The only **⛔ not‑possible** items are the Apple‑Silicon‑only
-CoreML speech models (Parakeet / Nemotron / Cohere / Apple Speech) and the closed Fluid Intelligence
-runtime; Whisper is the documented parity baseline for STT and Fluid Local AI is the open substitute
-for enhancement.
+a working open/native equivalent**. That now includes **Parakeet**, the mac app's flagship engine,
+substituted with the ONNX export on sherpa‑onnx including true streaming live partials. The only
+**⛔ not‑possible** items left are the remaining Apple‑Silicon‑only CoreML models (Nemotron / Cohere /
+Apple Speech) and the closed Fluid Intelligence runtime; Whisper is the documented parity baseline
+for multilingual STT and Fluid Local AI is the open substitute for enhancement.

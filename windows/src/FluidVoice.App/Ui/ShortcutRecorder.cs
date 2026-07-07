@@ -31,6 +31,14 @@ public sealed class ShortcutRecorder : Button
 
     public HotkeyShortcut Shortcut => _shortcut;
 
+    /// <summary>Programmatic update (preset buttons).</summary>
+    public void SetShortcut(HotkeyShortcut shortcut)
+    {
+        _shortcut = shortcut;
+        _recording = false;
+        UpdateLabel();
+    }
+
     private void BeginRecording()
     {
         _recording = true;

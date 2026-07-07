@@ -13,10 +13,13 @@ public static class WindowFx
     public static BitmapFrame AppIcon =>
         _icon ??= BitmapFrame.Create(new Uri("pack://application:,,,/Assets/fluidvoice.ico"));
 
-    /// <summary>Sets the window icon and switches the title bar to dark mode.</summary>
+    /// <summary>Sets the window icon, modern font, and switches the title bar to dark mode.</summary>
     public static void Apply(Window window)
     {
         try { window.Icon = AppIcon; } catch { }
+        window.FontFamily = new System.Windows.Media.FontFamily("Segoe UI Variable Text, Segoe UI");
+        System.Windows.Media.TextOptions.SetTextFormattingMode(window, System.Windows.Media.TextFormattingMode.Ideal);
+        window.UseLayoutRounding = true;
         window.SourceInitialized += (_, _) =>
         {
             try

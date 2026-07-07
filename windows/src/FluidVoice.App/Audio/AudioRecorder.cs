@@ -224,6 +224,20 @@ public sealed class AudioRecorder : IDisposable
         lock (_sync) return _buffer.ToArray();
     }
 
+    /// <summary>Thread-safe copy of samples from <paramref name="start"/> to the end — lets the
+    /// true-streaming partial loop feed only the samples it hasn't seen yet.</summary>
+    public float[] SnapshotFrom(int start)
+    {
+        lock (_sync)
+        {
+            if (start >= _buffer.Count) return Array.Empty<float>();
+            var count = _buffer.Count - start;
+            var result = new float[count];
+            _buffer.CopyTo(start, result, 0, count);
+            return result;
+        }
+    }
+
     private void OnData(object? sender, WaveInEventArgs e)
     {
         if (!_recording || e.BytesRecorded == 0) return;

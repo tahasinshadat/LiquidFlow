@@ -22,11 +22,11 @@ public sealed class SpeechModelsTab : StackPanel
     {
         Children.Clear();
         Children.Add(Theme.Heading("Speech models"));
-        Children.Add(Theme.Caption("Whisper models run fully on-device (whisper.cpp, ARM64-native). Larger = more accurate but slower. 99 languages."));
+        Children.Add(Theme.Caption("All models run fully on-device, ARM64-native. Parakeet (NVIDIA, via sherpa-onnx) is English-only with true live streaming; Whisper (whisper.cpp) covers 99 languages. Larger = more accurate but slower."));
 
         // language selector
         var langPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12) };
-        langPanel.Children.Add(new TextBlock { Text = "Language: ", Foreground = Theme.TextBrush, VerticalAlignment = VerticalAlignment.Center });
+        langPanel.Children.Add(new TextBlock { Text = "Language (Whisper): ", Foreground = Theme.TextBrush, VerticalAlignment = VerticalAlignment.Center });
         var langCombo = new ComboBox { Width = 160 };
         var langs = new (string Code, string Name)[]
         {
@@ -98,7 +98,12 @@ public sealed class SpeechModelsTab : StackPanel
             var delBtn = new Button { Content = "Delete", Padding = new Thickness(12, 5, 12, 5) };
             delBtn.Click += (_, _) =>
             {
-                try { File.Delete(model.LocalPath); } catch { }
+                try
+                {
+                    if (Directory.Exists(model.LocalPath)) Directory.Delete(model.LocalPath, recursive: true);
+                    else File.Delete(model.LocalPath);
+                }
+                catch { }
                 Build();
             };
             buttons.Children.Add(delBtn);
@@ -144,7 +149,7 @@ public sealed class SpeechModelsTab : StackPanel
         });
         try
         {
-            await ModelDownloader.DownloadAsync(SpeechModels.DownloadUrl(model), model.LocalPath, model.ExpectedBytes, progress, _downloadCts.Token);
+            await ModelDownloader.DownloadModelAsync(model, progress, _downloadCts.Token);
             Settings.Current.SelectedSpeechModel = model.Id;
             Settings.Current.Save("model");
             Build();

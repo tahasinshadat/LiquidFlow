@@ -35,7 +35,7 @@ public sealed class OverlayWindow : Window
     private readonly DispatcherTimer _animTimer;
     private readonly Random _rng = new();
 
-    private StackPanel? _topRow;
+    private Grid? _topRow;
     private OverlayState _state = OverlayState.Hidden;
     private RecordingMode _mode = RecordingMode.Dictation;
     private float _level;
@@ -68,38 +68,46 @@ public sealed class OverlayWindow : Window
         Focusable = false;
         Opacity = 0;
 
-        _statusText.Foreground = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255));
+        _statusText.Foreground = new SolidColorBrush(Color.FromArgb(150, 255, 255, 255)); // gray mode label
         _statusText.FontWeight = FontWeights.Medium;
         _statusText.VerticalAlignment = VerticalAlignment.Center;
 
-        _previewText.Foreground = new SolidColorBrush(Color.FromArgb(191, 255, 255, 255)); // white@0.75
+        _previewText.Foreground = Brushes.White;
         _previewText.TextWrapping = TextWrapping.Wrap;
         _previewText.TextTrimming = TextTrimming.None;
-        _previewText.FontWeight = FontWeights.Medium;
-        _previewText.VerticalAlignment = VerticalAlignment.Bottom;
+        _previewText.FontWeight = FontWeights.SemiBold;
+        _previewText.VerticalAlignment = VerticalAlignment.Top;
+        _previewText.HorizontalAlignment = HorizontalAlignment.Left;
+        _previewText.FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI");
 
-        // top row: active-app icon + mode label (mac bottom overlay shows the target app)
-        var topRow = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(0, 0, 0, 2),
-        };
-        topRow.Children.Add(_appIcon);
-        topRow.Children.Add(_statusText);
-
+        // Layout matching the mac overlay: live text fills the top; bottom bar is
+        // [target-app icon]  [waveform, centered]  [mode label, right, gray].
         var stack = new Grid();
-        stack.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        stack.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         stack.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        Grid.SetRow(topRow, 0);
-        Grid.SetRow(_barsCanvas, 1);
-        Grid.SetRow(_previewText, 2);
-        _barsCanvas.HorizontalAlignment = HorizontalAlignment.Center;
-        stack.Children.Add(topRow);
-        stack.Children.Add(_barsCanvas);
+        stack.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        Grid.SetRow(_previewText, 0);
         stack.Children.Add(_previewText);
-        _topRow = topRow;
+
+        var bottomBar = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        bottomBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        bottomBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        bottomBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        _appIcon.HorizontalAlignment = HorizontalAlignment.Left;
+        _appIcon.Margin = new Thickness(2, 0, 0, 0);
+        Grid.SetColumn(_appIcon, 0);
+        bottomBar.Children.Add(_appIcon);
+        _barsCanvas.HorizontalAlignment = HorizontalAlignment.Center;
+        _barsCanvas.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(_barsCanvas, 1);
+        bottomBar.Children.Add(_barsCanvas);
+        _statusText.HorizontalAlignment = HorizontalAlignment.Right;
+        _statusText.Margin = new Thickness(0, 0, 2, 0);
+        Grid.SetColumn(_statusText, 2);
+        bottomBar.Children.Add(_statusText);
+        Grid.SetRow(bottomBar, 1);
+        stack.Children.Add(bottomBar);
+        _topRow = bottomBar;
 
         _root = new Border
         {
@@ -139,11 +147,12 @@ public sealed class OverlayWindow : Window
         _root.Padding = Settings.Current.OverlaySize == Core.OverlaySize.Pill
             ? new Thickness(12, 8, 12, 8)
             : new Thickness(18, 12, 18, 12);
-        _statusText.FontSize = _layout.FontSize + 1;
+        _statusText.FontSize = _layout.FontSize;
         if (_topRow is not null)
             _topRow.Visibility = _layout.ShowStatus ? Visibility.Visible : Visibility.Collapsed;
-        _previewText.FontSize = _layout.FontSize;
+        _previewText.FontSize = _layout.FontSize + 2.5;
         _previewText.Visibility = _layout.ShowPreview ? Visibility.Visible : Visibility.Collapsed;
+        _appIcon.Width = _appIcon.Height = Settings.Current.OverlaySize == Core.OverlaySize.Large ? 22 : 18;
 
         _barsCanvas.Children.Clear();
         _bars.Clear();
@@ -267,9 +276,9 @@ public sealed class OverlayWindow : Window
             : _mode switch
             {
                 RecordingMode.Command => "Command",
-                RecordingMode.Rewrite => "Edit",
+                RecordingMode.Rewrite => "Rewrite",
                 RecordingMode.PromptMode => "Prompt",
-                _ => "Dictation",
+                _ => "Dictate",
             };
     }
 

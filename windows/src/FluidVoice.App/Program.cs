@@ -40,6 +40,7 @@ public static class Program
         }
 
         var app = new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
+        Styles.Apply(app);
 
         var overlay = new OverlayWindow();
         var coordinator = new DictationCoordinator(app.Dispatcher, overlay);
@@ -117,6 +118,18 @@ public static class Program
         if (Settings.Current.AutoUpdateCheckEnabled)
             _ = CheckForUpdatesAsync(interactive: false);
 
+        // Dev seam: show the overlay with sample content for visual checks (no recording, no typing).
+        if (Environment.GetEnvironmentVariable("FLUIDVOICE_OVERLAY_PREVIEW") == "1")
+        {
+            overlay.ShowRecording(Input.RecordingMode.Dictation);
+            overlay.SetTargetApp((uint)Environment.ProcessId);
+            overlay.SetPreviewText("Hi Joe, comma, new line. Can we meet at 8 a.m. tomorrow?");
+            var rng = new Random();
+            var t = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(66) };
+            t.Tick += (_, _) => overlay.SetLevel(0.35f + (float)rng.NextDouble() * 0.5f);
+            t.Start();
+        }
+
         Log.Info("app", $"FluidVoice started (hotkey: {Settings.Current.PrimaryDictationShortcuts.FirstOrDefault()?.DisplayString})");
         app.Run();
         return 0;
@@ -167,15 +180,17 @@ public static class Program
         }
 
         var model = SpeechModels.ById(modelId) ?? SpeechModels.ById(SpeechModels.DefaultModelId)!;
-        Console.WriteLine($"[selftest] model: {model.Id} ({(model.IsDownloaded ? "cached" : "will download " + model.SizeDisplay)})");
+        Console.WriteLine($"[selftest] model: {model.Id} · engine: {model.Engine} ({(model.IsDownloaded ? "cached" : "will download " + model.SizeDisplay)})");
 
-        using var whisper = new Stt.WhisperEngine();
+        using ISpeechEngine engine = model.Engine == SpeechEngineKind.Parakeet
+            ? new Stt.ParakeetEngine()
+            : new Stt.WhisperEngine();
         var progress = new Progress<ModelPreparationProgress>(p =>
         {
             if (p.Phase == ModelPreparationPhase.Downloading)
                 Console.Write($"\r[selftest] downloading {(int)(p.Fraction * 100)}%   ");
         });
-        await whisper.PrepareAsync(model, progress, CancellationToken.None);
+        await engine.PrepareAsync(model, progress, CancellationToken.None);
         Console.WriteLine("\n[selftest] model loaded");
 
         var pcm = LoadWavAs16kMono(wavPath);
@@ -188,12 +203,39 @@ public static class Program
         }
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var raw = await whisper.TranscribeAsync(pcm, CancellationToken.None);
+        var raw = await engine.TranscribeAsync(pcm, CancellationToken.None);
         sw.Stop();
         Console.WriteLine($"[selftest] transcribed in {sw.ElapsedMilliseconds}ms");
         Console.WriteLine($"[selftest] RAW: {raw}");
         var formatted = TranscriptFormatter.Process(raw);
         Console.WriteLine($"[selftest] FORMATTED: {formatted}");
+
+        // exercise the true-streaming path the overlay uses while recording (parakeet only)
+        using (var session = engine.TryBeginStreamingSession())
+        {
+            if (session is not null)
+            {
+                Console.WriteLine("[selftest] streaming partials (200ms chunks):");
+                sw.Restart();
+                var last = "";
+                const int chunk = 3200; // 200ms @ 16k
+                for (int offset = 0; offset < pcm.Length; offset += chunk)
+                {
+                    var take = Math.Min(chunk, pcm.Length - offset);
+                    var slice = new float[take];
+                    Array.Copy(pcm, offset, slice, 0, take);
+                    var partial = session.Feed(slice);
+                    if (partial != last && partial.Length > 0)
+                    {
+                        Console.WriteLine($"[selftest]   {offset / 16000.0,5:0.0}s → {partial}");
+                        last = partial;
+                    }
+                }
+                sw.Stop();
+                Console.WriteLine($"[selftest] streaming pass: {sw.ElapsedMilliseconds}ms for {pcm.Length / 16000.0:0.0}s of audio (must be ≪ realtime)");
+                Console.WriteLine($"[selftest] STREAM FINAL: {last}");
+            }
+        }
         return string.IsNullOrWhiteSpace(raw) ? 1 : 0;
     }
 

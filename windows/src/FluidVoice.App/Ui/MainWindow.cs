@@ -239,7 +239,7 @@ public sealed class MainWindow : Window
         try
         {
             _tryoutStatus.Text = "Preparing model…";
-            await _coordinator.Whisper.PrepareAsync(model, null, CancellationToken.None);
+            var engine = await _coordinator.EnsureEngineReadyAsync(model, null, CancellationToken.None);
             _tryoutStatus.Text = "🎙 Listening for 5 seconds — say something!";
             var recorder = new AudioRecorder();
             recorder.Start(Settings.Current.PreferredInputDeviceId);
@@ -253,7 +253,7 @@ public sealed class MainWindow : Window
                 pcm = padded;
             }
             _tryoutStatus.Text = "Transcribing…";
-            var text = await _coordinator.Whisper.TranscribeAsync(pcm, CancellationToken.None);
+            var text = await engine.TranscribeAsync(pcm, CancellationToken.None);
             var formatted = Text.TranscriptFormatter.Process(text);
             if (string.IsNullOrWhiteSpace(formatted))
             {
@@ -384,12 +384,12 @@ public sealed class MainWindow : Window
                 var model = SpeechModels.Selected();
                 if (!model.IsDownloaded) { status.Text = "Download a speech model first (AI Settings)."; return; }
                 status.Text = "Loading model…";
-                await _coordinator.Whisper.PrepareAsync(model, null, CancellationToken.None);
+                var engine = await _coordinator.EnsureEngineReadyAsync(model, null, CancellationToken.None);
                 status.Text = "Reading audio…";
                 var pcm = await Task.Run(() => AudioFileLoader.Load16kMono(dlg.FileName));
                 status.Text = $"Transcribing {pcm.Length / 16000.0 / 60:0.0} min of audio… (stays on this PC)";
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                var text = await _coordinator.Whisper.TranscribeAsync(pcm, CancellationToken.None);
+                var text = await engine.TranscribeAsync(pcm, CancellationToken.None);
                 status.Text = $"✓ Done in {sw.Elapsed.TotalSeconds:0.0}s";
                 result.Text = Text.TranscriptFormatter.Process(text);
                 result.Visibility = Visibility.Visible;

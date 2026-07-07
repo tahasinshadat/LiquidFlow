@@ -13,6 +13,7 @@ public static class AppPaths
     public static string ChatHistoryFile => Path.Combine(DataDir, "command-chats.json");
     public static string LogDir => Path.Combine(DataDir, "Logs");
     public static string WhisperModelDir => Path.Combine(DataDir, "Models", "Whisper");
+    public static string SherpaModelDir => Path.Combine(DataDir, "Models", "Sherpa");
     public static string LocalAiDir => Path.Combine(DataDir, "LocalAI");
     public static string LocalAiModelDir => Path.Combine(LocalAiDir, "Models");
     public static string LocalAiRuntimeDir => Path.Combine(LocalAiDir, "Runtime");

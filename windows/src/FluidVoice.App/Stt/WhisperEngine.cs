@@ -9,7 +9,7 @@ namespace FluidVoice.Stt;
 /// 16kHz mono float input, min 1s audio (padding handled by caller), batch decode.
 /// Also powers the live-preview loop (full-prefix re-decode, like the mac streaming path).
 /// </summary>
-public sealed class WhisperEngine : IDisposable
+public sealed class WhisperEngine : ISpeechEngine
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private WhisperFactory? _factory;
@@ -32,7 +32,7 @@ public sealed class WhisperEngine : IDisposable
 
         if (!model.IsDownloaded)
         {
-            await ModelDownloader.DownloadAsync(SpeechModels.DownloadUrl(model), model.LocalPath, model.ExpectedBytes, progress, ct);
+            await ModelDownloader.DownloadModelAsync(model, progress, ct);
         }
 
         progress?.Report(new(ModelPreparationPhase.Loading, 0));
@@ -107,6 +107,9 @@ public sealed class WhisperEngine : IDisposable
             _gate.Release();
         }
     }
+
+    /// <summary>Whisper is batch-only: no true streaming — callers use the re-decode partial loop.</summary>
+    public IStreamingPartialSession? TryBeginStreamingSession() => null;
 
     public void Unload()
     {

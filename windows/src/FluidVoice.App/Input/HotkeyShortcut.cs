@@ -51,10 +51,19 @@ public sealed class HotkeyShortcut : IEquatable<HotkeyShortcut>
     public static HotkeyShortcut AltR() => new() { VirtualKey = 0x52, Modifiers = ModMask.Alt };
     public static HotkeyShortcut Escape() => new() { VirtualKey = 0x1B };
 
+    /// <summary>The dedicated Copilot key on newer laptops sends Win+Shift+F23. Binding it here
+    /// makes the low-level hook swallow the chord, so Windows Copilot no longer opens.</summary>
+    public static HotkeyShortcut CopilotKey() => new() { VirtualKey = 0x86, Modifiers = ModMask.Win | ModMask.Shift };
+
+    [JsonIgnore]
+    public bool IsCopilotKey => Kind == ShortcutKind.Keyboard && VirtualKey == 0x86 &&
+                                Modifiers == (ModMask.Win | ModMask.Shift);
+
     public string DisplayString
     {
         get
         {
+            if (IsCopilotKey) return "Copilot key";
             if (Kind == ShortcutKind.Mouse)
             {
                 var btn = MouseButton switch { 2 => "Middle Click", 3 => "Mouse X1", 4 => "Mouse X2", _ => $"Mouse {MouseButton}" };

@@ -21,7 +21,27 @@ public sealed class GeneralTab : StackPanel
         var dictationRec = new ShortcutRecorder(s.PrimaryDictationShortcuts.FirstOrDefault() ?? HotkeyShortcut.RightAlt());
         dictationRec.ShortcutChanged += sc => { s.PrimaryDictationShortcuts = new List<HotkeyShortcut> { sc }; s.Save("hotkey"); };
         hk.Children.Add(dictationRec);
-        hk.Children.Add(Theme.Caption("Press your hotkey anywhere to start/stop dictation. Default: Right Alt."));
+        hk.Children.Add(Theme.Caption("Press your hotkey anywhere to start/stop dictation. Click the box to record a custom key, or use a preset:"));
+
+        // one-click presets — Copilot key first (Win+Shift+F23; intercepted so Windows Copilot won't open)
+        var presets = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
+        void AddPreset(string label, Func<HotkeyShortcut> make)
+        {
+            var chip = new Button { Content = label, Padding = new Thickness(11, 5, 11, 5), Margin = new Thickness(0, 0, 8, 0), FontSize = 12 };
+            chip.Click += (_, _) =>
+            {
+                var sc = make();
+                s.PrimaryDictationShortcuts = new List<HotkeyShortcut> { sc };
+                s.Save("hotkey");
+                dictationRec.SetShortcut(sc);
+            };
+            presets.Children.Add(chip);
+        }
+        AddPreset("🚀 Copilot key", HotkeyShortcut.CopilotKey);
+        AddPreset("Right Alt", HotkeyShortcut.RightAlt);
+        AddPreset("Right Ctrl", HotkeyShortcut.RightCtrl);
+        hk.Children.Add(presets);
+        hk.Children.Add(Theme.Caption("Copilot key: while FluidVoice is running, the key is captured before Windows sees it — it starts dictation instead of opening Copilot. Quit FluidVoice and it goes back to normal."));
 
         hk.Children.Add(Theme.Label("Activation mode"));
         var modeCombo = new ComboBox { Width = 220, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 6) };

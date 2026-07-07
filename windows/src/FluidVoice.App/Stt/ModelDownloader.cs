@@ -25,6 +25,44 @@ public static class ModelDownloader
         Http.DefaultRequestHeaders.UserAgent.ParseAdd("FluidVoice-Windows/1.6");
     }
 
+    /// <summary>
+    /// Download whatever the model needs: the single GGML file for Whisper, or every
+    /// ModelFile (skipping ones already valid) with aggregate progress for sherpa models.
+    /// </summary>
+    public static async Task DownloadModelAsync(
+        SpeechModelInfo model, IProgress<ModelPreparationProgress>? progress, CancellationToken ct)
+    {
+        if (model.Files is not { Count: > 0 } files)
+        {
+            await DownloadAsync(SpeechModels.DownloadUrl(model), model.LocalPath, model.ExpectedBytes, progress, ct);
+            return;
+        }
+
+        long totalBytes = files.Sum(f => f.Bytes);
+        long doneBytes = 0;
+        foreach (var file in files)
+        {
+            var destination = Path.Combine(model.LocalPath, file.RelativePath);
+            if (File.Exists(destination) && new FileInfo(destination).Length == file.Bytes)
+            {
+                doneBytes += file.Bytes;
+                continue;
+            }
+            var baseBytes = doneBytes;
+            var filePart = new Progress<ModelPreparationProgress>(p =>
+            {
+                if (p.Phase == ModelPreparationPhase.Downloading)
+                    progress?.Report(new(ModelPreparationPhase.Downloading,
+                        Math.Min(0.999, (baseBytes + p.Fraction * file.Bytes) / totalBytes)));
+                else if (p.Phase == ModelPreparationPhase.Failed)
+                    progress?.Report(p);
+            });
+            await DownloadAsync(file.Url, destination, file.Bytes, filePart, ct);
+            doneBytes += file.Bytes;
+        }
+        progress?.Report(new(ModelPreparationPhase.Downloading, 1.0));
+    }
+
     public static async Task DownloadAsync(
         string url, string destinationPath, long expectedBytes,
         IProgress<ModelPreparationProgress>? progress, CancellationToken ct)
