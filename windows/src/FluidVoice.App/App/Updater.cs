@@ -74,9 +74,12 @@ public static class Updater
             await using (var file = File.Create(tmp))
                 await resp.CopyToAsync(file, ct);
 
+            // Silent in-place update: the installer detects the existing install, closes the
+            // running app, replaces files in the same folder, and relaunches it (see FluidVoice.iss).
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = tmp,
+                Arguments = "/SILENT /NORESTART /SUPPRESSMSGBOXES",
                 UseShellExecute = true,
             });
             return true;
