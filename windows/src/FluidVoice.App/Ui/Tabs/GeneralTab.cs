@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using FluidVoice.App;
 using FluidVoice.Core;
 using FluidVoice.Input;
@@ -102,6 +103,23 @@ public sealed class GeneralTab : StackPanel
             if (Enum.TryParse<ThemePreference>((string)themeCombo.SelectedItem, out var t)) { s.Theme = t; s.Save("theme"); }
         };
         ap.Children.Add(themeCombo);
+
+        ap.Children.Add(Theme.Label("Font"));
+        var fontCombo = new ComboBox { Width = 220, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 2) };
+        foreach (var (name, stack) in FontChoice.Options)
+            fontCombo.Items.Add(new ComboBoxItem { Content = name, Tag = name, FontFamily = new FontFamily(stack) });
+        var fontIdx = Array.FindIndex(FontChoice.Options, o => o.Name.Equals(s.AppFont, StringComparison.OrdinalIgnoreCase));
+        fontCombo.SelectedIndex = fontIdx >= 0 ? fontIdx : 0;
+        fontCombo.SelectionChanged += (_, _) =>
+        {
+            if (fontCombo.SelectedItem is ComboBoxItem it && it.Tag is string name)
+            {
+                s.AppFont = name;
+                s.Save("font");
+            }
+        };
+        ap.Children.Add(fontCombo);
+        ap.Children.Add(Theme.Caption("Changes the font across the whole app instantly."));
         Children.Add(Theme.Card2(ap));
 
         // --- Behavior ---

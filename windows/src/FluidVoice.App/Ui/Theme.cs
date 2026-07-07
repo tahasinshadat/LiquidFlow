@@ -15,39 +15,41 @@ public static class Theme
         _ => SystemUsesDarkMode(),
     };
 
-    // Wispr Flow-style palette: warm canvas, white sheet, charcoal ink,
-    // muted teal analytics, and one purple accent for voice/profile progress.
-    public static Color Bg => IsDark ? Color.FromRgb(23, 24, 27) : Color.FromRgb(244, 242, 237);
-    public static Color Surface => IsDark ? Color.FromRgb(29, 30, 34) : Color.FromRgb(255, 255, 255);
-    public static Color Sidebar => IsDark ? Color.FromRgb(23, 24, 27) : Color.FromRgb(244, 242, 237);
-    public static Color SidebarSelected => IsDark ? Color.FromRgb(58, 60, 66) : Color.FromRgb(235, 232, 224);
-    public static Color Card => IsDark ? Color.FromRgb(35, 37, 41) : Color.FromRgb(248, 247, 244);
-    public static Color CardInner => IsDark ? Color.FromRgb(42, 44, 49) : Color.FromRgb(255, 255, 255);
-    public static Color CardBorder => IsDark ? Color.FromRgb(51, 54, 59) : Color.FromRgb(231, 227, 218);
-    public static Color Text => IsDark ? Color.FromRgb(240, 240, 244) : Color.FromRgb(31, 31, 29);
-    public static Color SubtleText => IsDark ? Color.FromRgb(155, 160, 166) : Color.FromRgb(113, 110, 104);
-    public static Color Field => IsDark ? Color.FromRgb(44, 46, 51) : Color.FromRgb(255, 255, 255);
-    public static Color Ink => IsDark ? Color.FromRgb(235, 235, 238) : Color.FromRgb(24, 24, 23);
-    public static Color InkText => IsDark ? Color.FromRgb(23, 24, 27) : Color.FromRgb(255, 255, 255);
-    public static Color Hairline => IsDark ? Color.FromRgb(48, 50, 55) : Color.FromRgb(235, 231, 222);
-    public static Color Green => Color.FromRgb(31, 112, 105);
-    public static Color GreenSoft => IsDark ? Color.FromRgb(37, 64, 61) : Color.FromRgb(219, 239, 235);
-    public static Color Teal2 => Color.FromRgb(67, 160, 149);
-    public static Color Purple => Color.FromRgb(124, 55, 177);
-    public static Color Warning => Color.FromRgb(159, 112, 43);
-    public static Color Danger => Color.FromRgb(184, 67, 67);
-    public static Color Accent => IsDark
-        ? (Color)ColorConverter.ConvertFromString(Settings.Current.AccentColor)
-        : Color.FromRgb(31, 122, 106);
+    // Light: warm cream canvas + white sheet (Wispr Flow).
+    // Dark: layered near-black with clear elevation steps (canvas < sheet < card < field)
+    // and a faint cool tint so surfaces read as "designed", not flat gray.
+    public static Color Bg => IsDark ? Color.FromRgb(17, 18, 21) : Color.FromRgb(244, 242, 237);
+    public static Color Surface => IsDark ? Color.FromRgb(26, 27, 32) : Color.FromRgb(255, 255, 255);
+    public static Color Sidebar => IsDark ? Color.FromRgb(17, 18, 21) : Color.FromRgb(244, 242, 237);
+    public static Color SidebarSelected => IsDark ? Color.FromRgb(45, 47, 54) : Color.FromRgb(235, 232, 224);
+    public static Color Card => IsDark ? Color.FromRgb(32, 34, 39) : Color.FromRgb(248, 247, 244);
+    public static Color CardInner => IsDark ? Color.FromRgb(38, 40, 46) : Color.FromRgb(255, 255, 255);
+    public static Color CardBorder => IsDark ? Color.FromRgb(46, 48, 55) : Color.FromRgb(231, 227, 218);
+    public static Color Text => IsDark ? Color.FromRgb(236, 237, 241) : Color.FromRgb(31, 31, 29);
+    public static Color SubtleText => IsDark ? Color.FromRgb(146, 149, 158) : Color.FromRgb(113, 110, 104);
+    public static Color Field => IsDark ? Color.FromRgb(38, 40, 46) : Color.FromRgb(255, 255, 255);
+    public static Color Ink => IsDark ? Color.FromRgb(236, 237, 241) : Color.FromRgb(24, 24, 23);
+    public static Color InkText => IsDark ? Color.FromRgb(20, 21, 24) : Color.FromRgb(255, 255, 255);
+    public static Color Hairline => IsDark ? Color.FromRgb(42, 44, 51) : Color.FromRgb(235, 231, 222);
+    public static Color Green => IsDark ? Color.FromRgb(58, 178, 162) : Color.FromRgb(31, 112, 105);
+    public static Color GreenSoft => IsDark ? Color.FromRgb(30, 58, 55) : Color.FromRgb(219, 239, 235);
+    public static Color Teal2 => IsDark ? Color.FromRgb(80, 184, 170) : Color.FromRgb(67, 160, 149);
+    public static Color Purple => IsDark ? Color.FromRgb(167, 116, 214) : Color.FromRgb(124, 55, 177);
+    public static Color Warning => IsDark ? Color.FromRgb(206, 158, 88) : Color.FromRgb(159, 112, 43);
+    public static Color Danger => IsDark ? Color.FromRgb(224, 108, 108) : Color.FromRgb(184, 67, 67);
+    public static Color Accent => IsDark ? Color.FromRgb(58, 178, 162) : Color.FromRgb(31, 122, 106);
     public static SolidColorBrush GreenBrush => new(Green);
     public static SolidColorBrush GreenSoftBrush => new(GreenSoft);
     public static SolidColorBrush SurfaceBrush => new(Surface);
     public static SolidColorBrush InkBrush => new(Ink);
     public static SolidColorBrush HairlineBrush => new(Hairline);
 
-    /// <summary>Serif family for the big stat numbers (Wispr uses a serif there).</summary>
+    /// <summary>Serif family for the big stat numbers / display headings.</summary>
     public static FontFamily StatSerif { get; } = new("Georgia, 'Times New Roman', serif");
     public static FontFamily DisplaySerif { get; } = new("Georgia, 'Times New Roman', serif");
+
+    /// <summary>The user-selectable UI font (Preferences → Appearance). Applied window-wide.</summary>
+    public static FontFamily UiFont => new(FontChoice.Resolve(Settings.Current.AppFont));
 
     public static SolidColorBrush BgBrush => new(Bg);
     public static SolidColorBrush CardBrush => new(Card);

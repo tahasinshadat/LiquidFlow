@@ -35,10 +35,13 @@ public static class EnhancementService
             if (!RefusalMarkers.Any(inputHead.Contains)) return true;
         }
 
-        // length divergence: cleaning shortens a little; it doesn't rewrite 8 words into an essay
+        // Length divergence. Formatting only strips disfluencies + retracted words, so the
+        // output should stay close to the input length. Catch summarizing (too short) and
+        // hallucinated expansion (too long) → fall back to the raw transcript.
         int inWords = input.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
         int outWords = trimmed.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
-        if (inWords >= 5 && (outWords < inWords * 0.25 || outWords > inWords * 3.0)) return true;
+        if (inWords >= 8 && outWords < inWords * 0.6) return true;   // summarized/condensed
+        if (inWords >= 5 && outWords > inWords * 2.0) return true;    // expanded/answered
 
         return false;
     }

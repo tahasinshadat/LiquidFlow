@@ -155,10 +155,13 @@ public sealed class Settings
     public int SettingsRevision { get; set; }
     public ThemePreference Theme { get; set; } = ThemePreference.Light; // Wispr-style light-first
     public string AccentColor { get; set; } = "#3AC8C6"; // Cyan default (mac AccentColorOption)
+    /// <summary>UI font display name (see Ui/FontChoice). "System" = Segoe UI Variable.</summary>
+    public string AppFont { get; set; } = "System";
     public bool LaunchAtStartup { get; set; } = true; // always-on dictation app
     public bool AutoUpdateCheckEnabled { get; set; } = true;
     public bool BetaReleasesEnabled { get; set; }
     public bool OnboardingCompleted { get; set; }
+    public string DisplayName { get; set; } = "";
     /// <summary>Welcome-page "Setup Tested Successfully" checkmark.</summary>
     public bool SetupTested { get; set; }
 

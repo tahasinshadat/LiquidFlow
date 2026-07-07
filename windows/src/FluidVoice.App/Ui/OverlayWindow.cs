@@ -31,6 +31,8 @@ public sealed class OverlayWindow : Window
     private readonly TextBlock _previewText = new();
     private readonly Image _appIcon = new() { Width = 16, Height = 16, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
     private readonly Border _root;
+    private readonly Grid _shell;
+    private const double ShadowPad = 20; // transparent room around the pill so its shadow isn't clipped
     private readonly List<Rectangle> _bars = new();
     private readonly DispatcherTimer _animTimer;
     private readonly Random _rng = new();
@@ -78,7 +80,7 @@ public sealed class OverlayWindow : Window
 
         _previewText.Foreground = Brushes.White;
         _previewText.TextWrapping = TextWrapping.Wrap;
-        _previewText.TextTrimming = TextTrimming.None;
+        _previewText.TextTrimming = TextTrimming.CharacterEllipsis; // degrade gracefully, never clip mid-line
         _previewText.FontWeight = FontWeights.SemiBold;
         _previewText.VerticalAlignment = VerticalAlignment.Top;
         _previewText.HorizontalAlignment = HorizontalAlignment.Left;
@@ -138,17 +140,24 @@ public sealed class OverlayWindow : Window
 
         _root = new Border
         {
-            Background = new SolidColorBrush(Color.FromRgb(0, 0, 0)),
+            // translucent charcoal — the desktop shows through faintly, white text stays legible
+            Background = new SolidColorBrush(Color.FromArgb(212, 24, 25, 30)),
             BorderBrush = new LinearGradientBrush(
-                Color.FromArgb(38, 255, 255, 255), Color.FromArgb(20, 255, 255, 255), 90),
+                Color.FromArgb(46, 255, 255, 255), Color.FromArgb(20, 255, 255, 255), 90),
             BorderThickness = new Thickness(1),
             Child = stack,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
         };
         _root.Effect = new System.Windows.Media.Effects.DropShadowEffect
         {
-            BlurRadius = 10, ShadowDepth = 4, Direction = 270, Opacity = 0.32, Color = Colors.Black,
+            BlurRadius = 22, ShadowDepth = 5, Direction = 270, Opacity = 0.36, Color = Colors.Black,
         };
-        Content = _root;
+        // The window is larger than the pill by ShadowPad on every side so the drop shadow
+        // isn't clipped at the window edge (positioning compensates for the pad).
+        _shell = new Grid { Margin = new Thickness(ShadowPad) };
+        _shell.Children.Add(_root);
+        Content = _shell;
 
         _animTimer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(33) }; // 30fps
         _animTimer.Tick += (_, _) => AnimateTick();
@@ -168,8 +177,10 @@ public sealed class OverlayWindow : Window
     private void ApplyLayout()
     {
         _layout = LayoutFor(Settings.Current.OverlaySize);
-        Width = _layout.W;
-        Height = _layout.H;
+        _root.Width = _layout.W;
+        _root.Height = _layout.H;
+        Width = _layout.W + 2 * ShadowPad;   // window includes transparent shadow room
+        Height = _layout.H + 2 * ShadowPad;
         _root.CornerRadius = new CornerRadius(_layout.Corner);
         _root.Padding = Settings.Current.OverlaySize == Core.OverlaySize.Pill
             ? new Thickness(10, 6, 10, 6)
@@ -380,9 +391,11 @@ public sealed class OverlayWindow : Window
 
         double offset = Math.Clamp(Settings.Current.OverlayBottomOffset, 10, 1000);
         double left = (wa.Left + (wa.Width - Width * dpiX) / 2) / dpiX;
+        // the visible pill is inset by ShadowPad inside the window, so shift by ShadowPad
+        // to keep the offset measured from the pill edge, not the transparent window edge
         double top = Settings.Current.OverlayPosition == OverlayPosition.Top
-            ? (wa.Top + offset * dpiY) / dpiY
-            : (wa.Bottom - Height * dpiY - offset * dpiY) / dpiY;
+            ? (wa.Top + offset * dpiY) / dpiY - ShadowPad
+            : (wa.Bottom - Height * dpiY - offset * dpiY) / dpiY + ShadowPad;
         Left = left;
         Top = top;
     }

@@ -12,31 +12,48 @@ function New-IconPng([int]$size) {
     $g.SmoothingMode = "AntiAlias"
     $g.Clear([System.Drawing.Color]::Transparent)
 
-    # rounded-rect background with vertical gradient
-    $r = [int]($size * 0.22)
-    $rect = New-Object System.Drawing.Rectangle(0, 0, $size, $size)
+    $g.InterpolationMode = "HighQualityBicubic"
+    $g.PixelOffsetMode = "HighQuality"
+    $inset = [double]($size * 0.06)  # small breathing room so the squircle isn't edge-to-edge
+    $sz = $size - 2 * $inset
+
+    # squircle background (large-radius rounded rect) with a diagonal teal gradient
+    $r = [double]($sz * 0.30)
+    $rect = New-Object System.Drawing.RectangleF($inset, $inset, $sz, $sz)
     $path = New-Object System.Drawing.Drawing2D.GraphicsPath
     $d = $r * 2
-    $path.AddArc(0, 0, $d, $d, 180, 90)
-    $path.AddArc($size - $d, 0, $d, $d, 270, 90)
-    $path.AddArc($size - $d, $size - $d, $d, $d, 0, 90)
-    $path.AddArc(0, $size - $d, $d, $d, 90, 90)
+    $path.AddArc($inset, $inset, $d, $d, 180, 90)
+    $path.AddArc($inset + $sz - $d, $inset, $d, $d, 270, 90)
+    $path.AddArc($inset + $sz - $d, $inset + $sz - $d, $d, $d, 0, 90)
+    $path.AddArc($inset, $inset + $sz - $d, $d, $d, 90, 90)
     $path.CloseFigure()
-    $c1 = [System.Drawing.Color]::FromArgb(255, 58, 208, 206)   # cyan #3AD0CE
-    $c2 = [System.Drawing.Color]::FromArgb(255, 37, 99, 235)    # blue #2563EB
-    $brush = New-Object System.Drawing.Drawing2D.LinearGradientBrush($rect, $c1, $c2, 90.0)
+    $c1 = [System.Drawing.Color]::FromArgb(255, 74, 214, 196)   # bright teal (top-left)
+    $c2 = [System.Drawing.Color]::FromArgb(255, 22, 120, 122)   # deep teal (bottom-right)
+    $grect = New-Object System.Drawing.RectangleF(($inset - 1), ($inset - 1), ($sz + 2), ($sz + 2))
+    $brush = New-Object System.Drawing.Drawing2D.LinearGradientBrush($grect, $c1, $c2, 55.0)
     $g.FillPath($brush, $path)
 
-    # white waveform bars (heights as fraction of size)
-    $heights = @(0.28, 0.46, 0.62, 0.46, 0.28)
-    $barW = [Math]::Max(1.0, $size * 0.085)
-    $gap = $size * 0.075
-    $totalW = $heights.Count * $barW + ($heights.Count - 1) * $gap
+    # soft top highlight for a subtle glassy sheen
+    $g.SetClip($path)
+    $hlRect = New-Object System.Drawing.RectangleF($inset, $inset, $sz, ($sz * 0.55))
+    $hl1 = [System.Drawing.Color]::FromArgb(46, 255, 255, 255)
+    $hl2 = [System.Drawing.Color]::FromArgb(0, 255, 255, 255)
+    $hlBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush($hlRect, $hl1, $hl2, 90.0)
+    $g.FillRectangle($hlBrush, $hlRect)
+    $g.ResetClip()
+
+    # centered waveform — 7 bars with a smooth bell envelope, rounded caps
+    $env = @(0.30, 0.52, 0.74, 0.92, 0.74, 0.52, 0.30)
+    $barW = [double]($sz * 0.072)
+    $gap = [double]($sz * 0.058)
+    $maxBar = [double]($sz * 0.62)
+    $totalW = $env.Count * $barW + ($env.Count - 1) * $gap
     $x = ($size - $totalW) / 2.0
-    $white = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
-    foreach ($h in $heights) {
-        $bh = $size * $h
-        $y = ($size - $bh) / 2.0
+    $cy = $size / 2.0
+    $white = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(245, 255, 255, 255))
+    foreach ($e in $env) {
+        $bh = [Math]::Max($barW, $maxBar * $e)
+        $y = $cy - $bh / 2.0
         $barRect = New-Object System.Drawing.RectangleF($x, $y, $barW, $bh)
         $bp = New-Object System.Drawing.Drawing2D.GraphicsPath
         $br = $barW / 2.0

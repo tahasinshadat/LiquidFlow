@@ -29,8 +29,15 @@ public sealed class MainWindow : Window
         HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
     };
     private readonly Dictionary<string, Border> _navItems = new();
+    private readonly List<TextBlock> _navLabels = new();
     private string _current = "";
     private string _feedFilter = "";
+    private bool _sidebarExpanded;  // collapsed icon-rail by default (more content room)
+    private bool _didPromptForName;
+    private ColumnDefinition? _railColumn;
+    private Border? _brandMark;
+    private TextBlock? _brandLabel;
+    private double SidebarWidth => _sidebarExpanded ? 252 : 66;
 
     private sealed record NavEntry(string Glyph, string Title, Func<UIElement> Page);
     private readonly List<NavEntry> _entries;
@@ -64,24 +71,25 @@ public sealed class MainWindow : Window
             new("", "Feedback", BuildFeedbackPage),
         };
 
+        var aiIndex = _entries.FindIndex(e => e.Title == "AI Settings");
+        if (aiIndex >= 0)
+            _entries[aiIndex] = new NavEntry(_entries[aiIndex].Glyph, "Models", () => Stack(new SpeechModelsTab(), new AiTab()));
+
+        var scratchGlyph = _entries.FirstOrDefault(e => e.Title == "Command Mode")?.Glyph ?? "S";
+        _entries.RemoveAll(e => e.Title is "Command Mode" or "Write Mode" or "File Transcription");
+        var insertIndex = _entries.FindIndex(e => e.Title == "Preferences");
+        _entries.Insert(insertIndex >= 0 ? insertIndex : _entries.Count, new NavEntry(scratchGlyph, "Scratchpad", BuildScratchpadPage));
+
         var root = new Grid { Background = new SolidColorBrush(Theme.Bg) };
-        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(66) });
+        _railColumn = new ColumnDefinition { Width = new GridLength(SidebarWidth) };
+        root.ColumnDefinitions.Add(_railColumn);
         root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-        // ----- icon-only rail -----
-        var rail = new DockPanel { Margin = new Thickness(10, 18, 8, 18), LastChildFill = false };
-        var topGroup = new StackPanel();
-        var bottomGroup = new StackPanel();
-        topGroup.Children.Add(BrandMark());
-        topGroup.Children.Add(new Border { Height = 18, Background = Brushes.Transparent });
-        foreach (var e in _entries)
-            (e.Title is "Preferences" or "Feedback" ? bottomGroup : topGroup).Children.Add(NavItem(e));
-        DockPanel.SetDock(topGroup, Dock.Top);
-        DockPanel.SetDock(bottomGroup, Dock.Bottom);
-        rail.Children.Add(topGroup);
-        rail.Children.Add(bottomGroup);
-        Grid.SetColumn(rail, 0);
-        root.Children.Add(rail);
+        // ----- icon rail (12px symmetric margin centers the 42px items in the 66px collapsed column) -----
+        _rail = new DockPanel { Margin = new Thickness(12, 18, 12, 18), LastChildFill = false };
+        BuildRailContent();
+        Grid.SetColumn(_rail, 0);
+        root.Children.Add(_rail);
 
         // ----- floating white sheet -----
         var sheet = new Border
@@ -100,39 +108,81 @@ public sealed class MainWindow : Window
         Content = root;
         SmoothScroll.Attach(_content);
         Navigate("Home");
+        Loaded += (_, _) => PromptForNameIfNeeded();
         HistoryStore.HistoryChanged += () => Dispatcher.BeginInvoke(() =>
         {
             if (_current == "Home") Navigate("Home");
         });
-        Settings.Changed += _ => Dispatcher.BeginInvoke(() =>
+        Settings.Changed += hint => Dispatcher.BeginInvoke(() =>
         {
             Background = new SolidColorBrush(Theme.Bg);
             root.Background = new SolidColorBrush(Theme.Bg);
             sheet.Background = Theme.SurfaceBrush;
             sheet.BorderBrush = Theme.HairlineBrush;
+            // theme/font swaps must re-render the whole surface (colors are snapshotted per control)
+            if (hint is "theme" or "font")
+            {
+                RebuildRail();
+                Navigate(_current);
+            }
         });
     }
 
     public void SelectTab(string title) => Navigate(
-        title switch { "Welcome" => "Home", "General" => "Preferences", "Stats" => "Insights", _ => title });
-
-    private static UIElement BrandMark() => new Border
-    {
-        Width = 42,
-        Height = 42,
-        CornerRadius = new CornerRadius(12),
-        Background = new SolidColorBrush(Theme.SidebarSelected),
-        ToolTip = "FluidVoice",
-        Child = new TextBlock
+        title switch
         {
-            Text = "FV",
-            FontFamily = Theme.DisplaySerif,
-            FontSize = 18,
+            "Welcome" => "Home",
+            "General" => "Preferences",
+            "Stats" => "Insights",
+            "Command Mode" or "Write Mode" or "File Transcription" => "Scratchpad",
+            "AI Settings" => "Models",
+            _ => title,
+        });
+
+    private UIElement BrandMark()
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        // center the 28px app-icon art inside the 42px leading box so it aligns with the nav glyphs
+        var markHost = new Border
+        {
+            Width = 42,
+            Height = 42,
+            Child = new Image
+            {
+                Width = 28,
+                Height = 28,
+                Source = WindowFx.AppIcon,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            },
+        };
+        row.Children.Add(markHost);
+        _brandLabel = new TextBlock
+        {
+            Text = "FluidVoice",
+            FontSize = 17,
+            FontWeight = FontWeights.SemiBold,
             Foreground = Theme.TextBrush,
-            HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-        },
-    };
+            Margin = new Thickness(6, 0, 0, 0),
+            Visibility = _sidebarExpanded ? Visibility.Visible : Visibility.Collapsed,
+        };
+        row.Children.Add(_brandLabel);
+
+        _brandMark = new Border
+        {
+            Width = _sidebarExpanded ? 220 : 42,
+            Height = 42,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            CornerRadius = new CornerRadius(12),
+            Background = Brushes.Transparent,
+            ToolTip = _sidebarExpanded ? "Collapse sidebar" : "Expand sidebar",
+            Cursor = Cursors.Hand,
+            Child = row,
+        };
+        _brandMark.MouseLeftButtonUp += (_, _) => SetSidebarExpanded(!_sidebarExpanded);
+        return _brandMark;
+    }
 
     private Border NavItem(NavEntry entry)
     {
@@ -144,27 +194,130 @@ public sealed class MainWindow : Window
             Foreground = new SolidColorBrush(Theme.Text),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
+            Width = 42, // matches the collapsed item width so the glyph never shifts on expand
         };
+        var label = new TextBlock
+        {
+            Text = entry.Title,
+            FontSize = 15,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = Theme.TextBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 0, 0),
+            Visibility = _sidebarExpanded ? Visibility.Visible : Visibility.Collapsed,
+        };
+        _navLabels.Add(label);
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        row.Children.Add(icon);
+        row.Children.Add(label);
         var item = new Border
         {
-            Child = icon,
-            Width = 42,
+            Child = row,
+            Width = _sidebarExpanded ? 220 : 42,
             Height = 42,
             Margin = new Thickness(0, 3, 0, 3),
+            HorizontalAlignment = HorizontalAlignment.Left,
             CornerRadius = new CornerRadius(10),
             Background = Brushes.Transparent,
             Cursor = Cursors.Hand,
             ToolTip = entry.Title,
         };
-        item.MouseLeftButtonUp += (_, _) => Navigate(entry.Title);
+        item.MouseLeftButtonUp += (_, _) =>
+        {
+            if (entry.Title == "Preferences") ShowSettingsDialog();
+            else Navigate(entry.Title);
+        };
         item.MouseEnter += (_, _) => { if (_current != entry.Title) item.Background = new SolidColorBrush(Theme.SidebarSelected) { Opacity = 0.6 }; };
         item.MouseLeave += (_, _) => { if (_current != entry.Title) item.Background = Brushes.Transparent; };
         _navItems[entry.Title] = item;
         return item;
     }
 
+    private DockPanel? _rail;
+
+    private void BuildRailContent()
+    {
+        if (_rail is null) return;
+        _rail.Children.Clear();
+        _navItems.Clear();
+        _navLabels.Clear();
+        var topGroup = new StackPanel { HorizontalAlignment = HorizontalAlignment.Left };
+        var bottomGroup = new StackPanel { HorizontalAlignment = HorizontalAlignment.Left };
+        topGroup.Children.Add(BrandMark());
+        topGroup.Children.Add(new Border { Height = 18, Background = Brushes.Transparent });
+        foreach (var e in _entries)
+            (e.Title is "Preferences" or "Feedback" ? bottomGroup : topGroup).Children.Add(NavItem(e));
+        DockPanel.SetDock(topGroup, Dock.Top);
+        DockPanel.SetDock(bottomGroup, Dock.Bottom);
+        _rail.Children.Add(topGroup);
+        _rail.Children.Add(bottomGroup);
+        // restore the selected-item highlight
+        if (_navItems.TryGetValue(_current, out var sel))
+            sel.Background = new SolidColorBrush(Theme.SidebarSelected);
+    }
+
+    private void RebuildRail() => BuildRailContent();
+
+    private void SetSidebarExpanded(bool expanded)
+    {
+        _sidebarExpanded = expanded;
+        if (_railColumn is not null)
+            _railColumn.Width = new GridLength(SidebarWidth);
+        if (_brandMark is not null)
+        {
+            _brandMark.Width = _sidebarExpanded ? 220 : 42;
+            _brandMark.ToolTip = _sidebarExpanded ? "Collapse sidebar" : "Expand sidebar";
+        }
+        if (_brandLabel is not null)
+            _brandLabel.Visibility = _sidebarExpanded ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var label in _navLabels)
+            label.Visibility = _sidebarExpanded ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var border in _navItems.Values)
+            border.Width = _sidebarExpanded ? 220 : 42;
+    }
+
+    private void ShowSettingsDialog()
+    {
+        var oldOpacity = Opacity;
+        try
+        {
+            Opacity = 0.62;
+            var dialog = new SettingsModal { Owner = this };
+            dialog.ShowDialog();
+        }
+        finally
+        {
+            Opacity = oldOpacity;
+            if (_current == "Home") Navigate("Home");
+        }
+    }
+
+    private void PromptForNameIfNeeded()
+    {
+        if (_didPromptForName || !string.IsNullOrWhiteSpace(Settings.Current.DisplayName)) return;
+        _didPromptForName = true;
+        var oldOpacity = Opacity;
+        try
+        {
+            Opacity = 0.72;
+            var dialog = new NamePromptDialog(FallbackFirstName()) { Owner = this };
+            dialog.ShowDialog();
+        }
+        finally
+        {
+            Opacity = oldOpacity;
+            if (_current == "Home") Navigate("Home");
+        }
+    }
+
     private void Navigate(string title)
     {
+        if (title == "Preferences")
+        {
+            ShowSettingsDialog();
+            return;
+        }
+
         var entry = _entries.FirstOrDefault(e => e.Title == title) ?? _entries[0];
         _current = entry.Title;
         foreach (var (name, border) in _navItems)
@@ -174,7 +327,7 @@ public sealed class MainWindow : Window
         {
             Margin = new Thickness(44, 38, 44, 40),
             MaxWidth = entry.Title == "Home" ? 1120 : 1080,
-            HorizontalAlignment = HorizontalAlignment.Left,
+            HorizontalAlignment = HorizontalAlignment.Center, // content stays centered in the sheet
         };
         if (entry.Title != "Home") page.Children.Add(PageHeader(entry.Title));
         page.Children.Add(entry.Page());
@@ -207,10 +360,17 @@ public sealed class MainWindow : Window
 
         page.Children.Add(new TextBlock
         {
-            Text = $"Welcome back, {FirstName()}",
+            Text = $"{Greeting()}, {FirstName()}",
             FontSize = 24,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(Theme.Text),
+            Margin = new Thickness(0, 0, 0, 6),
+        });
+        page.Children.Add(new TextBlock
+        {
+            Text = WelcomeMessage(),
+            FontSize = 14,
+            Foreground = Theme.SubtleBrush,
             Margin = new Thickness(0, 0, 0, 24),
         });
 
@@ -274,7 +434,8 @@ public sealed class MainWindow : Window
 
         var content = new StackPanel
         {
-            Width = 560,
+            MaxWidth = 560,
+            HorizontalAlignment = HorizontalAlignment.Left,
             Margin = new Thickness(36, 30, 36, 30),
             VerticalAlignment = VerticalAlignment.Center,
         };
@@ -331,10 +492,39 @@ public sealed class MainWindow : Window
 
     private static string FirstName()
     {
+        var display = Settings.Current.DisplayName;
+        if (!string.IsNullOrWhiteSpace(display))
+        {
+            var first = display.Trim().Split(' ', '.', '_', '-')[0];
+            return char.ToUpperInvariant(first[0]) + first[1..];
+        }
+        return FallbackFirstName();
+    }
+
+    private static string FallbackFirstName()
+    {
         var name = Environment.UserName;
         if (string.IsNullOrWhiteSpace(name)) return "there";
         name = name.Split(' ', '.', '_', '-')[0];
         return char.ToUpperInvariant(name[0]) + name[1..];
+    }
+
+    private static string Greeting() => DateTime.Now.Hour switch
+    {
+        < 12 => "Good morning",
+        < 17 => "Good afternoon",
+        _ => "Good evening",
+    };
+
+    private static string WelcomeMessage()
+    {
+        var messages = new[]
+        {
+            "Ready when you are. Speak naturally and FluidVoice will clean up the rest.",
+            "Your voice workspace is ready. Start dictating in any app.",
+            "Keep your hands on the work. FluidVoice will handle the words.",
+        };
+        return messages[DateTime.Today.DayOfYear % messages.Length];
     }
 
     private UIElement BuildStatsPanel()
@@ -683,6 +873,95 @@ public sealed class MainWindow : Window
 
     // =================== Command / Write / Files / Feedback pages ===================
 
+    private UIElement BuildScratchpadPage()
+    {
+        var page = new StackPanel();
+        page.Children.Add(new TextBlock
+        {
+            Text = "Dictate, rewrite, run commands, or transcribe a file from one compact workspace.",
+            FontSize = 14,
+            Foreground = Theme.SubtleBrush,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, -8, 0, 24),
+        });
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(22) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var left = new StackPanel();
+        left.Children.Add(ScratchpadCard("Write Mode", "Rewrite selected text or dictate a fresh draft into the focused app.", BuildWriteModeControls()));
+        left.Children.Add(ScratchpadCard("Command Mode", "Use voice instructions to operate your PC with confirmation controls.", BuildCommandModeControls()));
+        Grid.SetColumn(left, 0);
+        grid.Children.Add(left);
+
+        var right = ScratchpadCard("File Transcription", "Turn an audio file into text locally. Nothing is uploaded.", BuildFileTranscriptionControls());
+        Grid.SetColumn(right, 2);
+        grid.Children.Add(right);
+        page.Children.Add(grid);
+        return page;
+    }
+
+    private UIElement ScratchpadCard(string title, string subtitle, UIElement body)
+    {
+        var panel = new StackPanel();
+        panel.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 19,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = Theme.TextBrush,
+            Margin = new Thickness(0, 0, 0, 6),
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text = subtitle,
+            FontSize = 13,
+            Foreground = Theme.SubtleBrush,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 14),
+        });
+        panel.Children.Add(body);
+        return Theme.Panel(panel, new Thickness(22), new Thickness(0, 0, 0, 18));
+    }
+
+    private UIElement BuildCommandModeControls()
+    {
+        var card = new StackPanel();
+        card.Children.Add(Theme.Toggle("Enable Command Mode hotkey", Settings.Current.CommandModeShortcutEnabled, v =>
+        {
+            Settings.Current.CommandModeShortcutEnabled = v;
+            Settings.Current.CommandModeShortcut ??= Input.HotkeyShortcut.RightCtrl();
+            Settings.Current.Save("hotkey");
+        }));
+        card.Children.Add(Theme.Toggle("Ask before destructive commands", Settings.Current.CommandModeConfirmBeforeExecute, v =>
+        {
+            Settings.Current.CommandModeConfirmBeforeExecute = v;
+            Settings.Current.Save();
+        }));
+        var open = Theme.PrimaryButton("Open command chat");
+        open.Margin = new Thickness(0, 12, 0, 0);
+        open.Click += (_, _) => OpenCommandWindow?.Invoke();
+        card.Children.Add(open);
+        return card;
+    }
+
+    private UIElement BuildWriteModeControls()
+    {
+        var card = new StackPanel();
+        card.Children.Add(Theme.Toggle("Enable Write Mode hotkey", Settings.Current.RewriteModeShortcutEnabled, v =>
+        {
+            Settings.Current.RewriteModeShortcutEnabled = v;
+            Settings.Current.Save("hotkey");
+        }));
+        var open = Theme.PrimaryButton("Open edit window");
+        open.Margin = new Thickness(0, 12, 0, 0);
+        open.Click += (_, _) => OpenRewriteWindow?.Invoke();
+        card.Children.Add(open);
+        return card;
+    }
+
     private UIElement BuildCommandModePage()
     {
         var page = new StackPanel();
@@ -739,6 +1018,76 @@ public sealed class MainWindow : Window
         card.Children.Add(open);
         page.Children.Add(BigCard(card));
         return page;
+    }
+
+    private UIElement BuildFileTranscriptionControls()
+    {
+        var card = new StackPanel();
+        var status = new TextBlock { Foreground = new SolidColorBrush(Theme.SubtleText), Margin = new Thickness(0, 8, 0, 8) };
+        var result = new TextBox
+        {
+            IsReadOnly = true,
+            TextWrapping = TextWrapping.Wrap,
+            AcceptsReturn = true,
+            MinHeight = 220,
+            Padding = new Thickness(10),
+            Visibility = Visibility.Collapsed,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            MaxHeight = 360,
+        };
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed };
+        var copyBtn = Theme.SecondaryButton("Copy");
+        copyBtn.Margin = new Thickness(0, 0, 8, 0);
+        copyBtn.Click += (_, _) => ClipboardService.SetText(result.Text);
+        var saveBtn = Theme.SecondaryButton("Save as .txt");
+        saveBtn.Click += (_, _) =>
+        {
+            var dlg = new Microsoft.Win32.SaveFileDialog { Filter = "Text file|*.txt", FileName = "transcript.txt" };
+            if (dlg.ShowDialog() == true) File.WriteAllText(dlg.FileName, result.Text);
+        };
+        buttons.Children.Add(copyBtn);
+        buttons.Children.Add(saveBtn);
+
+        var pick = Theme.PrimaryButton("Choose audio file");
+        pick.Click += async (_, _) =>
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "Audio files|*.wav;*.mp3;*.m4a;*.flac;*.ogg;*.wma;*.aac|All files|*.*",
+            };
+            if (dlg.ShowDialog() != true || _coordinator is null) return;
+            try
+            {
+                pick.IsEnabled = false;
+                var model = SpeechModels.Selected();
+                if (!model.IsDownloaded) { status.Text = "Download a speech model first."; return; }
+                status.Text = "Loading model...";
+                var engine = await _coordinator.EnsureEngineReadyAsync(model, null, CancellationToken.None);
+                status.Text = "Reading audio...";
+                var pcm = await Task.Run(() => AudioFileLoader.Load16kMono(dlg.FileName));
+                status.Text = $"Transcribing {pcm.Length / 16000.0 / 60:0.0} min of audio...";
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var text = await engine.TranscribeAsync(Dsp.Normalize(pcm), CancellationToken.None);
+                status.Text = $"Done in {sw.Elapsed.TotalSeconds:0.0}s";
+                result.Text = Text.TranscriptFormatter.Process(text);
+                result.Visibility = Visibility.Visible;
+                buttons.Visibility = Visibility.Visible;
+            }
+            catch (Exception ex)
+            {
+                status.Text = $"Failed: {ex.Message}";
+            }
+            finally
+            {
+                pick.IsEnabled = true;
+            }
+        };
+
+        card.Children.Add(pick);
+        card.Children.Add(status);
+        card.Children.Add(result);
+        card.Children.Add(buttons);
+        return card;
     }
 
     private UIElement BuildFileTranscriptionPage()

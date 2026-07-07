@@ -39,7 +39,6 @@ public sealed class AiTab : StackPanel
             Margin = new Thickness(0, 0, 0, 14),
         });
 
-        // enable + provider select
         var enablePanel = new StackPanel();
         var enabled = !string.IsNullOrEmpty(s.SelectedProviderID);
         enablePanel.Children.Add(Theme.Toggle("Enable AI enhancement for dictation", enabled, v =>
@@ -48,7 +47,7 @@ public sealed class AiTab : StackPanel
         }));
 
         enablePanel.Children.Add(Theme.Label("Provider"));
-        var providerCombo = new ComboBox { Width = 260, HorizontalAlignment = HorizontalAlignment.Left };
+        var providerCombo = new ComboBox { Width = 340, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 4) };
         var providers = ProviderCatalog.All().ToList();
         foreach (var p in providers) providerCombo.Items.Add(p.Name);
         var current = providers.FindIndex(p => p.Id == s.SelectedProviderID);
@@ -63,7 +62,7 @@ public sealed class AiTab : StackPanel
             }
         };
         enablePanel.Children.Add(providerCombo);
-        Children.Add(Theme.Card2(enablePanel));
+        Children.Add(Theme.Panel(enablePanel, new Thickness(22), new Thickness(0, 0, 0, 16)));
 
         if (string.IsNullOrEmpty(s.SelectedProviderID)) return;
 
@@ -78,12 +77,12 @@ public sealed class AiTab : StackPanel
 
         // cloud/custom provider config
         var cfg = new StackPanel();
-        cfg.Children.Add(Theme.Heading($"{provider.Name} configuration"));
+        cfg.Children.Add(Theme.Heading($"{provider.Name} model"));
 
         if (!provider.IsLocal)
         {
             cfg.Children.Add(Theme.Label("API key"));
-            var keyBox = new PasswordBox { Width = 360, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 6) };
+            var keyBox = new PasswordBox { Width = 420, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 6) };
             var existing = CredentialStore.GetApiKey(provider.Id);
             if (!string.IsNullOrEmpty(existing)) keyBox.Password = existing;
             keyBox.PasswordChanged += (_, _) => CredentialStore.SetApiKey(provider.Id, keyBox.Password);
@@ -95,9 +94,9 @@ public sealed class AiTab : StackPanel
             cfg.Children.Add(Theme.Caption($"Local endpoint: {provider.BaseUrl}. Make sure the server is running."));
         }
 
-        var statusText = new TextBlock { Foreground = Theme.SubtleBrush, Margin = new Thickness(0, 4, 0, 6) };
-        var verifyBtn = new Button { Content = "Verify & load models", Padding = new Thickness(12, 6, 12, 6), HorizontalAlignment = HorizontalAlignment.Left };
-        var modelCombo = new ComboBox { Width = 300, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 8, 0, 0) };
+        var statusText = new TextBlock { Foreground = Theme.SubtleBrush, FontSize = 12, Margin = new Thickness(0, 8, 0, 0) };
+        var verifyBtn = Theme.SecondaryButton("Refresh models");
+        var modelCombo = new ComboBox { Width = 420, HorizontalAlignment = HorizontalAlignment.Left };
 
         void PopulateModels(List<string> models)
         {
@@ -138,11 +137,21 @@ public sealed class AiTab : StackPanel
             }
             finally { verifyBtn.IsEnabled = true; }
         };
-        cfg.Children.Add(verifyBtn);
-        cfg.Children.Add(statusText);
-        cfg.Children.Add(Theme.Label("Model"));
-        cfg.Children.Add(modelCombo);
-        Children.Add(Theme.Card2(cfg));
+        var selector = new Grid { Margin = new Thickness(0, 14, 0, 0) };
+        selector.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        selector.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var selectorLeft = new StackPanel();
+        selectorLeft.Children.Add(Theme.Label("Model"));
+        selectorLeft.Children.Add(modelCombo);
+        selectorLeft.Children.Add(statusText);
+        Grid.SetColumn(selectorLeft, 0);
+        selector.Children.Add(selectorLeft);
+        verifyBtn.Margin = new Thickness(18, 24, 0, 0);
+        verifyBtn.VerticalAlignment = VerticalAlignment.Top;
+        Grid.SetColumn(verifyBtn, 1);
+        selector.Children.Add(verifyBtn);
+        cfg.Children.Add(selector);
+        Children.Add(Theme.Panel(cfg, new Thickness(22), new Thickness(0, 0, 0, 16)));
 
         Children.Add(StreamingCard());
     }
@@ -158,7 +167,7 @@ public sealed class AiTab : StackPanel
 
         if (LocalAiServer.IsRuntimeInstalled())
             panel.Children.Add(Theme.Caption("llama.cpp runtime installed. The selected model starts on demand and stops when FluidVoice quits."));
-        return Theme.Card2(panel);
+        return Theme.Panel(panel, new Thickness(22), new Thickness(0, 0, 0, 16));
     }
 
     private UIElement LocalModelRow(LocalAiModel m)
@@ -166,7 +175,7 @@ public sealed class AiTab : StackPanel
         var installed = LocalAiServer.IsModelInstalled(m);
         var selected = Settings.Current.LocalAiModelId == m.Id;
 
-        var grid = new Grid { Margin = new Thickness(0, 4, 0, 4) };
+        var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
@@ -175,18 +184,34 @@ public sealed class AiTab : StackPanel
         {
             Text = m.DisplayName + (selected ? " - selected" : ""),
             FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal,
-            Foreground = Theme.TextBrush, FontSize = 13,
+            Foreground = Theme.TextBrush, FontSize = 14,
         });
-        text.Children.Add(new TextBlock { Text = m.Description, Foreground = Theme.SubtleBrush, FontSize = 11, TextWrapping = TextWrapping.Wrap });
-        var bar = new ProgressBar { Height = 4, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 4, 0, 0) };
+        text.Children.Add(new TextBlock
+        {
+            Text = m.Description,
+            Foreground = Theme.SubtleBrush,
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 4, 0, 0),
+        });
+        var status = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0) };
+        status.Children.Add(Theme.Pill(installed ? "Installed" : "Not installed", installed ? Theme.GreenBrush : new SolidColorBrush(Theme.SidebarSelected), installed ? Brushes.White : Theme.TextBrush, 11));
+        if (selected)
+        {
+            var selectedPill = Theme.Pill("Selected", Theme.PurpleBrush, Brushes.White, 11);
+            selectedPill.Margin = new Thickness(8, 0, 0, 0);
+            status.Children.Add(selectedPill);
+        }
+        text.Children.Add(status);
+        var bar = new ProgressBar { Height = 5, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 12, 0, 0) };
         text.Children.Add(bar);
         Grid.SetColumn(text, 0);
         grid.Children.Add(text);
 
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(18, 0, 0, 0) };
         if (!installed)
         {
-            var dl = new Button { Content = "Download", Padding = new Thickness(11, 5, 11, 5) };
+            var dl = Theme.PrimaryButton("Download");
             dl.Click += async (_, _) =>
             {
                 dl.IsEnabled = false;
@@ -213,7 +238,8 @@ public sealed class AiTab : StackPanel
         {
             if (!selected)
             {
-                var use = new Button { Content = "Use", Padding = new Thickness(11, 5, 11, 5), Margin = new Thickness(0, 0, 6, 0) };
+                var use = Theme.PrimaryButton("Use");
+                use.Margin = new Thickness(0, 0, 8, 0);
                 use.Click += (_, _) =>
                 {
                     LocalAiServer.Stop(); // restart on demand with the new model
@@ -223,7 +249,8 @@ public sealed class AiTab : StackPanel
                 };
                 buttons.Children.Add(use);
             }
-            var del = new Button { Content = "Uninstall", Padding = new Thickness(11, 5, 11, 5) };
+            var del = Theme.SecondaryButton("Uninstall");
+            del.Foreground = new SolidColorBrush(Theme.Danger);
             del.Click += (_, _) =>
             {
                 var gb = LocalAiServer.InstalledBytes(m) / 1024.0 / 1024 / 1024;
@@ -236,7 +263,16 @@ public sealed class AiTab : StackPanel
         }
         Grid.SetColumn(buttons, 1);
         grid.Children.Add(buttons);
-        return grid;
+        return new Border
+        {
+            Background = Theme.SurfaceBrush,
+            BorderBrush = new SolidColorBrush(Theme.CardBorder),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(16),
+            Margin = new Thickness(0, 10, 0, 0),
+            Child = grid,
+        };
     }
 
     private Border StreamingCard()
@@ -245,6 +281,6 @@ public sealed class AiTab : StackPanel
         panel.Children.Add(Theme.Heading("Options"));
         panel.Children.Add(Theme.Toggle("Stream AI responses", Settings.Current.EnableAIStreaming, v => { Settings.Current.EnableAIStreaming = v; Settings.Current.Save("ai"); }));
         panel.Children.Add(Theme.Toggle("Notify me if AI enhancement fails", Settings.Current.NotifyAIProcessingFailures, v => { Settings.Current.NotifyAIProcessingFailures = v; Settings.Current.Save("ai"); }));
-        return Theme.Card2(panel);
+        return Theme.Panel(panel, new Thickness(22), new Thickness(0, 0, 0, 16));
     }
 }

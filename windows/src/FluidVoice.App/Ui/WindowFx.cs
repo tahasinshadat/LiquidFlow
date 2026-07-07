@@ -17,9 +17,13 @@ public static class WindowFx
     public static void Apply(Window window)
     {
         try { window.Icon = AppIcon; } catch { }
-        window.FontFamily = new System.Windows.Media.FontFamily("Segoe UI Variable Text, Segoe UI");
+        window.FontFamily = Theme.UiFont;
         System.Windows.Media.TextOptions.SetTextFormattingMode(window, System.Windows.Media.TextFormattingMode.Ideal);
         window.UseLayoutRounding = true;
+        Core.Settings.Changed += _ => window.Dispatcher.BeginInvoke(() =>
+        {
+            if (window.IsLoaded) window.FontFamily = Theme.UiFont;
+        });
         window.SourceInitialized += (_, _) => ApplyTitlebar(window);
         Core.Settings.Changed += _ => window.Dispatcher.BeginInvoke(() =>
         {
