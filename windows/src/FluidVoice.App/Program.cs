@@ -80,6 +80,7 @@ public static class Program
                 await rewriteService.ApplyInstructionAsync(text, CancellationToken.None);
             }).Task.Unwrap();
 
+        overlay.CancelRequested += () => coordinator.RequestCancel();
         Notifications.ShowHandler = (title, body) => tray.ShowBalloon(title, body);
         coordinator.RecordingStateChanged += recording =>
             app.Dispatcher.BeginInvoke(() => tray.UpdateStatus(recording));

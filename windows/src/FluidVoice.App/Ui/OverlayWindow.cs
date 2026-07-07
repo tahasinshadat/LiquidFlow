@@ -36,6 +36,9 @@ public sealed class OverlayWindow : Window
     private readonly Random _rng = new();
 
     private Grid? _topRow;
+    private readonly Border _cancelButton = new();
+    /// <summary>Raised when the ✕ on the bar is clicked (wired to coordinator cancel).</summary>
+    public event Action? CancelRequested;
     private OverlayState _state = OverlayState.Hidden;
     private RecordingMode _mode = RecordingMode.Dictation;
     private float _level;
@@ -47,13 +50,14 @@ public sealed class OverlayWindow : Window
 
     private Layout _layout = LayoutFor(Core.OverlaySize.Medium);
 
+    // Wispr-bar proportions: a slim strip, not a big panel.
     private static Layout LayoutFor(OverlaySize size) => size switch
     {
-        Core.OverlaySize.Pill => new(100, 46, 23, 8, 3.0, 2.5, 30, 10, false, false),
-        Core.OverlaySize.Small => new(300, 124, 14, 7, 3.0, 3.5, 20, 11, true, true),
-        Core.OverlaySize.Medium => new(380, 156, 18, 9, 3.5, 4.5, 32, 13, true, true),
-        Core.OverlaySize.Large => new(600, 288, 24, 11, 5.0, 6.0, 48, 15, true, true),
-        _ => new(380, 156, 18, 9, 3.5, 4.5, 32, 13, true, true),
+        Core.OverlaySize.Pill => new(96, 36, 18, 8, 2.6, 2.4, 20, 10, false, false),
+        Core.OverlaySize.Small => new(320, 74, 16, 9, 2.8, 3.2, 16, 11, true, true),
+        Core.OverlaySize.Medium => new(420, 88, 18, 11, 3.0, 3.6, 18, 12, true, true),
+        Core.OverlaySize.Large => new(560, 108, 20, 13, 3.4, 4.2, 22, 13, true, true),
+        _ => new(420, 88, 18, 11, 3.0, 3.6, 18, 12, true, true),
     };
 
     public OverlayWindow()
@@ -101,10 +105,33 @@ public sealed class OverlayWindow : Window
         _barsCanvas.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(_barsCanvas, 1);
         bottomBar.Children.Add(_barsCanvas);
-        _statusText.HorizontalAlignment = HorizontalAlignment.Right;
-        _statusText.Margin = new Thickness(0, 0, 2, 0);
-        Grid.SetColumn(_statusText, 2);
-        bottomBar.Children.Add(_statusText);
+        var rightSide = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+        };
+        _statusText.Margin = new Thickness(0, 0, 10, 0);
+        rightSide.Children.Add(_statusText);
+        _cancelButton.Child = new TextBlock
+        {
+            Text = "✕",
+            FontSize = 11,
+            Foreground = new SolidColorBrush(Color.FromArgb(170, 255, 255, 255)),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        _cancelButton.Width = _cancelButton.Height = 20;
+        _cancelButton.CornerRadius = new CornerRadius(10);
+        _cancelButton.Background = new SolidColorBrush(Color.FromArgb(38, 255, 255, 255));
+        _cancelButton.VerticalAlignment = VerticalAlignment.Center;
+        _cancelButton.Cursor = System.Windows.Input.Cursors.Hand;
+        _cancelButton.ToolTip = "Cancel — keeps the transcript in History, types nothing (Esc)";
+        _cancelButton.MouseLeftButtonUp += (_, e) => { e.Handled = true; CancelRequested?.Invoke(); };
+        _cancelButton.MouseEnter += (_, _) => _cancelButton.Background = new SolidColorBrush(Color.FromArgb(70, 255, 255, 255));
+        _cancelButton.MouseLeave += (_, _) => _cancelButton.Background = new SolidColorBrush(Color.FromArgb(38, 255, 255, 255));
+        rightSide.Children.Add(_cancelButton);
+        Grid.SetColumn(rightSide, 2);
+        bottomBar.Children.Add(rightSide);
         Grid.SetRow(bottomBar, 1);
         stack.Children.Add(bottomBar);
         _topRow = bottomBar;
@@ -145,8 +172,8 @@ public sealed class OverlayWindow : Window
         Height = _layout.H;
         _root.CornerRadius = new CornerRadius(_layout.Corner);
         _root.Padding = Settings.Current.OverlaySize == Core.OverlaySize.Pill
-            ? new Thickness(12, 8, 12, 8)
-            : new Thickness(18, 12, 18, 12);
+            ? new Thickness(10, 6, 10, 6)
+            : new Thickness(14, 9, 12, 9);
         _statusText.FontSize = _layout.FontSize;
         if (_topRow is not null)
             _topRow.Visibility = _layout.ShowStatus ? Visibility.Visible : Visibility.Collapsed;

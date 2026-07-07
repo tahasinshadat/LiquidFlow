@@ -139,54 +139,90 @@ public sealed class AiTab : StackPanel
         panel.Children.Add(Theme.Heading("Fluid Local AI (open substitute)"));
         panel.Children.Add(Theme.Caption("Runs a small instruct model locally via llama.cpp (ARM64-native). This is the open replacement for the proprietary Fluid Intelligence runtime — same on-device enhancement, no data leaves your PC."));
 
-        panel.Children.Add(Theme.Label("Model"));
-        var modelCombo = new ComboBox { Width = 320, HorizontalAlignment = HorizontalAlignment.Left };
-        foreach (var m in LocalAiServer.Models) modelCombo.Items.Add(m.DisplayName);
-        modelCombo.SelectedIndex = Math.Max(0, LocalAiServer.Models.ToList().FindIndex(m => m.Id == Settings.Current.LocalAiModelId));
-        modelCombo.SelectionChanged += (_, _) =>
-        {
-            if (modelCombo.SelectedIndex >= 0)
-            {
-                Settings.Current.LocalAiModelId = LocalAiServer.Models[modelCombo.SelectedIndex].Id;
-                Settings.Current.Save("localai");
-            }
-        };
-        panel.Children.Add(modelCombo);
+        foreach (var m in LocalAiServer.Models)
+            panel.Children.Add(LocalModelRow(m));
 
-        var status = new TextBlock { Foreground = Theme.SubtleBrush, Margin = new Thickness(0, 6, 0, 6), TextWrapping = TextWrapping.Wrap };
-        status.Text = LocalAiServer.IsRuntimeInstalled() && LocalAiServer.IsModelInstalled()
-            ? "✓ Installed and ready"
-            : "Not set up yet — downloads the llama.cpp runtime + model (~1 GB).";
-        var bar = new ProgressBar { Height = 4, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 4, 0, 6) };
-
-        var setupBtn = new Button { Content = "Download & set up", Padding = new Thickness(12, 6, 12, 6), HorizontalAlignment = HorizontalAlignment.Left };
-        setupBtn.Click += async (_, _) =>
-        {
-            setupBtn.IsEnabled = false;
-            bar.Visibility = Visibility.Visible;
-            _localAiCts = new CancellationTokenSource();
-            var progress = new Progress<ModelPreparationProgress>(p => Dispatcher.BeginInvoke(() =>
-            {
-                if (p.Phase == ModelPreparationPhase.Downloading) { bar.Value = p.Fraction * 100; status.Text = $"Downloading {(int)(p.Fraction * 100)}%…"; }
-            }));
-            try
-            {
-                await LocalAiServer.EnsureInstalledAsync(progress, _localAiCts.Token);
-                ProviderCatalog.MarkVerified(ProviderCatalog.FluidLocalId);
-                Settings.Current.Save("localai");
-                status.Text = "✓ Installed and ready";
-            }
-            catch (Exception ex)
-            {
-                status.Text = $"✗ {ex.Message}";
-                setupBtn.IsEnabled = true;
-            }
-            finally { bar.Visibility = Visibility.Collapsed; }
-        };
-        panel.Children.Add(setupBtn);
-        panel.Children.Add(bar);
-        panel.Children.Add(status);
+        if (LocalAiServer.IsRuntimeInstalled())
+            panel.Children.Add(Theme.Caption("llama.cpp runtime installed. The selected model starts on demand and stops when FluidVoice quits."));
         return Theme.Card2(panel);
+    }
+
+    private UIElement LocalModelRow(LocalAiModel m)
+    {
+        var installed = LocalAiServer.IsModelInstalled(m);
+        var selected = Settings.Current.LocalAiModelId == m.Id;
+
+        var grid = new Grid { Margin = new Thickness(0, 4, 0, 4) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var text = new StackPanel();
+        text.Children.Add(new TextBlock
+        {
+            Text = m.DisplayName + (selected ? "  ·  selected" : ""),
+            FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal,
+            Foreground = Theme.TextBrush, FontSize = 13,
+        });
+        text.Children.Add(new TextBlock { Text = m.Description, Foreground = Theme.SubtleBrush, FontSize = 11, TextWrapping = TextWrapping.Wrap });
+        var bar = new ProgressBar { Height = 4, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 4, 0, 0) };
+        text.Children.Add(bar);
+        Grid.SetColumn(text, 0);
+        grid.Children.Add(text);
+
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        if (!installed)
+        {
+            var dl = new Button { Content = "Download", Padding = new Thickness(11, 5, 11, 5) };
+            dl.Click += async (_, _) =>
+            {
+                dl.IsEnabled = false;
+                bar.Visibility = Visibility.Visible;
+                Settings.Current.LocalAiModelId = m.Id;
+                Settings.Current.Save("localai");
+                _localAiCts = new CancellationTokenSource();
+                var progress = new Progress<ModelPreparationProgress>(p => Dispatcher.BeginInvoke(() =>
+                {
+                    if (p.Phase == ModelPreparationPhase.Downloading) { bar.Value = p.Fraction * 100; dl.Content = $"{(int)(p.Fraction * 100)}%"; }
+                }));
+                try
+                {
+                    await LocalAiServer.EnsureInstalledAsync(progress, _localAiCts.Token);
+                    ProviderCatalog.MarkVerified(ProviderCatalog.FluidLocalId);
+                    Settings.Current.Save("localai");
+                }
+                catch (Exception ex) { Log.Warn("localai", ex.Message); }
+                Dispatcher.BeginInvoke(Build);
+            };
+            buttons.Children.Add(dl);
+        }
+        else
+        {
+            if (!selected)
+            {
+                var use = new Button { Content = "Use", Padding = new Thickness(11, 5, 11, 5), Margin = new Thickness(0, 0, 6, 0) };
+                use.Click += (_, _) =>
+                {
+                    LocalAiServer.Stop(); // restart on demand with the new model
+                    Settings.Current.LocalAiModelId = m.Id;
+                    Settings.Current.Save("localai");
+                    Dispatcher.BeginInvoke(Build);
+                };
+                buttons.Children.Add(use);
+            }
+            var del = new Button { Content = "Uninstall", Padding = new Thickness(11, 5, 11, 5) };
+            del.Click += (_, _) =>
+            {
+                var gb = LocalAiServer.InstalledBytes(m) / 1024.0 / 1024 / 1024;
+                if (MessageBox.Show($"Uninstall {m.DisplayName} and free {gb:0.0} GB?", "FluidVoice",
+                        MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                LocalAiServer.DeleteModel(m);
+                Dispatcher.BeginInvoke(Build);
+            };
+            buttons.Children.Add(del);
+        }
+        Grid.SetColumn(buttons, 1);
+        grid.Children.Add(buttons);
+        return grid;
     }
 
     private Border StreamingCard()

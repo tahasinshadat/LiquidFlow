@@ -1,6 +1,5 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using FluidVoice.App;
@@ -13,9 +12,8 @@ using FluidVoice.Typing;
 namespace FluidVoice.Ui;
 
 /// <summary>
-/// Main window — replica of the mac app shell (ContentView.swift): left sidebar
-/// (Welcome / AI Settings / Command Mode / Write Mode / File Transcription / Stats /
-/// History / Preferences / Feedback) + content pages.
+/// Main window, styled after Wispr Flow: cream canvas, icon-only left rail,
+/// a floating white sheet for content, and a transcript-feed Home page.
 /// </summary>
 public sealed class MainWindow : Window
 {
@@ -24,14 +22,14 @@ public sealed class MainWindow : Window
     public Action? OpenCommandWindow;
     public Action? OpenRewriteWindow;
 
-    private readonly StackPanel _nav = new();
     private readonly ScrollViewer _content = new()
     {
         VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-        HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, // constrain children to viewport width
+        HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
     };
     private readonly Dictionary<string, Border> _navItems = new();
     private string _current = "";
+    private string _feedFilter = "";
 
     private sealed record NavEntry(string Glyph, string Title, Func<UIElement> Page);
     private readonly List<NavEntry> _entries;
@@ -41,10 +39,10 @@ public sealed class MainWindow : Window
         _commandService = commandService;
         _coordinator = coordinator;
         Title = "FluidVoice";
-        Width = 1080;
-        Height = 740;
-        MinWidth = 860;
-        MinHeight = 560;
+        Width = 1120;
+        Height = 760;
+        MinWidth = 900;
+        MinHeight = 580;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         Background = new SolidColorBrush(Theme.Bg);
         ShowInTaskbar = true;
@@ -52,77 +50,93 @@ public sealed class MainWindow : Window
 
         _entries = new List<NavEntry>
         {
-            new("", "Welcome", () => BuildWelcomePage()),
-            new("", "AI Settings", () => Stack(new SpeechModelsTab(), new AiTab())),
-            new("", "Command Mode", () => BuildCommandModePage()),
-            new("", "Write Mode", () => BuildWriteModePage()),
-            new("", "File Transcription", () => BuildFileTranscriptionPage()),
-            new("", "Stats", () => new HomeTab()),
+            new("", "Home", BuildHomePage),
+            new("", "Insights", () => new HomeTab()),
+            new("", "Dictionary", () => new DictionaryTab()),
             new("", "History", () => new HistoryTab()),
-            new("", "Preferences", () => Stack(new GeneralTab(), new FormattingTab(), new DictionaryTab())),
-            new("", "Feedback", () => BuildFeedbackPage()),
+            new("", "AI Settings", () => Stack(new SpeechModelsTab(), new AiTab())),
+            new("", "Command Mode", BuildCommandModePage),
+            new("", "Write Mode", BuildWriteModePage),
+            new("", "File Transcription", BuildFileTranscriptionPage),
+            // rail pins these to the bottom (Wispr-style)
+            new("", "Preferences", () => Stack(new GeneralTab(), new FormattingTab())),
+            new("", "Feedback", BuildFeedbackPage),
         };
 
-        var root = new Grid();
-        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(232) });
+        var root = new Grid { Background = new SolidColorBrush(Theme.Bg) };
+        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(58) });
         root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-        // ----- sidebar -----
-        var side = new Border
-        {
-            Background = new SolidColorBrush(Theme.Sidebar),
-            BorderBrush = new SolidColorBrush(Theme.CardBorder),
-            BorderThickness = new Thickness(0, 0, 1, 0),
-        };
-        _nav.Margin = new Thickness(10, 14, 10, 14);
-        foreach (var e in _entries) _nav.Children.Add(NavItem(e));
-        side.Child = _nav;
-        Grid.SetColumn(side, 0);
-        root.Children.Add(side);
+        // ----- icon-only rail -----
+        var rail = new DockPanel { Margin = new Thickness(8, 14, 2, 14), LastChildFill = false };
+        var topGroup = new StackPanel();
+        var bottomGroup = new StackPanel();
+        foreach (var e in _entries)
+            (e.Title is "Preferences" or "Feedback" ? bottomGroup : topGroup).Children.Add(NavItem(e));
+        DockPanel.SetDock(topGroup, Dock.Top);
+        DockPanel.SetDock(bottomGroup, Dock.Bottom);
+        rail.Children.Add(topGroup);
+        rail.Children.Add(bottomGroup);
+        Grid.SetColumn(rail, 0);
+        root.Children.Add(rail);
 
+        // ----- floating white sheet -----
+        var sheet = new Border
+        {
+            Background = Theme.SurfaceBrush,
+            CornerRadius = new CornerRadius(16),
+            Margin = new Thickness(0, 10, 10, 10),
+            BorderBrush = Theme.HairlineBrush,
+            BorderThickness = new Thickness(1),
+        };
         _content.Padding = new Thickness(0);
-        Grid.SetColumn(_content, 1);
-        root.Children.Add(_content);
+        sheet.Child = _content;
+        Grid.SetColumn(sheet, 1);
+        root.Children.Add(sheet);
 
         Content = root;
         SmoothScroll.Attach(_content);
-        Navigate("Welcome");
-        Settings.Changed += _ => Dispatcher.BeginInvoke(() => Background = new SolidColorBrush(Theme.Bg));
+        Navigate("Home");
+        HistoryStore.HistoryChanged += () => Dispatcher.BeginInvoke(() =>
+        {
+            if (_current == "Home") Navigate("Home");
+        });
+        Settings.Changed += _ => Dispatcher.BeginInvoke(() =>
+        {
+            Background = new SolidColorBrush(Theme.Bg);
+            root.Background = new SolidColorBrush(Theme.Bg);
+            sheet.Background = Theme.SurfaceBrush;
+            sheet.BorderBrush = Theme.HairlineBrush;
+        });
     }
 
     public void SelectTab(string title) => Navigate(
-        title switch { "Home" => "Welcome", "General" => "Preferences", "Dictionary" => "Preferences", _ => title });
+        title switch { "Welcome" => "Home", "General" => "Preferences", "Stats" => "Insights", _ => title });
 
     private Border NavItem(NavEntry entry)
     {
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
-        row.Children.Add(new TextBlock
+        var icon = new TextBlock
         {
             Text = entry.Glyph,
             FontFamily = new FontFamily("Segoe MDL2 Assets"),
-            FontSize = 15,
-            Width = 26,
-            Foreground = new SolidColorBrush(Theme.SubtleText),
-            VerticalAlignment = VerticalAlignment.Center,
-        });
-        row.Children.Add(new TextBlock
-        {
-            Text = entry.Title,
-            FontSize = 13.5,
+            FontSize = 16,
             Foreground = new SolidColorBrush(Theme.Text),
+            HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-        });
+        };
         var item = new Border
         {
-            Child = row,
-            Padding = new Thickness(12, 9, 12, 9),
-            Margin = new Thickness(0, 1, 0, 1),
-            CornerRadius = new CornerRadius(8),
+            Child = icon,
+            Width = 40,
+            Height = 40,
+            Margin = new Thickness(0, 2, 0, 2),
+            CornerRadius = new CornerRadius(10),
             Background = Brushes.Transparent,
             Cursor = Cursors.Hand,
+            ToolTip = entry.Title,
         };
         item.MouseLeftButtonUp += (_, _) => Navigate(entry.Title);
-        item.MouseEnter += (_, _) => { if (_current != entry.Title) item.Background = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)); };
+        item.MouseEnter += (_, _) => { if (_current != entry.Title) item.Background = new SolidColorBrush(Theme.SidebarSelected) { Opacity = 0.6 }; };
         item.MouseLeave += (_, _) => { if (_current != entry.Title) item.Background = Brushes.Transparent; };
         _navItems[entry.Title] = item;
         return item;
@@ -135,35 +149,21 @@ public sealed class MainWindow : Window
         foreach (var (name, border) in _navItems)
             border.Background = name == entry.Title ? new SolidColorBrush(Theme.SidebarSelected) : Brushes.Transparent;
 
-        var page = new StackPanel { Margin = new Thickness(28, 22, 28, 28), MaxWidth = 880, HorizontalAlignment = HorizontalAlignment.Left };
-        page.Children.Add(PageHeader(entry.Glyph, entry.Title == "Welcome" ? "Welcome to FluidVoice" : entry.Title));
+        var page = new StackPanel { Margin = new Thickness(40, 30, 40, 34), MaxWidth = 980, HorizontalAlignment = HorizontalAlignment.Left };
+        if (entry.Title != "Home") page.Children.Add(PageHeader(entry.Title));
         page.Children.Add(entry.Page());
         _content.Content = page;
         _content.ScrollToTop();
     }
 
-    private static UIElement PageHeader(string glyph, string title)
+    private static UIElement PageHeader(string title) => new TextBlock
     {
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 16) };
-        row.Children.Add(new TextBlock
-        {
-            Text = glyph,
-            FontFamily = new FontFamily("Segoe MDL2 Assets"),
-            FontSize = 18,
-            Foreground = Theme.GreenBrush,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 10, 0),
-        });
-        row.Children.Add(new TextBlock
-        {
-            Text = title,
-            FontSize = 19,
-            FontWeight = FontWeights.Bold,
-            Foreground = new SolidColorBrush(Theme.Text),
-            VerticalAlignment = VerticalAlignment.Center,
-        });
-        return row;
-    }
+        Text = title,
+        FontSize = 24,
+        FontWeight = FontWeights.SemiBold,
+        Foreground = new SolidColorBrush(Theme.Text),
+        Margin = new Thickness(0, 0, 0, 20),
+    };
 
     private static StackPanel Stack(params UIElement[] children)
     {
@@ -172,16 +172,237 @@ public sealed class MainWindow : Window
         return p;
     }
 
-    // =================== Welcome (Quick Setup + How to Use) ===================
+    // =================== Home (Wispr-style: welcome + transcript feed + stats) ===================
 
-    private UIElement BuildWelcomePage()
+    private UIElement BuildHomePage()
     {
         var page = new StackPanel();
 
+        page.Children.Add(new TextBlock
+        {
+            Text = $"Welcome back, {FirstName()}",
+            FontSize = 25,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Theme.Text),
+            Margin = new Thickness(0, 0, 0, 22),
+        });
+
+        var columns = new Grid();
+        columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(250) });
+
+        var main = new StackPanel { Margin = new Thickness(0, 0, 24, 0) };
+
+        var model = SpeechModels.Selected();
+        bool setupDone = model.IsDownloaded && Settings.Current.SetupTested;
+        if (!setupDone)
+        {
+            main.Children.Add(BigCard(BuildQuickSetup(model)));
+            main.Children.Add(BigCard(BuildHowToUse()));
+        }
+        main.Children.Add(BuildFeed());
+        Grid.SetColumn(main, 0);
+        columns.Children.Add(main);
+
+        var side = new StackPanel();
+        side.Children.Add(BigCard(BuildStatsPanel()));
+        Grid.SetColumn(side, 1);
+        columns.Children.Add(side);
+        page.Children.Add(columns);
+        return page;
+    }
+
+    private static string FirstName()
+    {
+        var name = Environment.UserName;
+        if (string.IsNullOrWhiteSpace(name)) return "there";
+        name = name.Split(' ', '.', '_', '-')[0];
+        return char.ToUpperInvariant(name[0]) + name[1..];
+    }
+
+    private UIElement BuildStatsPanel()
+    {
+        var panel = new StackPanel();
+        void Stat(string value, string label, bool first = false)
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = value,
+                FontFamily = Theme.StatSerif,
+                FontSize = 27,
+                Foreground = new SolidColorBrush(Theme.Text),
+                Margin = new Thickness(0, first ? 0 : 14, 0, 0),
+            });
+            panel.Children.Add(new TextBlock { Text = label, FontSize = 12, Foreground = new SolidColorBrush(Theme.SubtleText) });
+        }
+        var total = HistoryStore.TotalWords;
+        Stat(total >= 1000 ? $"{total / 1000.0:0.#}K" : total.ToString(), "total words", first: true);
+        Stat(HistoryStore.FormatMinutes(HistoryStore.TimeSavedMinutes(HistoryStore.WordsToday)), "time saved today");
+        Stat(HistoryStore.CurrentStreakDays.ToString(), "day streak");
+        return panel;
+    }
+
+    private UIElement BuildFeed()
+    {
+        var panel = new StackPanel();
+
+        var header = new DockPanel { Margin = new Thickness(2, 6, 2, 8) };
+        var label = new TextBlock
+        {
+            Text = "TODAY",
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Theme.SubtleText),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        DockPanel.SetDock(label, Dock.Left);
+        header.Children.Add(label);
+
+        var searchBox = new TextBox
+        {
+            Width = 220,
+            Padding = new Thickness(8, 4, 8, 4),
+            Visibility = string.IsNullOrEmpty(_feedFilter) ? Visibility.Collapsed : Visibility.Visible,
+            Text = _feedFilter,
+        };
+        searchBox.TextChanged += (_, _) => { _feedFilter = searchBox.Text; RebuildFeedRows(); };
+        var searchBtn = new TextBlock
+        {
+            Text = "",
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+            FontSize = 14,
+            Foreground = new SolidColorBrush(Theme.SubtleText),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 0, 0),
+            Cursor = Cursors.Hand,
+            ToolTip = "Search past transcripts",
+        };
+        searchBtn.MouseLeftButtonUp += (_, _) =>
+        {
+            searchBox.Visibility = searchBox.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+            if (searchBox.Visibility == Visibility.Visible) searchBox.Focus();
+            else { _feedFilter = ""; searchBox.Text = ""; RebuildFeedRows(); }
+        };
+        var right = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        right.Children.Add(searchBox);
+        right.Children.Add(searchBtn);
+        DockPanel.SetDock(right, Dock.Right);
+        header.Children.Add(right);
+        panel.Children.Add(header);
+
+        _feedRows = new StackPanel();
+        panel.Children.Add(new Border
+        {
+            Background = new SolidColorBrush(Theme.CardInner),
+            BorderBrush = Theme.HairlineBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Child = _feedRows,
+        });
+        RebuildFeedRows();
+        return panel;
+    }
+
+    private StackPanel? _feedRows;
+
+    private void RebuildFeedRows()
+    {
+        if (_feedRows is null) return;
+        _feedRows.Children.Clear();
+        var entries = (string.IsNullOrWhiteSpace(_feedFilter) ? HistoryStore.Entries.ToList() : HistoryStore.Search(_feedFilter))
+            .Take(30).ToList();
+        if (entries.Count == 0)
+        {
+            _feedRows.Children.Add(new TextBlock
+            {
+                Text = "No transcripts yet — press your hotkey and start talking.",
+                Foreground = new SolidColorBrush(Theme.SubtleText),
+                Margin = new Thickness(16, 18, 16, 18),
+            });
+            return;
+        }
+        for (int i = 0; i < entries.Count; i++)
+        {
+            _feedRows.Children.Add(FeedRow(entries[i]));
+            if (i < entries.Count - 1)
+                _feedRows.Children.Add(new Border { Height = 1, Background = Theme.HairlineBrush });
+        }
+    }
+
+    private UIElement FeedRow(TranscriptionHistoryEntry entry)
+    {
+        var grid = new Grid { Margin = new Thickness(16, 12, 12, 12), Background = Brushes.Transparent };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(74) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var time = new TextBlock
+        {
+            Text = entry.Timestamp.ToString("h:mm tt").ToLowerInvariant(),
+            Foreground = new SolidColorBrush(Theme.SubtleText),
+            FontSize = 12,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(0, 2, 0, 0),
+        };
+        Grid.SetColumn(time, 0);
+        grid.Children.Add(time);
+
+        var textCol = new StackPanel();
+        textCol.Children.Add(new TextBlock
+        {
+            Text = entry.ProcessedText,
+            Foreground = new SolidColorBrush(Theme.Text),
+            FontSize = 13.5,
+            TextWrapping = TextWrapping.Wrap,
+        });
+        if (entry.WasCancelled)
+            textCol.Children.Add(new TextBlock
+            {
+                Text = "cancelled — not typed",
+                Foreground = new SolidColorBrush(Theme.SubtleText),
+                FontSize = 11,
+                Margin = new Thickness(0, 2, 0, 0),
+            });
+        Grid.SetColumn(textCol, 1);
+        grid.Children.Add(textCol);
+
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Opacity = 0, VerticalAlignment = VerticalAlignment.Top };
+        UIElement ActionIcon(string glyph, string tip, Action click)
+        {
+            var b = new Border
+            {
+                Width = 26, Height = 26, CornerRadius = new CornerRadius(6),
+                Background = Brushes.Transparent, Cursor = Cursors.Hand, ToolTip = tip,
+                Margin = new Thickness(2, 0, 0, 0),
+                Child = new TextBlock
+                {
+                    Text = glyph, FontFamily = new FontFamily("Segoe MDL2 Assets"), FontSize = 13,
+                    Foreground = new SolidColorBrush(Theme.SubtleText),
+                    HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                },
+            };
+            b.MouseEnter += (_, _) => b.Background = new SolidColorBrush(Theme.SidebarSelected);
+            b.MouseLeave += (_, _) => b.Background = Brushes.Transparent;
+            b.MouseLeftButtonUp += (_, e) => { e.Handled = true; click(); };
+            return b;
+        }
+        actions.Children.Add(ActionIcon("", "Copy", () => ClipboardService.SetText(entry.ProcessedText)));
+        actions.Children.Add(ActionIcon("", "Delete", () => HistoryStore.DeleteEntries(new[] { entry.Id })));
+        Grid.SetColumn(actions, 2);
+        grid.Children.Add(actions);
+
+        grid.MouseEnter += (_, _) => actions.Opacity = 1;
+        grid.MouseLeave += (_, _) => actions.Opacity = 0;
+        return grid;
+    }
+
+    // =================== Quick Setup (shown until complete) ===================
+
+    private UIElement BuildQuickSetup(SpeechModelInfo model)
+    {
         var setup = new StackPanel();
         setup.Children.Add(SectionHeader("", "Quick Setup"));
 
-        var model = SpeechModels.Selected();
         setup.Children.Add(SetupRow(
             "Voice Model Ready", "Speech recognition model is loaded and ready",
             model.IsDownloaded,
@@ -194,7 +415,7 @@ public sealed class MainWindow : Window
             micOk ? null : ("Open Settings", () => TryOpen("ms-settings:privacy-microphone"))));
 
         setup.Children.Add(SetupRow(
-            "Global Input Hooks Active", "Hotkeys and typing into apps are enabled (no extra permission needed on Windows)",
+            "Global Input Hooks Active", "Hotkeys and typing into apps are enabled",
             true, null));
 
         bool aiOk = !string.IsNullOrEmpty(Settings.Current.SelectedProviderID) &&
@@ -204,28 +425,26 @@ public sealed class MainWindow : Window
             aiOk,
             aiOk ? null : ("Configure", () => Navigate("AI Settings"))));
 
-        _tryoutRow = SetupRow(
+        setup.Children.Add(SetupRow(
             "Setup Tested Successfully", "You've successfully tested voice transcription",
             Settings.Current.SetupTested,
-            Settings.Current.SetupTested ? null : ("Test now", () => _ = RunTryoutAsync()));
-        setup.Children.Add(_tryoutRow);
+            Settings.Current.SetupTested ? null : ("Test now", () => _ = RunTryoutAsync())));
         _tryoutStatus = new TextBlock { Foreground = new SolidColorBrush(Theme.SubtleText), Margin = new Thickness(4, 2, 0, 0), TextWrapping = TextWrapping.Wrap };
         setup.Children.Add(_tryoutStatus);
+        return setup;
+    }
 
-        page.Children.Add(BigCard(setup));
-
+    private UIElement BuildHowToUse()
+    {
         var how = new StackPanel();
         how.Children.Add(SectionHeader("", "How to Use"));
         var hotkey = Settings.Current.PrimaryDictationShortcuts.FirstOrDefault()?.DisplayString ?? "Right Alt";
         how.Children.Add(NumberRow(1, "Start Recording", $"Press your hotkey (default: {hotkey}) in any app"));
         how.Children.Add(NumberRow(2, "Speak Clearly", "Speak naturally — works best in quiet environments"));
         how.Children.Add(NumberRow(3, "Auto-Type Result", "Transcription is automatically typed into your focused app"));
-        page.Children.Add(BigCard(how));
-
-        return page;
+        return how;
     }
 
-    private Border? _tryoutRow;
     private TextBlock? _tryoutStatus;
 
     private async Task RunTryoutAsync()
@@ -264,7 +483,7 @@ public sealed class MainWindow : Window
             _tryoutStatus.Text = $"✓ You said: “{formatted}”";
             Settings.Current.SetupTested = true;
             Settings.Current.Save();
-            Navigate("Welcome");
+            Navigate("Home");
         }
         catch (Exception ex)
         {
@@ -355,8 +574,7 @@ public sealed class MainWindow : Window
         {
             IsReadOnly = true, TextWrapping = TextWrapping.Wrap, AcceptsReturn = true,
             MinHeight = 180, Padding = new Thickness(10), Visibility = Visibility.Collapsed,
-            Background = new SolidColorBrush(Theme.Field), Foreground = new SolidColorBrush(Theme.Text),
-            BorderBrush = new SolidColorBrush(Theme.CardBorder), VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             MaxHeight = 320,
         };
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed };
@@ -441,7 +659,7 @@ public sealed class MainWindow : Window
         return page;
     }
 
-    // =================== shared building blocks (mac look) ===================
+    // =================== shared building blocks ===================
 
     private static UIElement SectionHeader(string glyph, string title)
     {
@@ -470,7 +688,6 @@ public sealed class MainWindow : Window
         Child = child,
     };
 
-    /// <summary>One Quick-Setup row: check circle, title/sub, Done pill or action button.</summary>
     private static Border SetupRow(string title, string subtitle, bool done, (string Label, Action Click)? action)
     {
         var grid = new Grid();
@@ -481,7 +698,7 @@ public sealed class MainWindow : Window
         var check = new Border
         {
             Width = 26, Height = 26, CornerRadius = new CornerRadius(13),
-            Background = done ? Theme.GreenBrush : new SolidColorBrush(Color.FromArgb(60, 155, 160, 166)),
+            Background = done ? Theme.GreenBrush : new SolidColorBrush(Color.FromArgb(50, 122, 120, 114)),
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 12, 0),
             Child = new TextBlock
@@ -508,7 +725,7 @@ public sealed class MainWindow : Window
         {
             right = new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(45, 48, 209, 88)),
+                Background = new SolidColorBrush(Color.FromArgb(34, 31, 122, 106)),
                 CornerRadius = new CornerRadius(11),
                 Padding = new Thickness(12, 4, 12, 4),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -554,7 +771,7 @@ public sealed class MainWindow : Window
         row.Children.Add(new Border
         {
             Width = 24, Height = 24, CornerRadius = new CornerRadius(12),
-            Background = new SolidColorBrush(Color.FromArgb(55, 48, 209, 88)),
+            Background = new SolidColorBrush(Color.FromArgb(40, 31, 122, 106)),
             Margin = new Thickness(0, 2, 12, 0),
             Child = new TextBlock
             {
@@ -570,14 +787,15 @@ public sealed class MainWindow : Window
         return row;
     }
 
+    /// <summary>Dark charcoal pill button (Wispr's "Add new" style).</summary>
     private static Button PrimaryButton(string label) => new()
     {
         Content = label,
-        Padding = new Thickness(14, 7, 14, 7),
+        Padding = new Thickness(16, 8, 16, 8),
         Margin = new Thickness(0, 6, 0, 0),
         HorizontalAlignment = HorizontalAlignment.Left,
-        Background = Theme.AccentBrush,
-        Foreground = Brushes.White,
+        Background = Theme.InkBrush,
+        Foreground = new SolidColorBrush(Theme.InkText),
         BorderThickness = new Thickness(0),
     };
 

@@ -64,13 +64,28 @@ public static class LocalAiServer
 
     public static bool IsRuntimeInstalled() => File.Exists(ServerExe);
 
-    public static bool IsModelInstalled()
+    public static bool IsModelInstalled() => IsModelInstalled(SelectedModel);
+
+    public static bool IsModelInstalled(LocalAiModel m)
     {
-        var m = SelectedModel;
         var path = ModelPath(m);
         if (!File.Exists(path)) return false;
         var len = new FileInfo(path).Length;
         return m.ExpectedBytes > 0 ? len == m.ExpectedBytes : len > 100_000_000;
+    }
+
+    /// <summary>Uninstall a local LLM (stops the server first if it's serving this model).</summary>
+    public static void DeleteModel(LocalAiModel m)
+    {
+        if (SelectedModel.Id == m.Id && IsRunning) Stop();
+        try { File.Delete(ModelPath(m)); }
+        catch (Exception ex) { Log.Warn("localai", $"Delete {m.Id} failed: {ex.Message}"); }
+    }
+
+    public static long InstalledBytes(LocalAiModel m)
+    {
+        var path = ModelPath(m);
+        return File.Exists(path) ? new FileInfo(path).Length : 0;
     }
 
     /// <summary>Download the llama.cpp runtime + selected model (with progress).</summary>
@@ -125,7 +140,7 @@ public static class LocalAiServer
             FileName = ServerExe,
             Arguments = $"-m \"{ModelPath(model)}\" --host 127.0.0.1 --port {port} " +
                         $"-c {Math.Clamp(Settings.Current.LocalAiContextTokens, 2048, 8192)} " +
-                        "--threads " + Math.Clamp(Environment.ProcessorCount - 2, 2, 8) +
+                        "--threads " + Math.Clamp(Environment.ProcessorCount - 2, 4, 10) +
                         " --no-webui --log-disable",
             UseShellExecute = false,
             CreateNoWindow = true,

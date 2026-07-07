@@ -151,7 +151,9 @@ public sealed class Settings
     public bool PauseMediaDuringTranscription { get; set; }
 
     // ----- App behavior -----
-    public ThemePreference Theme { get; set; } = ThemePreference.System;
+    /// <summary>Bumped when a release wants to migrate existing settings once.</summary>
+    public int SettingsRevision { get; set; }
+    public ThemePreference Theme { get; set; } = ThemePreference.Light; // Wispr-style light-first
     public string AccentColor { get; set; } = "#3AC8C6"; // Cyan default (mac AccentColorOption)
     public bool LaunchAtStartup { get; set; }
     public bool AutoUpdateCheckEnabled { get; set; } = true;
@@ -187,6 +189,13 @@ public sealed class Settings
                 if (loaded is not null)
                 {
                     Current = loaded;
+                    // rev 1: Wispr-style light-first UI — move existing System-theme users to Light once
+                    if (Current.SettingsRevision < 1)
+                    {
+                        if (Current.Theme == ThemePreference.System) Current.Theme = ThemePreference.Light;
+                        Current.SettingsRevision = 1;
+                        Current.Save("migration");
+                    }
                     return;
                 }
             }

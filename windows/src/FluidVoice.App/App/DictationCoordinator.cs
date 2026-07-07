@@ -379,17 +379,59 @@ public sealed class DictationCoordinator : IDictationControl
         HistoryStore.AddEntry(entry);
     }
 
+    /// <summary>
+    /// Wispr-style cancel: nothing is typed, but the recording is still transcribed in the
+    /// background and saved to History (marked cancelled), so a mis-fired dictation isn't lost.
+    /// </summary>
     private void CancelRecording()
     {
         if (_activeMode == RecordingMode.None) return;
-        Log.Info("coordinator", "Recording cancelled");
+        Log.Info("coordinator", "Recording cancelled (transcript will be kept in history)");
+        var mode = _activeMode;
+        var focus = _focusAtStart;
         _activeMode = RecordingMode.None;
         _partialCts?.Cancel();
-        _recorder.Stop();
+        var pcm = _recorder.Stop();
         SoundCues.PlayStop();
         MediaPauseService.ResumeIfWePaused();
         RecordingStateChanged?.Invoke(false);
         _overlay.HideOverlay();
         StatusChanged?.Invoke("Ready");
+
+        if (mode != RecordingMode.Dictation && mode != RecordingMode.PromptMode) return;
+        if (pcm.Length < AudioRecorder.TargetSampleRate / 2) return; // < 0.5s of audio: nothing worth keeping
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (_partialTask is not null) { try { await _partialTask; } catch { } }
+                if (pcm.Length < AudioRecorder.TargetSampleRate)
+                {
+                    var padded = new float[AudioRecorder.TargetSampleRate];
+                    Array.Copy(pcm, padded, pcm.Length);
+                    pcm = padded;
+                }
+                var model = SpeechModels.Selected();
+                if (!model.IsDownloaded) return;
+                var engine = await EnsureEngineReadyAsync(model, null, CancellationToken.None);
+                var raw = await engine.TranscribeAsync(pcm, CancellationToken.None);
+                var formatted = Text.TranscriptFormatter.Process(raw, focus?.ProcessName, focus?.WindowTitle);
+                if (string.IsNullOrWhiteSpace(formatted)) return;
+                HistoryStore.AddEntry(new TranscriptionHistoryEntry
+                {
+                    RawText = raw,
+                    ProcessedText = formatted,
+                    AppName = focus?.ProcessName ?? "",
+                    WindowTitle = focus?.WindowTitle ?? "",
+                    WasCancelled = true,
+                });
+                Log.Info("coordinator", "Cancelled recording transcribed and saved to history");
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("coordinator", $"Cancelled-recording transcription failed: {ex.Message}");
+            }
+        });
     }
 }

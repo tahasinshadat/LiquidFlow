@@ -23,18 +23,21 @@ public static class Styles
         });
     }
 
+    private static string Hex(System.Windows.Media.Color c) => $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+
     private static ResourceDictionary Build()
     {
-        string accent = Settings.Current.AccentColor;
+        bool dark = Theme.IsDark;
         string xaml = Template
-            .Replace("{ACCENT}", accent)
-            .Replace("{FG}", "#F2F3F5")
-            .Replace("{FIELD}", "#2C2E33")
-            .Replace("{FIELDBORDER}", "#3C3F45")
-            .Replace("{POPUP}", "#26282D")
-            .Replace("{HOVER}", "#3A3D43")
-            .Replace("{TRACK}", "#41444B")
-            .Replace("{THUMB}", "#5A5E66");
+            .Replace("{ACCENT}", Hex(Theme.Accent))
+            .Replace("{FG}", Hex(Theme.Text))
+            .Replace("{FIELD}", Hex(Theme.Field))
+            .Replace("{FIELDBORDER}", Hex(Theme.CardBorder))
+            .Replace("{POPUP}", Hex(Theme.CardInner))
+            .Replace("{HOVER}", Hex(Theme.SidebarSelected))
+            .Replace("{TRACK}", dark ? "#41444B" : "#DDD9D0")
+            .Replace("{THUMB}", dark ? "#5A5E66" : "#C6C2B8")
+            .Replace("{HOVERLAYER}", dark ? "#FFFFFF" : "#000000");
         return (ResourceDictionary)XamlReader.Parse(xaml);
     }
 
@@ -60,7 +63,7 @@ public static class Styles
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}"
                     CornerRadius="8"/>
-            <Border x:Name="HoverLayer" Background="#FFFFFF" Opacity="0" CornerRadius="8"/>
+            <Border x:Name="HoverLayer" Background="{HOVERLAYER}" Opacity="0" CornerRadius="8"/>
             <ContentPresenter Margin="{TemplateBinding Padding}"
                               HorizontalAlignment="Center" VerticalAlignment="Center"
                               TextElement.Foreground="{TemplateBinding Foreground}"/>

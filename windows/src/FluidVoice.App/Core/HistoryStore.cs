@@ -24,6 +24,8 @@ public sealed class TranscriptionHistoryEntry
     public string AppName { get; set; } = "";
     public string WindowTitle { get; set; } = "";
     public bool WasAIProcessed { get; set; }
+    /// <summary>User cancelled before insertion — transcript kept, nothing typed (Wispr-style cancel).</summary>
+    public bool WasCancelled { get; set; }
     public string? ProcessingModel { get; set; }
     public string? AiProcessingError { get; set; }
     public DictationAudioMetadata? Audio { get; set; }
