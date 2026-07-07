@@ -59,26 +59,57 @@ public sealed class KeyboardHook : IDisposable
         }
     }
 
+    private const uint WM_REARM = 0x0400 + 1; // WM_APP+1: watchdog asks the hook thread to re-install
+    private System.Threading.Timer? _watchdog;
+    private IntPtr _hMod;
+
     private void HookThread()
     {
         _threadId = GetCurrentThreadId();
         _kbProc = KbCallback;
         _mouseProc = MouseCallback;
         using var module = Process.GetCurrentProcess().MainModule;
-        var hMod = GetModuleHandle(module?.ModuleName);
-        _kbHook = SetWindowsHookEx(WH_KEYBOARD_LL, _kbProc, hMod, 0);
-        _mouseHook = SetWindowsHookEx(WH_MOUSE_LL, _mouseProc, hMod, 0);
-        if (_kbHook == IntPtr.Zero)
-            Log.Error("hook", $"SetWindowsHookEx(WH_KEYBOARD_LL) failed: {Marshal.GetLastWin32Error()}");
+        _hMod = GetModuleHandle(module?.ModuleName);
+        InstallHooks();
         _ready.Set();
+
+        // Windows silently unhooks a low-level hook if a callback ever exceeds
+        // LowLevelHooksTimeout (~300ms) — no error, events just stop. Re-arm every 15s so
+        // hotkeys always keep working across sleep/resume, UAC prompts, and slow moments.
+        _watchdog = new System.Threading.Timer(
+            _ => PostThreadMessage(_threadId, WM_REARM, IntPtr.Zero, IntPtr.Zero),
+            null, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(15));
 
         while (GetMessage(out var msg, IntPtr.Zero, 0, 0) > 0)
         {
+            if (msg.message == WM_REARM)
+            {
+                ReinstallHooks();
+                continue;
+            }
             TranslateMessage(ref msg);
             DispatchMessage(ref msg);
         }
+        _watchdog?.Dispose();
         if (_kbHook != IntPtr.Zero) UnhookWindowsHookEx(_kbHook);
         if (_mouseHook != IntPtr.Zero) UnhookWindowsHookEx(_mouseHook);
+    }
+
+    private void InstallHooks()
+    {
+        _kbHook = SetWindowsHookEx(WH_KEYBOARD_LL, _kbProc!, _hMod, 0);
+        _mouseHook = SetWindowsHookEx(WH_MOUSE_LL, _mouseProc!, _hMod, 0);
+        if (_kbHook == IntPtr.Zero)
+            Log.Error("hook", $"SetWindowsHookEx(WH_KEYBOARD_LL) failed: {Marshal.GetLastWin32Error()}");
+    }
+
+    private void ReinstallHooks()
+    {
+        // fresh handles; clear any stuck key state so a re-arm mid-chord can't wedge a modifier
+        if (_kbHook != IntPtr.Zero) { UnhookWindowsHookEx(_kbHook); _kbHook = IntPtr.Zero; }
+        if (_mouseHook != IntPtr.Zero) { UnhookWindowsHookEx(_mouseHook); _mouseHook = IntPtr.Zero; }
+        lock (_downSync) _downKeys.Clear();
+        InstallHooks();
     }
 
     private IntPtr KbCallback(int nCode, IntPtr wParam, IntPtr lParam)

@@ -155,7 +155,7 @@ public sealed class Settings
     public int SettingsRevision { get; set; }
     public ThemePreference Theme { get; set; } = ThemePreference.Light; // Wispr-style light-first
     public string AccentColor { get; set; } = "#3AC8C6"; // Cyan default (mac AccentColorOption)
-    public bool LaunchAtStartup { get; set; }
+    public bool LaunchAtStartup { get; set; } = true; // always-on dictation app
     public bool AutoUpdateCheckEnabled { get; set; } = true;
     public bool BetaReleasesEnabled { get; set; }
     public bool OnboardingCompleted { get; set; }

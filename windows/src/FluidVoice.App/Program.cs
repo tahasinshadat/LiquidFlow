@@ -31,11 +31,11 @@ public static class Program
         if (args.Contains("--selftest-type"))
             return SelfTestType(args);
 
-        using var singleInstance = new Mutex(true, @"Local\FluidVoice.SingleInstance", out var isFirst);
-        if (!isFirst)
+        using var singleInstance = new SingleInstance();
+        if (!singleInstance.IsFirstInstance)
         {
-            System.Windows.MessageBox.Show("FluidVoice is already running — look for the F icon in the system tray.",
-                "FluidVoice", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+            // Already running: bring the existing window forward instead of a dialog.
+            SingleInstance.SignalExistingInstance();
             return 0;
         }
 
@@ -55,6 +55,7 @@ public static class Program
         }
 
         var app = new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
+        CrashGuard.Install(app);
         Styles.Apply(app);
 
         var overlay = new OverlayWindow();
@@ -121,7 +122,20 @@ public static class Program
 
         hook.Start();
         coordinator.WarmUpModelInBackground();
+
+        // A dictation app is meant to be always-on, so autostart defaults ON. rev 3 turns it
+        // on once for existing installs (a user who explicitly turned it off keeps it off,
+        // because after rev 3 we no longer force it).
+        if (Settings.Current.SettingsRevision < 3)
+        {
+            Settings.Current.LaunchAtStartup = true;
+            Settings.Current.SettingsRevision = 3;
+            Settings.Current.Save("migration");
+        }
         StartupManager.Apply(Settings.Current.LaunchAtStartup);
+
+        // Second launches (or the tray/dock click) bring the running window forward.
+        singleInstance.StartListening(() => app.Dispatcher.BeginInvoke(() => ShowMain(mainWindow, null)));
 
         // Show the main window on launch (like the mac app); closing hides to tray.
         mainWindow.Show();
@@ -178,7 +192,34 @@ public static class Program
             window.WindowState = System.Windows.WindowState.Normal;
         if (tab is not null) window.SelectTab(tab);
         window.Activate();
+
+        // Reliably pull the window to the foreground even when the request comes from a
+        // background thread / another process (Windows blocks plain Activate() then).
+        try
+        {
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+            if (hwnd != IntPtr.Zero)
+            {
+                ShowWindow(hwnd, 9 /*SW_RESTORE*/);
+                var fg = GetForegroundWindow();
+                uint foreThread = GetWindowThreadProcessId(fg, out _);
+                uint ourThread = GetCurrentThreadId();
+                if (foreThread != ourThread) AttachThreadInput(ourThread, foreThread, true);
+                SetForegroundWindow(hwnd);
+                if (foreThread != ourThread) AttachThreadInput(ourThread, foreThread, false);
+            }
+        }
+        catch { }
+        window.Topmost = true;
+        window.Topmost = false;
     }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
 
     /// <summary>
     /// Headless pipeline check: --selftest-stt &lt;wav&gt; [modelId]
