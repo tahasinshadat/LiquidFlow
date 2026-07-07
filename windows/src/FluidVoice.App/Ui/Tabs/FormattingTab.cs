@@ -13,14 +13,14 @@ public sealed class FormattingTab : StackPanel
 
         var fmt = new StackPanel();
         fmt.Children.Add(Theme.Heading("Formatting"));
-        fmt.Children.Add(Theme.Caption("Applied on-device to every transcript before typing (and before AI enhancement)."));
-        fmt.Children.Add(Theme.Toggle("Convert spoken punctuation (\"period\" → \".\", \"new line\", etc.)", s.AutoConvertPunctuationEnabled, v => { s.AutoConvertPunctuationEnabled = v; s.Save("fmt"); }));
-        fmt.Children.Add(Theme.Toggle("Remove filler words (um, uh, …)", s.RemoveFillerWordsEnabled, v => { s.RemoveFillerWordsEnabled = v; s.Save("fmt"); }));
+        fmt.Children.Add(Theme.Caption("Applied locally before FluidVoice types the result."));
+        fmt.Children.Add(Theme.Toggle("Convert spoken punctuation", s.AutoConvertPunctuationEnabled, v => { s.AutoConvertPunctuationEnabled = v; s.Save("fmt"); }));
+        fmt.Children.Add(Theme.Toggle("Remove filler words", s.RemoveFillerWordsEnabled, v => { s.RemoveFillerWordsEnabled = v; s.Save("fmt"); }));
         Children.Add(Theme.Card2(fmt));
 
         var fillers = new StackPanel();
         fillers.Children.Add(Theme.Heading("Filler words"));
-        fillers.Children.Add(Theme.Caption("Comma-separated. These words are stripped when \"Remove filler words\" is on."));
+        fillers.Children.Add(Theme.Caption("Comma-separated words to strip when filler removal is on."));
         var box = new TextBox
         {
             Text = string.Join(", ", s.FillerWords),
@@ -59,7 +59,7 @@ public sealed class FormattingTab : StackPanel
             s.Save("typing");
         };
         typing.Children.Add(combo);
-        typing.Children.Add(Theme.Caption("Clipboard-free types Unicode directly. Clipboard paste briefly uses the clipboard (restored after) — use it if some apps drop characters."));
+        typing.Children.Add(Theme.Caption("Use clipboard paste if a Windows app drops characters during direct insertion."));
         Children.Add(Theme.Card2(typing));
     }
 }

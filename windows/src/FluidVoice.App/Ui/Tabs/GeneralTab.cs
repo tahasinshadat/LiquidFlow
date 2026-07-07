@@ -15,15 +15,15 @@ public sealed class GeneralTab : StackPanel
 
         // --- Hotkeys ---
         var hk = new StackPanel();
-        hk.Children.Add(Theme.Heading("Hotkeys"));
+        hk.Children.Add(Theme.Heading("Shortcuts"));
 
         hk.Children.Add(Theme.Label("Dictation"));
         var dictationRec = new ShortcutRecorder(s.PrimaryDictationShortcuts.FirstOrDefault() ?? HotkeyShortcut.RightAlt());
         dictationRec.ShortcutChanged += sc => { s.PrimaryDictationShortcuts = new List<HotkeyShortcut> { sc }; s.Save("hotkey"); };
         hk.Children.Add(dictationRec);
-        hk.Children.Add(Theme.Caption("Press your hotkey anywhere to start/stop dictation. Click the box to record a custom key, or use a preset:"));
+        hk.Children.Add(Theme.Caption("Use this shortcut anywhere in Windows to start or stop dictation."));
 
-        // one-click presets — Copilot key first (Win+Shift+F23; intercepted so Windows Copilot won't open)
+        // one-click presets: Copilot key first (Win+Shift+F23)
         var presets = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
         void AddPreset(string label, Func<HotkeyShortcut> make)
         {
@@ -37,11 +37,11 @@ public sealed class GeneralTab : StackPanel
             };
             presets.Children.Add(chip);
         }
-        AddPreset("🚀 Copilot key", HotkeyShortcut.CopilotKey);
+        AddPreset("Copilot key", HotkeyShortcut.CopilotKey);
         AddPreset("Right Alt", HotkeyShortcut.RightAlt);
         AddPreset("Right Ctrl", HotkeyShortcut.RightCtrl);
         hk.Children.Add(presets);
-        hk.Children.Add(Theme.Caption("Copilot key: while FluidVoice is running, the key is captured before Windows sees it — it starts dictation instead of opening Copilot. Quit FluidVoice and it goes back to normal."));
+        hk.Children.Add(Theme.Caption("While FluidVoice is running, the Copilot key starts dictation instead of opening Copilot."));
 
         hk.Children.Add(Theme.Label("Activation mode"));
         var modeCombo = new ComboBox { Width = 220, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 6) };
@@ -52,7 +52,7 @@ public sealed class GeneralTab : StackPanel
             if (Enum.TryParse<HotkeyActivationMode>((string)modeCombo.SelectedItem, out var m)) { s.HotkeyMode = m; s.Save("hotkey"); }
         };
         hk.Children.Add(modeCombo);
-        hk.Children.Add(Theme.Caption("Toggle: tap to start, tap to stop. Hold: hold to record. Automatic: tap toggles, hold is push-to-talk (400ms threshold)."));
+        hk.Children.Add(Theme.Caption("Toggle taps on and off. Hold records while pressed. Automatic supports both."));
 
         hk.Children.Add(WithEnableToggle("Edit / Write mode", s.RewriteModeShortcut, s.RewriteModeShortcutEnabled,
             sc => { s.RewriteModeShortcut = sc; s.Save("hotkey"); },
@@ -76,7 +76,7 @@ public sealed class GeneralTab : StackPanel
             if (Enum.TryParse<OverlaySize>((string)sizeCombo.SelectedItem, out var sz)) { s.OverlaySize = sz; s.Save("overlay"); }
         };
         ov.Children.Add(sizeCombo);
-        ov.Children.Add(Theme.Caption("Pill (minimal) · Small · Medium · Large. Live transcription appears in Small and larger."));
+        ov.Children.Add(Theme.Caption("Pill (minimal), Small, Medium, Large. Live transcription appears in Small and larger."));
 
         ov.Children.Add(Theme.Label("Position"));
         var posCombo = new ComboBox { Width = 220, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 6) };

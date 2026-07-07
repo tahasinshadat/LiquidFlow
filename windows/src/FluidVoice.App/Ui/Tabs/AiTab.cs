@@ -22,8 +22,22 @@ public sealed class AiTab : StackPanel
         Children.Clear();
         var s = Settings.Current;
 
-        Children.Add(Theme.Heading("AI enhancement"));
-        Children.Add(Theme.Caption("Optional. Cleans up dictation (formatting, capitalization, corrections) using a cloud provider or the local Fluid Local AI. Nothing leaves your PC unless you enable a cloud provider."));
+        Children.Add(new TextBlock
+        {
+            Text = "AI enhancement",
+            FontSize = 22,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = Theme.TextBrush,
+            Margin = new Thickness(0, 20, 0, 8),
+        });
+        Children.Add(new TextBlock
+        {
+            Text = "Choose how FluidVoice cleans up capitalization, phrasing, and corrections after speech recognition.",
+            FontSize = 14,
+            Foreground = Theme.SubtleBrush,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 14),
+        });
 
         // enable + provider select
         var enablePanel = new StackPanel();
@@ -74,7 +88,7 @@ public sealed class AiTab : StackPanel
             if (!string.IsNullOrEmpty(existing)) keyBox.Password = existing;
             keyBox.PasswordChanged += (_, _) => CredentialStore.SetApiKey(provider.Id, keyBox.Password);
             cfg.Children.Add(keyBox);
-            cfg.Children.Add(Theme.Caption("Stored securely in Windows Credential Manager. Never leaves your PC except to this provider."));
+            cfg.Children.Add(Theme.Caption("Stored in Windows Credential Manager and only sent to the selected provider."));
         }
         else
         {
@@ -106,7 +120,7 @@ public sealed class AiTab : StackPanel
         verifyBtn.Click += async (_, _) =>
         {
             verifyBtn.IsEnabled = false;
-            statusText.Text = "Verifying…";
+            statusText.Text = "Verifying...";
             try
             {
                 var models = await LlmClient.ListModelsAsync(provider.Id, CancellationToken.None);
@@ -114,12 +128,12 @@ public sealed class AiTab : StackPanel
                 ProviderCatalog.MarkVerified(provider.Id);
                 s.Save("ai");
                 PopulateModels(models);
-                statusText.Text = $"✓ Verified — {models.Count} models available";
+                statusText.Text = $"Verified - {models.Count} models available";
                 statusText.Foreground = Theme.AccentBrush;
             }
             catch (Exception ex)
             {
-                statusText.Text = $"✗ {ex.Message}";
+                statusText.Text = ex.Message;
                 statusText.Foreground = new SolidColorBrush(Color.FromRgb(220, 90, 90));
             }
             finally { verifyBtn.IsEnabled = true; }
@@ -136,8 +150,8 @@ public sealed class AiTab : StackPanel
     private Border LocalAiCard()
     {
         var panel = new StackPanel();
-        panel.Children.Add(Theme.Heading("Fluid Local AI (open substitute)"));
-        panel.Children.Add(Theme.Caption("Runs a small instruct model locally via llama.cpp (ARM64-native). This is the open replacement for the proprietary Fluid Intelligence runtime — same on-device enhancement, no data leaves your PC."));
+        panel.Children.Add(Theme.Heading("Fluid Local AI"));
+        panel.Children.Add(Theme.Caption("Runs a small local model for private cleanup. No dictation text leaves your PC when this provider is selected."));
 
         foreach (var m in LocalAiServer.Models)
             panel.Children.Add(LocalModelRow(m));
@@ -159,7 +173,7 @@ public sealed class AiTab : StackPanel
         var text = new StackPanel();
         text.Children.Add(new TextBlock
         {
-            Text = m.DisplayName + (selected ? "  ·  selected" : ""),
+            Text = m.DisplayName + (selected ? " - selected" : ""),
             FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal,
             Foreground = Theme.TextBrush, FontSize = 13,
         });
