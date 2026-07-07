@@ -1,31 +1,63 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using FluidVoice.Core;
+using FluidVoice.Modes;
 
 namespace FluidVoice.Ui;
 
-/// <summary>Main window placeholder — replaced by the full dashboard/settings UI.</summary>
+/// <summary>
+/// The dashboard + settings window. Tabs mirror the mac SettingsView areas:
+/// Home (stats), General (hotkey/overlay/theme), Speech (model picker/download),
+/// AI (providers/keys/local AI), Formatting (filler/punctuation/dictionary), History.
+/// </summary>
 public sealed class MainWindow : Window
 {
-    public MainWindow()
+    private readonly TabControl _tabs = new();
+
+    public MainWindow(CommandModeService? commandService = null)
     {
         Title = "FluidVoice";
-        Width = 900;
-        Height = 620;
-        Background = new SolidColorBrush(Color.FromRgb(24, 24, 27));
-        Content = new TextBlock
+        Width = 940;
+        Height = 680;
+        WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        Background = Theme.BgBrush;
+
+        _tabs.Background = Theme.BgBrush;
+        _tabs.BorderThickness = new Thickness(0);
+        _tabs.Margin = new Thickness(8);
+
+        AddTab("Home", new HomeTab());
+        AddTab("General", new GeneralTab());
+        AddTab("Speech Models", new SpeechModelsTab());
+        AddTab("AI Enhancement", new AiTab());
+        AddTab("Formatting", new FormattingTab());
+        AddTab("Dictionary", new DictionaryTab());
+        AddTab("History", new HistoryTab());
+
+        Content = _tabs;
+        Settings.Changed += _ => Dispatcher.BeginInvoke(() => { Background = Theme.BgBrush; });
+    }
+
+    public void SelectTab(string header)
+    {
+        foreach (TabItem t in _tabs.Items)
+            if ((string)t.Header == header) { _tabs.SelectedItem = t; break; }
+    }
+
+    private void AddTab(string header, UIElement content)
+    {
+        var scroll = new ScrollViewer
         {
-            Text = "FluidVoice for Windows",
-            Foreground = Brushes.White,
-            FontSize = 22,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Content = new Border { Padding = new Thickness(20), Child = content },
         };
+        _tabs.Items.Add(new TabItem { Header = header, Content = scroll, Foreground = Theme.TextBrush });
     }
 
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
-        // hide to tray instead of quitting (mac: menu-bar app behavior)
+        // Hide to tray (menu-bar app behavior); Quit is via the tray menu.
         e.Cancel = true;
         Hide();
     }

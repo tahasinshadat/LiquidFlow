@@ -41,13 +41,13 @@ public static class Program
 
         var overlay = new OverlayWindow();
         var coordinator = new DictationCoordinator(app.Dispatcher, overlay);
-        var mainWindow = new MainWindow();
         var tray = new TrayIcon();
         var hook = new KeyboardHook();
         var hotkeys = new HotkeyManager(hook, coordinator);
 
         // Command + Rewrite (Edit) modes
         var commandService = new CommandModeService();
+        var mainWindow = new MainWindow(commandService);
         var commandWindow = new CommandWindow(commandService);
         var rewriteService = new RewriteModeService();
         var rewriteWindow = new RewriteWindow(rewriteService);
@@ -73,9 +73,9 @@ public static class Program
         coordinator.RecordingStateChanged += recording =>
             app.Dispatcher.BeginInvoke(() => tray.UpdateStatus(recording));
 
-        tray.OpenRequested += () => app.Dispatcher.BeginInvoke(() => ShowMain(mainWindow));
-        tray.SettingsRequested += () => app.Dispatcher.BeginInvoke(() => ShowMain(mainWindow));
-        tray.DictionaryRequested += () => app.Dispatcher.BeginInvoke(() => ShowMain(mainWindow));
+        tray.OpenRequested += () => app.Dispatcher.BeginInvoke(() => ShowMain(mainWindow, "Home"));
+        tray.SettingsRequested += () => app.Dispatcher.BeginInvoke(() => ShowMain(mainWindow, "General"));
+        tray.DictionaryRequested += () => app.Dispatcher.BeginInvoke(() => ShowMain(mainWindow, "Dictionary"));
         tray.CheckUpdatesRequested += () => app.Dispatcher.BeginInvoke(() =>
             Notifications.Show("Updates", "Update checking arrives with the installer build."));
         tray.QuitRequested += () => app.Dispatcher.BeginInvoke(() =>
@@ -105,11 +105,12 @@ public static class Program
         return 0;
     }
 
-    private static void ShowMain(MainWindow window)
+    private static void ShowMain(MainWindow window, string? tab = null)
     {
         window.Show();
         if (window.WindowState == System.Windows.WindowState.Minimized)
             window.WindowState = System.Windows.WindowState.Normal;
+        if (tab is not null) window.SelectTab(tab);
         window.Activate();
     }
 
