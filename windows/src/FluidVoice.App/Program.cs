@@ -139,6 +139,11 @@ public static class Program
 
         // Show the main window on launch (like the mac app); closing hides to tray.
         mainWindow.Show();
+
+        // New web UI (WebView2 + React) — runs alongside the WPF window while it's being built out.
+        // LIQUIDFLOW_WEB=1 shows it; when it reaches parity it becomes the default shell.
+        if (Environment.GetEnvironmentVariable("LIQUIDFLOW_WEB") == "1")
+            new Ui.Web.WebShellWindow().Show();
         if (!Settings.Current.OnboardingCompleted)
         {
             Settings.Current.OnboardingCompleted = true;

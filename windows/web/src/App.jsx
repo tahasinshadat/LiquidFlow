@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { call, isNative } from "./core.js";
 
 // ---- tiny inline icon set (stroke, currentColor) ----
 const Icon = ({ d, size = 20, fill = "none" }) => (
@@ -81,10 +82,12 @@ function Stat({ n, label }) {
   );
 }
 
-function Home() {
+function Home({ state }) {
+  const s = state?.stats ?? {};
+  const profileModel = state?.selectedModel ?? "Parakeet TDT 0.6B v2";
   return (
     <div className="mx-auto max-w-[1120px]">
-      <h1 className="text-[26px] font-semibold">Good evening, Tahasin</h1>
+      <h1 className="text-[26px] font-semibold">{state?.greeting ?? "Welcome"}, {state?.name ?? "there"}</h1>
       <p className="mt-1 text-[14px] text-muted">Keep your hands on the work. LiquidFlow will handle the words.</p>
 
       <div className="mt-6 grid grid-cols-[1fr_300px] gap-6">
@@ -95,7 +98,7 @@ function Home() {
             <h2 className="font-display text-[30px] text-white">
               Make LiquidFlow sound like <span className="italic">you</span>
             </h2>
-            <p className="mt-2 max-w-md text-[14px] font-semibold text-white/90">Finish setup for Parakeet TDT 0.6B v2, then dictate into any Windows app.</p>
+            <p className="mt-2 max-w-md text-[14px] font-semibold text-white/90">Finish setup for {profileModel}, then dictate into any Windows app.</p>
             <button className="mt-5 rounded-lg bg-white/95 px-4 py-2 text-[13px] font-semibold text-ink transition hover:bg-white">Finish setup</button>
           </div>
 
@@ -130,9 +133,9 @@ function Home() {
         {/* right column */}
         <div className="space-y-5">
           <div className="flex flex-col gap-5 rounded-2xl border border-line bg-card p-6">
-            <Stat n="117" label="total words" />
-            <Stat n="40" label="typing wpm" />
-            <Stat n="1" label="day streak" />
+            <Stat n={s.totalWords >= 1000 ? (s.totalWords / 1000).toFixed(1) + "K" : (s.totalWords ?? 0)} label="total words" />
+            <Stat n={s.wpm ?? 40} label="typing wpm" />
+            <Stat n={s.streak ?? 0} label="day streak" />
           </div>
           <div className="rounded-2xl border border-line bg-card p-6">
             <div className="text-[16px] font-semibold">Your Voice Profile</div>
@@ -144,7 +147,7 @@ function Home() {
               <span className="text-[12px] font-semibold text-teal">Active</span>
             </div>
             <div className="my-4 h-px bg-line" />
-            <div className="flex items-center gap-2 text-[13px] font-semibold"><Icon d={IMic} size={16} /> Parakeet TDT 0.6B v2</div>
+            <div className="flex items-center gap-2 text-[13px] font-semibold"><Icon d={IMic} size={16} /> {profileModel}</div>
             <div className="mt-1 text-[12px] text-muted">English</div>
           </div>
         </div>
@@ -155,12 +158,34 @@ function Home() {
 
 export default function App() {
   const [active, setActive] = useState("home");
+  const [state, setState] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () => call("getState").then((s) => alive && setState(s)).catch(() => {});
+    load();
+    // re-pull when the core signals settings/history changed
+    import("./core.js").then(({ on }) => {
+      on("settingsChanged", load);
+      on("historyChanged", load);
+    });
+    return () => { alive = false; };
+  }, []);
+
   return (
     <div className="flex h-full bg-ink">
       <Rail active={active} setActive={setActive} />
       <div className="flex-1 p-3 pl-0">
         <div className="h-full overflow-y-auto rounded-2xl border border-line bg-surface px-10 py-9">
-          <Home />
+          {active === "home" ? (
+            <Home state={state} />
+          ) : (
+            <div className="mx-auto max-w-[1120px]">
+              <h1 className="text-[26px] font-semibold capitalize">{active}</h1>
+              <p className="mt-2 text-[14px] text-muted">Coming soon on the new UI — wiring this screen to the native core next.</p>
+              {!isNative && <p className="mt-4 text-[12px] text-muted/70">(browser preview — running on mock data)</p>}
+            </div>
+          )}
         </div>
       </div>
     </div>

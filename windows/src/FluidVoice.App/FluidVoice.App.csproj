@@ -42,6 +42,8 @@
     <!-- sherpa-onnx: Parakeet (NeMo transducer, ONNX) engine; ships win-arm64 + win-x64 native runtimes -->
     <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.13.3" />
     <PackageReference Include="NAudio" Version="2.2.1" />
+    <!-- WebView2: hosts the React front-end (windows/web) as the app UI; Evergreen runtime, arm64 + x64 -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
   </ItemGroup>
 
 </Project>
