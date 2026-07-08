@@ -10,6 +10,7 @@ namespace FluidVoice.Ui;
 public sealed class SettingsModal : Window
 {
     private readonly ContentControl _content = new();
+    private readonly TextBlock _headerTitle = new();
     private readonly Dictionary<string, Border> _items = new();
     private readonly List<SettingsSection> _sections;
 
@@ -58,15 +59,19 @@ public sealed class SettingsModal : Window
         Grid.SetColumn(sidebar, 0);
         grid.Children.Add(sidebar);
 
-        var contentShell = new Grid { Margin = new Thickness(40, 38, 40, 30) };
-        var scroller = new ScrollViewer
-        {
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            Content = _content,
-        };
-        contentShell.Children.Add(scroller);
-        WindowFx.RoundClip(shell, 18); // keep scrollbars inside the rounded shell
+        // content column = fixed header (title + close) over a scrolling body, so the
+        // scrollbar lives only in the body and never runs under the close button.
+        var contentColumn = new Grid();
+        contentColumn.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        contentColumn.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+        var header = new Grid { Margin = new Thickness(40, 30, 14, 6) };
+        _headerTitle.FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI");
+        _headerTitle.FontSize = 21;
+        _headerTitle.FontWeight = FontWeights.SemiBold;
+        _headerTitle.Foreground = Theme.TextBrush;
+        _headerTitle.VerticalAlignment = VerticalAlignment.Center;
+        header.Children.Add(_headerTitle);
 
         var close = new Button
         {
@@ -76,19 +81,35 @@ public sealed class SettingsModal : Window
                 FontFamily = new FontFamily("Segoe MDL2 Assets"),
                 FontSize = 11,
             },
-            Width = 34,
-            Height = 34,
+            Width = 32,
+            Height = 32,
             Padding = new Thickness(0),
+            Background = Brushes.Transparent,
+            BorderBrush = Brushes.Transparent,
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Top,
-            ToolTip = "Close settings",
+            ToolTip = "Close settings (Esc)",
         };
         close.Click += (_, _) => Close();
-        contentShell.Children.Add(close);
+        header.Children.Add(close);
+        Grid.SetRow(header, 0);
+        contentColumn.Children.Add(header);
 
-        Grid.SetColumn(contentShell, 1);
-        grid.Children.Add(contentShell);
+        var scroller = new ScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Content = _content,
+            Padding = new Thickness(40, 4, 26, 26),
+            Margin = new Thickness(0, 0, 8, 10), // inset the scrollbar off the rounded corner
+        };
+        Grid.SetRow(scroller, 1);
+        contentColumn.Children.Add(scroller);
+
+        Grid.SetColumn(contentColumn, 1);
+        grid.Children.Add(contentColumn);
         shell.Child = grid;
+        WindowFx.RoundClip(shell, 18); // clip everything (incl. scrollbar) to the rounded shell
         Content = shell;
 
         _currentSection = initialSection;
@@ -208,18 +229,12 @@ public sealed class SettingsModal : Window
         foreach (var (name, item) in _items)
             item.Background = name == section.Title ? new SolidColorBrush(Theme.SidebarSelected) : Brushes.Transparent;
 
+        _headerTitle.Text = section.Title;
+        _headerTitle.Foreground = Theme.TextBrush;
         var body = new StackPanel { LayoutTransform = Theme.PageScale() };
-        body.Children.Add(new TextBlock
-        {
-            Text = section.Title,
-            FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI"),
-            FontSize = 21,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = Theme.TextBrush,
-            Margin = new Thickness(0, 0, 46, 22),
-        });
         body.Children.Add(section.Build());
         _content.Content = body;
+        _content.Dispatcher.BeginInvoke(() => (_content.Parent as ScrollViewer)?.ScrollToTop());
     }
 }
 
