@@ -138,21 +138,26 @@ public static class Styles
       <Setter.Value>
         <ControlTemplate TargetType="CheckBox">
           <StackPanel Orientation="Horizontal" Background="Transparent">
-            <Border x:Name="Track" Width="38" Height="21" CornerRadius="10.5" VerticalAlignment="Center">
+            <Border x:Name="Track" Width="44" Height="25" CornerRadius="12.5" VerticalAlignment="Center">
               <Border.Background>
                 <SolidColorBrush x:Name="TrackBrush" Color="{TRACK}"/>
               </Border.Background>
-              <Ellipse x:Name="Thumb" Width="15" Height="15"
-                       HorizontalAlignment="Left" Margin="3,0,3,0">
-                <Ellipse.Fill>
-                  <SolidColorBrush x:Name="ThumbBrush" Color="#E8E9EB"/>
-                </Ellipse.Fill>
-                <Ellipse.RenderTransform>
-                  <TranslateTransform x:Name="ThumbShift" X="0"/>
-                </Ellipse.RenderTransform>
-              </Ellipse>
+              <Grid>
+                <Ellipse x:Name="Thumb" Width="19" Height="19"
+                         HorizontalAlignment="Left" Margin="3,0,3,0">
+                  <Ellipse.Fill>
+                    <SolidColorBrush x:Name="ThumbBrush" Color="#FDFDFE"/>
+                  </Ellipse.Fill>
+                  <Ellipse.Effect>
+                    <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.30" Color="#000000"/>
+                  </Ellipse.Effect>
+                  <Ellipse.RenderTransform>
+                    <TranslateTransform x:Name="ThumbShift" X="0"/>
+                  </Ellipse.RenderTransform>
+                </Ellipse>
+              </Grid>
             </Border>
-            <ContentPresenter Margin="10,0,0,0" VerticalAlignment="Center"
+            <ContentPresenter Margin="11,0,0,0" VerticalAlignment="Center"
                               TextElement.Foreground="{TemplateBinding Foreground}"/>
           </StackPanel>
           <ControlTemplate.Triggers>
@@ -161,7 +166,7 @@ public static class Styles
                 <BeginStoryboard>
                   <Storyboard>
                     <DoubleAnimation Storyboard.TargetName="ThumbShift" Storyboard.TargetProperty="X"
-                                     To="17" Duration="0:0:0.16">
+                                     To="19" Duration="0:0:0.16">
                       <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
                     </DoubleAnimation>
                     <ColorAnimation Storyboard.TargetName="TrackBrush" Storyboard.TargetProperty="Color"

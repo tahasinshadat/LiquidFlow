@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using FluidVoice.Core;
 
@@ -184,6 +185,55 @@ public static class Theme
         HorizontalAlignment = HorizontalAlignment.Center,
         VerticalAlignment = VerticalAlignment.Center,
     };
+
+    /// <summary>
+    /// iOS-style segmented control (a pill with a sliding selected segment). Cleaner than a
+    /// dropdown for a small fixed set of choices like the activation mode.
+    /// </summary>
+    public static UIElement Segmented(IReadOnlyList<string> options, int selected, Action<int> onSelect, double maxWidth = 360)
+    {
+        var track = new Border
+        {
+            Background = new SolidColorBrush(SidebarSelected),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(3),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            MaxWidth = maxWidth,
+            Margin = new Thickness(0, 0, 0, 6),
+        };
+        var grid = new Grid();
+        var segs = new List<Border>();
+        for (int i = 0; i < options.Count; i++)
+        {
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            int idx = i;
+            bool on = i == selected;
+            var seg = new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                Background = on ? SurfaceBrush : Brushes.Transparent,
+                Padding = new Thickness(16, 7, 16, 7),
+                Cursor = Cursors.Hand,
+                Child = new TextBlock
+                {
+                    Text = options[i],
+                    FontSize = 13,
+                    FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal,
+                    Foreground = on ? TextBrush : SubtleBrush,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    TextAlignment = TextAlignment.Center,
+                },
+            };
+            if (on)
+                seg.Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 5, ShadowDepth = 1, Opacity = 0.14, Color = Colors.Black };
+            seg.MouseLeftButtonUp += (_, _) => onSelect(idx);
+            Grid.SetColumn(seg, i);
+            grid.Children.Add(seg);
+            segs.Add(seg);
+        }
+        track.Child = grid;
+        return track;
+    }
 
     public static CheckBox Toggle(string label, bool value, Action<bool> onChange)
     {

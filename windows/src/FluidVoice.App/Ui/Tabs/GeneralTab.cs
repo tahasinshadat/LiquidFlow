@@ -10,6 +10,10 @@ namespace FluidVoice.Ui;
 /// <summary>Hotkey, activation mode, overlay size/position, theme (SettingsView general area).</summary>
 public sealed class GeneralTab : StackPanel
 {
+    private ContentControl? _modeHost;
+    private Action? _rebuildMode;
+    private void RefreshModeControl() => _rebuildMode?.Invoke();
+
     public GeneralTab()
     {
         var s = Settings.Current;
@@ -45,14 +49,15 @@ public sealed class GeneralTab : StackPanel
         hk.Children.Add(Theme.Caption("While LiquidFlow is running, the Copilot key starts dictation instead of opening Copilot."));
 
         hk.Children.Add(Theme.Label("Activation mode"));
-        var modeCombo = new ComboBox { Width = 220, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 6) };
-        foreach (var m in Enum.GetValues<HotkeyActivationMode>()) modeCombo.Items.Add(m.ToString());
-        modeCombo.SelectedItem = s.HotkeyMode.ToString();
-        modeCombo.SelectionChanged += (_, _) =>
-        {
-            if (Enum.TryParse<HotkeyActivationMode>((string)modeCombo.SelectedItem, out var m)) { s.HotkeyMode = m; s.Save("hotkey"); }
-        };
-        hk.Children.Add(modeCombo);
+        var modes = Enum.GetValues<HotkeyActivationMode>().ToList();
+        UIElement BuildModeControl() => Theme.Segmented(
+            modes.Select(m => m.ToString()).ToList(),
+            modes.IndexOf(s.HotkeyMode),
+            i => { s.HotkeyMode = modes[i]; s.Save("hotkey"); RefreshModeControl(); },
+            maxWidth: 340);
+        _modeHost = new ContentControl { Content = BuildModeControl(), HorizontalAlignment = HorizontalAlignment.Left };
+        _rebuildMode = () => _modeHost.Content = BuildModeControl();
+        hk.Children.Add(_modeHost);
         hk.Children.Add(Theme.Caption("Toggle taps on and off. Hold records while pressed. Automatic supports both."));
 
         hk.Children.Add(WithEnableToggle("Edit / Write mode", s.RewriteModeShortcut, s.RewriteModeShortcutEnabled,
