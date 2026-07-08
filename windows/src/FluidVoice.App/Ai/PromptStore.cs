@@ -83,6 +83,32 @@ Use the following selected context to improve your response:
     public static string BasePrompt(PromptMode mode) =>
         mode == PromptMode.Edit ? EditBasePrompt : DictateBasePrompt;
 
+    /// <summary>The shipped default body for a mode, ignoring any user override (for the prompt editor's "reset").</summary>
+    public static string BuiltInBody(PromptMode mode) =>
+        mode == PromptMode.Edit ? EditDefaultBody : DictateDefaultBody;
+
+    /// <summary>Current effective body a user is editing = their override, or the built-in default.</summary>
+    public static string EffectiveBody(PromptMode mode)
+    {
+        var overrideText = mode == PromptMode.Edit
+            ? Settings.Current.DefaultEditPromptOverride
+            : Settings.Current.DefaultDictationPromptOverride;
+        return string.IsNullOrWhiteSpace(overrideText) ? BuiltInBody(mode) : overrideText;
+    }
+
+    /// <summary>Persist an edited body. Passing null/blank or the built-in text clears the override.</summary>
+    public static void SetOverride(PromptMode mode, string? body)
+    {
+        var trimmed = body?.Trim();
+        var value = string.IsNullOrEmpty(trimmed) || trimmed == BuiltInBody(mode).Trim() ? null : trimmed;
+        if (mode == PromptMode.Edit) Settings.Current.DefaultEditPromptOverride = value;
+        else Settings.Current.DefaultDictationPromptOverride = value;
+        Settings.Current.Save("prompt");
+    }
+
+    public static bool HasOverride(PromptMode mode) => !string.IsNullOrWhiteSpace(
+        mode == PromptMode.Edit ? Settings.Current.DefaultEditPromptOverride : Settings.Current.DefaultDictationPromptOverride);
+
     public static string DefaultBody(PromptMode mode)
     {
         var overrideText = mode == PromptMode.Edit
