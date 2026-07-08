@@ -1,0 +1,24 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="lfBg" x1="24" y1="24" x2="232" y2="232" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4AD6C4"/>
+      <stop offset="1" stop-color="#147C74"/>
+    </linearGradient>
+    <linearGradient id="lfGlass" x1="128" y1="16" x2="128" y2="150" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="224" height="224" rx="66" fill="url(#lfBg)"/>
+  <rect x="16" y="16" width="224" height="122" rx="66" fill="url(#lfGlass)"/>
+  <!-- ripples (water = sound waves) -->
+  <g stroke="#FFFFFF" fill="none" stroke-linecap="round" stroke-width="7">
+    <path d="M92 170 A 36 15 0 0 0 164 170" opacity="0.92"/>
+    <path d="M72 174 A 56 23 0 0 0 184 174" opacity="0.6"/>
+    <path d="M54 178 A 74 31 0 0 0 202 178" opacity="0.38"/>
+  </g>
+  <!-- water droplet -->
+  <path d="M128 44 C 145 72 163 93 163 111 A 35 35 0 1 1 93 111 C 93 93 111 72 128 44 Z"
+        fill="#FFFFFF" fill-opacity="0.98"/>
+  <ellipse cx="118" cy="106" rx="10" ry="15" fill="#4AD6C4" fill-opacity="0.28"/>
+</svg>
