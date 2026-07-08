@@ -411,6 +411,8 @@ public sealed class AiTab : StackPanel
         panel.Children.Add(Theme.Heading("Options"));
         panel.Children.Add(Theme.Toggle("Stream AI responses", Settings.Current.EnableAIStreaming, v => { Settings.Current.EnableAIStreaming = v; Settings.Current.Save("ai"); }));
         panel.Children.Add(Theme.Toggle("Notify me if AI enhancement fails", Settings.Current.NotifyAIProcessingFailures, v => { Settings.Current.NotifyAIProcessingFailures = v; Settings.Current.Save("ai"); }));
+        panel.Children.Add(Theme.Toggle("Auto-learn corrections", Settings.Current.AutoLearnCorrections, v => { Settings.Current.AutoLearnCorrections = v; Settings.Current.Save("ai"); }));
+        panel.Children.Add(Theme.Caption("Watches which names and terms AI cleanup fixes, and after a few repeats adds them to your dictionary so plain transcription gets them right too. Review them under Dictionary."));
         return Theme.Panel(panel, new Thickness(22), new Thickness(0, 0, 0, 16));
     }
 }

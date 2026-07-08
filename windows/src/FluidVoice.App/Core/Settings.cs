@@ -21,6 +21,20 @@ public sealed class CustomDictionaryEntry
     public string Replacement { get; set; } = "";
 }
 
+/// <summary>
+/// A candidate correction observed by the auto-learner: the transcriber keeps producing
+/// <see cref="From"/> where the intended word is <see cref="To"/>. Once <see cref="Count"/>
+/// crosses the promotion threshold it's added to the custom dictionary automatically.
+/// </summary>
+public sealed class LearnedCorrection
+{
+    public string From { get; set; } = "";
+    public string To { get; set; } = "";
+    public int Count { get; set; } = 1;
+    public bool Promoted { get; set; }
+    public bool Dismissed { get; set; }
+}
+
 /// <summary>A named prompt profile for a mode (mirrors DictationPromptProfile).</summary>
 public sealed class PromptProfile
 {
@@ -155,6 +169,14 @@ public sealed class Settings
     public bool VadAutoStopEnabled { get; set; }
     /// <summary>Seconds of continuous silence (after speech) that end the recording.</summary>
     public double VadAutoStopSilenceSeconds { get; set; } = 2.5;
+
+    // ----- Auto-learn (correction learning) -----
+    /// <summary>Watch what AI cleanup fixes vs the raw transcript and learn recurring name/term corrections into the dictionary.</summary>
+    public bool AutoLearnCorrections { get; set; } = true;
+    /// <summary>How many times a correction must recur before it's promoted to the dictionary.</summary>
+    public int AutoLearnThreshold { get; set; } = 3;
+    /// <summary>Observed correction candidates (some promoted to the dictionary, some pending/dismissed).</summary>
+    public List<LearnedCorrection> LearnedCorrections { get; set; } = new();
 
     // ----- App behavior -----
     /// <summary>Bumped when a release wants to migrate existing settings once.</summary>

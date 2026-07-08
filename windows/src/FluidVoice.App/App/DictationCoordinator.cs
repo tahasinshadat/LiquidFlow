@@ -367,6 +367,8 @@ public sealed class DictationCoordinator : IDictationControl
                     finalText = TranscriptFormatter.ApplyGaavFormatting(enhanced.Trim());
                     aiProcessed = true;
                     aiModel = EnhancementService.LastUsedModelDescription;
+                    // auto-learn: names/terms the AI fixed vs the raw formatter output
+                    CorrectionLearner.Observe(formatted, finalText);
                 }
                 else if (!string.IsNullOrWhiteSpace(enhanced))
                 {
