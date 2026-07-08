@@ -184,12 +184,19 @@ public sealed class SettingsModal : Window
         var item = new Border
         {
             Child = row,
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(12, 12, 12, 12),
-            Margin = new Thickness(0, 0, 0, 4),
+            Background = Brushes.Transparent, // always hit-testable, even before first Select
+            CornerRadius = new CornerRadius(9),
+            Padding = new Thickness(12, 11, 12, 11),
+            Margin = new Thickness(0, 0, 0, 3),
             Cursor = Cursors.Hand,
         };
+        // Critical: swallow the press so it never reaches the shell's DragMove handler —
+        // otherwise DragMove enters a modal loop and eats our MouseLeftButtonUp, and the
+        // section never opens (this was the "Speech Models / AI Enhancement do nothing" bug).
+        item.MouseLeftButtonDown += (_, e) => e.Handled = true;
         item.MouseLeftButtonUp += (_, _) => Select(section.Title);
+        item.MouseEnter += (_, _) => { if (_currentSection != section.Title) item.Background = new SolidColorBrush(Theme.SidebarSelected) { Opacity = 0.5 }; };
+        item.MouseLeave += (_, _) => { if (_currentSection != section.Title) item.Background = Brushes.Transparent; };
         _items[section.Title] = item;
         return item;
     }
