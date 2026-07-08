@@ -261,7 +261,7 @@ migrateProviderSettings();
 // persists is available to copy. Before this context existed the upload page
 // used the base dictation settings, so copy each value the user actually set
 // into the matching `upload*` key. Fresh installs have no base keys persisted,
-// so nothing is copied and the upload context falls through to its OpenWhispr
+// so nothing is copied and the upload context falls through to its LiquidFlow
 // Cloud defaults.
 const UPLOAD_TRANSCRIPTION_PAIRS: ReadonlyArray<[string, string]> = [
   ["useLocalWhisper", "uploadUseLocalWhisper"],
@@ -1676,7 +1676,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       cloudTranscriptionModel,
     } = useSettingsStore.getState();
     // Each Settings tab selects on its InferenceMode field, so set it for every
-    // scope — otherwise the UI keeps showing the previous mode (e.g. OpenWhispr
+    // scope — otherwise the UI keeps showing the previous mode (e.g. LiquidFlow
     // Cloud) even though the cloud routing now points at the new provider.
     const mode = deriveTranscriptionMode(
       useLocalWhisper,

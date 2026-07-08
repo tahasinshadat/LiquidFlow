@@ -27,7 +27,7 @@ export const openwhisprProvider: InferenceProvider = {
 
       if (!res?.success) {
         const err: Error & { code?: string } = new Error(
-          res?.error || "OpenWhispr cloud reasoning failed"
+          res?.error || "LiquidFlow cloud reasoning failed"
         );
         err.code = res?.code;
         throw err;

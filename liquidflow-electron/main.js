@@ -91,7 +91,7 @@ function configureChannelUserDataPath() {
     return;
   }
 
-  const isolatedPath = path.join(app.getPath("appData"), `OpenWhispr-${APP_CHANNEL}`);
+  const isolatedPath = path.join(app.getPath("appData"), `LiquidFlow-${APP_CHANNEL}`);
   app.setPath("userData", isolatedPath);
 }
 
@@ -205,7 +205,7 @@ function isOAuthSchemeRegistered() {
 // Register custom protocol for OAuth callbacks.
 // In development, always include the app path argument so macOS/Windows/Linux
 // can launch the project app instead of opening bare Electron.
-function registerOpenWhisprProtocol() {
+function registerLiquidFlowProtocol() {
   const protocol = OAUTH_PROTOCOL;
   const htmlHandler = process.platform === "linux" ? getDefaultHtmlHandler() : null;
 
@@ -228,7 +228,7 @@ function registerOpenWhisprProtocol() {
 // fall back to probing the system MIME database for an actual handler. This keeps
 // OAuth enabled where the callback can resolve (deb/rpm/flatpak/AUR) and correctly
 // gated where it can't (AppImage/tar.gz with no scheme registration).
-const protocolRegistered = registerOpenWhisprProtocol() || isOAuthSchemeRegistered();
+const protocolRegistered = registerLiquidFlowProtocol() || isOAuthSchemeRegistered();
 if (!protocolRegistered) {
   console.warn(`[Auth] Failed to register ${OAUTH_PROTOCOL}:// protocol handler`);
 }
@@ -242,8 +242,8 @@ if (!gotSingleInstanceLock) {
 const isLiveWindow = (window) => window && !window.isDestroyed();
 
 // Ensure macOS menus use the proper casing for the app name
-if (process.platform === "darwin" && app.getName() !== "OpenWhispr") {
-  app.setName("OpenWhispr");
+if (process.platform === "darwin" && app.getName() !== "LiquidFlow") {
+  app.setName("LiquidFlow");
 }
 
 // Add global error handling for uncaught exceptions
@@ -747,7 +747,7 @@ function startAuthBridgeServer() {
 
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(
-      "<html><body><h3>OpenWhispr sign-in complete.</h3><p>You can close this tab.</p></body></html>"
+      "<html><body><h3>LiquidFlow sign-in complete.</h3><p>You can close this tab.</p></body></html>"
     );
   });
 
@@ -786,7 +786,7 @@ async function startApp() {
 
   // Electron's file:// renderer sends Origin: null, which Better Auth's
   // trustedOrigins check rejects. Spoof Origin to the request's own URL so
-  // calls to OpenWhispr's auth and API hosts are treated as same-origin.
+  // calls to LiquidFlow's auth and API hosts are treated as same-origin.
   session.defaultSession.webRequest.onBeforeSendHeaders(
     {
       urls: [

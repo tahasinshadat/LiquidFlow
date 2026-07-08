@@ -47,7 +47,7 @@ const VALID_HOTKEY_PATTERN =
 
 const BINDS_FILENAME = "openwhispr-binds.conf";
 const MANAGED_HEADER_LINES = [
-  "# OpenWhispr keybinds (managed automatically)",
+  "# LiquidFlow keybinds (managed automatically)",
   "# If you delete this file, also remove the matching source line from your Hyprland config.",
 ];
 
@@ -162,7 +162,7 @@ class HyprlandShortcutManager {
   }
 
   _createInterfaceClass(dbusModule, callback) {
-    class OpenWhisprInterface extends dbusModule.interface.Interface {
+    class LiquidFlowInterface extends dbusModule.interface.Interface {
       constructor() {
         super(DBUS_INTERFACE);
         this._callback = callback;
@@ -175,13 +175,13 @@ class HyprlandShortcutManager {
       }
     }
 
-    OpenWhisprInterface.configureMembers({
+    LiquidFlowInterface.configureMembers({
       methods: {
         Toggle: { inSignature: "", outSignature: "" },
       },
     });
 
-    return OpenWhisprInterface;
+    return LiquidFlowInterface;
   }
 
   static isValidHotkey(hotkey) {
@@ -376,7 +376,7 @@ class HyprlandShortcutManager {
     }
 
     try {
-      // First unregister any existing OpenWhispr binding if the hotkey changed.
+      // First unregister any existing LiquidFlow binding if the hotkey changed.
       if (this.currentBinding && this.currentBinding !== converted.bindKey) {
         await this.unregisterKeybinding();
       }

@@ -126,7 +126,7 @@ const CLOUD_CHUNK_CONCURRENCY = 5;
 const CLOUD_CHUNK_SEGMENT_SECONDS = 240;
 
 function buildMultipartBody(fileBuffer, fileName, contentType, fields = {}) {
-  const boundary = `----OpenWhispr${Date.now()}`;
+  const boundary = `----LiquidFlow${Date.now()}`;
   const parts = [];
 
   parts.push(
@@ -3681,7 +3681,7 @@ class IPCHandlers {
     ipcMain.handle("cloud-transcribe", async (event, audioBuffer, opts = {}) => {
       try {
         const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+        if (!apiUrl) throw new Error("LiquidFlow API URL not configured");
 
         const authHeader = await getAuthHeader(event);
         if (!Object.keys(authHeader).length) throw new Error("Not authenticated");
@@ -4360,7 +4360,7 @@ class IPCHandlers {
       const postServerToken = async (path, body = {}) => {
         const apiUrl = getApiUrl();
         if (!apiUrl) {
-          const err = new Error("OpenWhispr API URL not configured");
+          const err = new Error("LiquidFlow API URL not configured");
           err.code = "NO_API";
           throw err;
         }
@@ -5980,7 +5980,7 @@ class IPCHandlers {
     ipcMain.handle("cloud-reason", async (event, text, opts = {}) => {
       try {
         const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+        if (!apiUrl) throw new Error("LiquidFlow API URL not configured");
 
         const authHeader = await getAuthHeader(event);
         if (!Object.keys(authHeader).length) throw new Error("Not authenticated");
@@ -6067,7 +6067,7 @@ class IPCHandlers {
     ipcMain.on("cloud-agent-stream-start", async (event, messages, opts = {}) => {
       try {
         const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+        if (!apiUrl) throw new Error("LiquidFlow API URL not configured");
 
         const authHeader = await getAuthHeader(event);
         if (!Object.keys(authHeader).length) throw new Error("Not authenticated");
@@ -6160,7 +6160,7 @@ class IPCHandlers {
     ipcMain.handle("agent-web-search", async (event, query, numResults = 5) => {
       try {
         const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+        if (!apiUrl) throw new Error("LiquidFlow API URL not configured");
 
         const authHeader = await getAuthHeader(event);
         if (!Object.keys(authHeader).length) throw new Error("Not authenticated");
@@ -6203,7 +6203,7 @@ class IPCHandlers {
       async (event, text, audioDurationSeconds, opts = {}) => {
         try {
           const apiUrl = getApiUrl();
-          if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+          if (!apiUrl) throw new Error("LiquidFlow API URL not configured");
 
           const authHeader = await getAuthHeader(event);
           if (!Object.keys(authHeader).length) throw new Error("Not authenticated");
@@ -6254,7 +6254,7 @@ class IPCHandlers {
     ipcMain.handle("cloud-usage", async (event) => {
       try {
         const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+        if (!apiUrl) throw new Error("LiquidFlow API URL not configured");
 
         const authHeader = await getAuthHeader(event);
         if (!Object.keys(authHeader).length) throw new Error("Not authenticated");
@@ -6284,7 +6284,7 @@ class IPCHandlers {
     const fetchStripeUrl = async (event, endpoint, errorPrefix, body) => {
       try {
         const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+        if (!apiUrl) throw new Error("LiquidFlow API URL not configured");
 
         const authHeader = await getAuthHeader(event);
         if (!Object.keys(authHeader).length) throw new Error("Not authenticated");
@@ -6328,7 +6328,7 @@ class IPCHandlers {
     ipcMain.handle("cloud-switch-plan", async (event, opts) => {
       try {
         const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+        if (!apiUrl) throw new Error("LiquidFlow API URL not configured");
 
         const authHeader = await getAuthHeader(event);
         if (!Object.keys(authHeader).length) throw new Error("Not authenticated");
@@ -6360,7 +6360,7 @@ class IPCHandlers {
     ipcMain.handle("cloud-preview-switch", async (event, opts) => {
       try {
         const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+        if (!apiUrl) throw new Error("LiquidFlow API URL not configured");
 
         const authHeader = await getAuthHeader(event);
         if (!Object.keys(authHeader).length) throw new Error("Not authenticated");
@@ -6392,7 +6392,7 @@ class IPCHandlers {
     ipcMain.handle("cloud-api-request", async (event, opts) => {
       try {
         const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+        if (!apiUrl) throw new Error("LiquidFlow API URL not configured");
 
         const authHeader = await getAuthHeader(event);
         if (!Object.keys(authHeader).length) throw new Error("Not authenticated");
@@ -6454,7 +6454,7 @@ class IPCHandlers {
     ipcMain.handle("get-stt-config", async (event) => {
       try {
         const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+        if (!apiUrl) throw new Error("LiquidFlow API URL not configured");
 
         const authHeader = await getAuthHeader(event);
         if (!Object.keys(authHeader).length) throw new Error("Not authenticated");
@@ -6484,7 +6484,7 @@ class IPCHandlers {
     ipcMain.handle("get-note-recording-config", async (event) => {
       try {
         const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+        if (!apiUrl) throw new Error("LiquidFlow API URL not configured");
 
         const authHeader = await getAuthHeader(event);
         if (!Object.keys(authHeader).length) throw new Error("Not authenticated");
@@ -6511,7 +6511,7 @@ class IPCHandlers {
     ipcMain.handle("transcribe-audio-file-cloud", async (event, filePath) => {
       try {
         const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+        if (!apiUrl) throw new Error("LiquidFlow API URL not configured");
 
         const authHeader = await getAuthHeader(event);
         if (!Object.keys(authHeader).length) throw new Error("Not authenticated");
@@ -6664,7 +6664,7 @@ class IPCHandlers {
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) {
-          throw new Error("OpenWhispr API URL not configured");
+          throw new Error("LiquidFlow API URL not configured");
         }
 
         const authHeader = await getAuthHeader(event);
@@ -6700,7 +6700,7 @@ class IPCHandlers {
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) {
-          throw new Error("OpenWhispr API URL not configured");
+          throw new Error("LiquidFlow API URL not configured");
         }
 
         const authHeader = await getAuthHeader(event);
@@ -6738,7 +6738,7 @@ class IPCHandlers {
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) {
-          throw new Error("OpenWhispr API URL not configured");
+          throw new Error("LiquidFlow API URL not configured");
         }
 
         const authHeader = await getAuthHeader(event);
@@ -6928,7 +6928,7 @@ class IPCHandlers {
     const fetchStreamingToken = async (event) => {
       const apiUrl = getApiUrl();
       if (!apiUrl) {
-        throw new Error("OpenWhispr API URL not configured");
+        throw new Error("LiquidFlow API URL not configured");
       }
 
       const authHeader = await getAuthHeader(event);
@@ -7129,7 +7129,7 @@ class IPCHandlers {
 
     const fetchDeepgramStreamingTokenFromWindow = async (windowId) => {
       const apiUrl = getApiUrl();
-      if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+      if (!apiUrl) throw new Error("LiquidFlow API URL not configured");
 
       const win = BrowserWindow.fromId(windowId);
       if (!win || win.isDestroyed()) throw new Error("Window not available for token refresh");
@@ -7159,7 +7159,7 @@ class IPCHandlers {
     const fetchDeepgramStreamingToken = async (event) => {
       const apiUrl = getApiUrl();
       if (!apiUrl) {
-        throw new Error("OpenWhispr API URL not configured");
+        throw new Error("LiquidFlow API URL not configured");
       }
 
       const authHeader = await getAuthHeader(event);

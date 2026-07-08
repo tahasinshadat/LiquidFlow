@@ -745,8 +745,8 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
       const cloudTranscriptionMode = settings.cloudTranscriptionMode;
       const isSignedIn = settings.isSignedIn;
 
-      const isOpenWhisprCloudMode = !useLocalWhisper && cloudTranscriptionMode === "openwhispr";
-      const useCloud = isOpenWhisprCloudMode && isSignedIn;
+      const isLiquidFlowCloudMode = !useLocalWhisper && cloudTranscriptionMode === "openwhispr";
+      const useCloud = isLiquidFlowCloudMode && isSignedIn;
       logger.debug(
         "Transcription routing",
         { useLocalWhisper, useCloud, isSignedIn, cloudTranscriptionMode },
@@ -763,17 +763,17 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
           activeModel = whisperModel;
           result = await this.processWithLocalWhisper(audioBlob, whisperModel, metadata);
         }
-      } else if (isOpenWhisprCloudMode) {
+      } else if (isLiquidFlowCloudMode) {
         if (!isSignedIn) {
           const err = new Error(
-            "OpenWhispr Cloud requires sign-in. Please sign in again or switch to BYOK mode."
+            "LiquidFlow Cloud requires sign-in. Please sign in again or switch to BYOK mode."
           );
           err.code = "AUTH_REQUIRED";
           err.messageKey = "hooks.audioRecording.errorDescriptions.sessionExpired";
           throw err;
         }
         activeModel = "openwhispr-cloud";
-        result = await this.processWithOpenWhisprCloud(audioBlob, metadata);
+        result = await this.processWithLiquidFlowCloud(audioBlob, metadata);
       } else {
         activeModel = this.getTranscriptionModel();
         result = await this.processWithOpenAIAPI(audioBlob, metadata);
@@ -1513,7 +1513,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
     return result;
   }
 
-  async processWithOpenWhisprCloud(audioBlob, metadata = {}) {
+  async processWithLiquidFlowCloud(audioBlob, metadata = {}) {
     if (!navigator.onLine) {
       const err = new Error("You're offline. Cloud transcription requires an internet connection.");
       err.code = "OFFLINE";
@@ -1926,7 +1926,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
         const err = new Error(`API Error: ${response.status} ${errorText}`);
         if (response.status === 401) err.code = "INVALID_KEY";
         else if (response.status === 429) {
-          // The user's own provider rate-limited the request — not an OpenWhispr plan limit
+          // The user's own provider rate-limited the request — not an LiquidFlow plan limit
           err.code = "PROVIDER_RATE_LIMITED";
           err.messageKey = "hooks.audioRecording.errorDescriptions.providerRateLimited";
         } else if (response.status >= 500) err.code = "SERVER_ERROR";
@@ -2447,12 +2447,12 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
     // Self-hosted transcription is batch HTTP to the user's server, never cloud realtime WS.
     if (isSelfHostedTranscription(s)) return false;
 
-    // Corti (BYOK) streams over its own WSS — independent of OpenWhispr Cloud.
+    // Corti (BYOK) streams over its own WSS — independent of LiquidFlow Cloud.
     if (s.cloudTranscriptionProvider === "corti" && s.cloudTranscriptionMode === "byok") {
       return !!(s.cortiClientId && s.cortiClientSecret);
     }
 
-    // Tinfoil realtime streams without an OpenWhispr account.
+    // Tinfoil realtime streams without an LiquidFlow account.
     if (s.cloudTranscriptionProvider === "tinfoil") {
       const provider = getTranscriptionProvider("tinfoil");
       const model = provider?.models.find((m) => m.id === s.cloudTranscriptionModel);
@@ -2840,7 +2840,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
       } else if (error.code === "AUTH_EXPIRED" || error.code === "AUTH_REQUIRED") {
         errorTitle = "Sign-in Required";
         errorDescription =
-          "Your OpenWhispr Cloud session is unavailable. Please sign in again from Settings.";
+          "Your LiquidFlow Cloud session is unavailable. Please sign in again from Settings.";
       } else if (error.code === "NETWORK_ERROR") {
         errorTitle = "streaming.errors.cloudUnreachable.title";
         errorDescription = error.messageKey || "streaming.errors.cloudUnreachable.generic";
@@ -3083,7 +3083,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
         "streaming"
       );
       try {
-        const batchResult = await this.processWithOpenWhisprCloud(fallbackBlob, {
+        const batchResult = await this.processWithLiquidFlowCloud(fallbackBlob, {
           durationSeconds,
         });
         if (batchResult?.text) {

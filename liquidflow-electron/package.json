@@ -1,7 +1,7 @@
 {
-  "name": "open-whispr",
+  "name": "liquidflow",
   "version": "1.7.4",
-  "description": "A desktop dictation application using whisper.cpp for speech-to-text transcription",
+  "description": "LiquidFlow — local voice dictation (fork of OpenWhispr, MIT)",
   "main": "main.js",
   "private": true,
   "engines": {
@@ -85,8 +85,7 @@
     "desktop-app"
   ],
   "author": {
-    "name": "OpenWhispr Team",
-    "email": "support@openwhispr.com"
+    "name": "LiquidFlow"
   },
   "license": "MIT",
   "devDependencies": {

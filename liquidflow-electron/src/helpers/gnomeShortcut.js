@@ -9,19 +9,19 @@ const DBUS_INTERFACE = "com.openwhispr.App";
 const SLOT_CONFIG = {
   dictation: {
     path: "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/openwhispr/",
-    name: "OpenWhispr Toggle",
+    name: "LiquidFlow Toggle",
   },
   agent: {
     path: "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/openwhispr-agent/",
-    name: "OpenWhispr Agent",
+    name: "LiquidFlow Agent",
   },
   meeting: {
     path: "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/openwhispr-meeting/",
-    name: "OpenWhispr Meeting",
+    name: "LiquidFlow Meeting",
   },
   voiceAgent: {
     path: "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/openwhispr-voice-agent/",
-    name: "OpenWhispr Voice Agent",
+    name: "LiquidFlow Voice Agent",
   },
 };
 
@@ -171,7 +171,7 @@ class GnomeShortcutManager {
   }
 
   _createInterfaceClass(dbusModule) {
-    class OpenWhisprInterface extends dbusModule.interface.Interface {
+    class LiquidFlowInterface extends dbusModule.interface.Interface {
       constructor(dictationCallback, agentCallback, meetingCallback, voiceAgentCallback) {
         super(DBUS_INTERFACE);
         this._dictationCallback = dictationCallback;
@@ -205,7 +205,7 @@ class GnomeShortcutManager {
       }
     }
 
-    OpenWhisprInterface.configureMembers({
+    LiquidFlowInterface.configureMembers({
       methods: {
         Toggle: { inSignature: "", outSignature: "" },
         ToggleAgent: { inSignature: "", outSignature: "" },
@@ -214,7 +214,7 @@ class GnomeShortcutManager {
       },
     });
 
-    return OpenWhisprInterface;
+    return LiquidFlowInterface;
   }
 
   static isValidShortcut(shortcut) {

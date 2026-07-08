@@ -35,7 +35,7 @@ class UpdateManager {
 
     autoUpdater.setFeedURL({
       provider: "github",
-      owner: "OpenWhispr",
+      owner: "LiquidFlow",
       repo: "openwhispr",
       private: false,
     });

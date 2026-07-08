@@ -39,7 +39,7 @@ const PROVIDER_CONFIG: Record<string, ProviderConfig> = {
   gemini: { label: "Gemini", apiKeyStorageKey: "geminiApiKey" },
   groq: { label: "Groq", apiKeyStorageKey: "groqApiKey" },
   tinfoil: { label: "Tinfoil", apiKeyStorageKey: "tinfoilApiKey" },
-  openwhispr: { label: "OpenWhispr Cloud" },
+  openwhispr: { label: "LiquidFlow Cloud" },
   custom: {
     label: "Custom endpoint",
     apiKeyStorageKey: "openaiApiKey",

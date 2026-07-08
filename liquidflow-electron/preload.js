@@ -493,7 +493,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   authGetToken: () => ipcRenderer.invoke("auth-get-token"),
   authSetToken: (token) => ipcRenderer.invoke("auth-set-token", token),
 
-  // OpenWhispr Cloud API
+  // LiquidFlow Cloud API
   cloudHealthCheck: () => ipcRenderer.invoke("cloud-health-check"),
   cloudTranscribe: (audioBuffer, opts) => ipcRenderer.invoke("cloud-transcribe", audioBuffer, opts),
   cloudReason: (text, opts) => ipcRenderer.invoke("cloud-reason", text, opts),

@@ -114,11 +114,11 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
   );
   const useCleanupModel = useSettingsStore((s) => s.useCleanupModel);
 
-  const isOpenWhisprCloud =
+  const isLiquidFlowCloud =
     isSignedIn && cloudTranscriptionMode === "openwhispr" && !useLocalWhisper;
 
   // Mode detection
-  const isByok = !useLocalWhisper && !isOpenWhisprCloud;
+  const isByok = !useLocalWhisper && !isLiquidFlowCloud;
 
   // Mode-aware file size validation
   // Local: no limits at all
@@ -142,7 +142,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
         requiresAccount = true;
       }
     } else {
-      // Cloud (OpenWhispr) — user is always signed in here
+      // Cloud (LiquidFlow) — user is always signed in here
       fileTooLarge = file.sizeBytes > CLOUD_PRO_MAX_FILE_SIZE;
       requiresUpgrade = !isProUser && file.sizeBytes > CLOUD_FREE_MAX_FILE_SIZE;
       isLargeFile = file.sizeBytes > CLOUD_FREE_MAX_FILE_SIZE;
@@ -166,7 +166,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
   useEffect(() => {
     let cancelled = false;
     const checkProviderReady = async () => {
-      if (isOpenWhisprCloud) {
+      if (isLiquidFlowCloud) {
         setProviderReady(true);
         return;
       }
@@ -210,7 +210,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
       cancelled = true;
     };
   }, [
-    isOpenWhisprCloud,
+    isLiquidFlowCloud,
     useLocalWhisper,
     localTranscriptionProvider,
     cloudTranscriptionProvider,
@@ -225,7 +225,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
   ]);
 
   const getActiveModelLabel = (): string => {
-    if (isOpenWhisprCloud) return t("notes.upload.openwhisprCloud");
+    if (isLiquidFlowCloud) return t("notes.upload.openwhisprCloud");
     if (useLocalWhisper) {
       if (localTranscriptionProvider === "nvidia")
         return `Parakeet · ${parakeetModel || "default"}`;
@@ -322,7 +322,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
     setProgress(0);
     setChunkProgress(null);
 
-    const useChunkProgress = isOpenWhisprCloud && isLargeFile;
+    const useChunkProgress = isLiquidFlowCloud && isLargeFile;
 
     if (useChunkProgress) {
       progressCleanupRef.current =
@@ -350,7 +350,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
     try {
       let res: { success: boolean; text?: string; error?: string; code?: string };
 
-      if (isOpenWhisprCloud) {
+      if (isLiquidFlowCloud) {
         res = await withSessionRefresh(async () => {
           const r = await window.electronAPI.transcribeAudioFileCloud!(file.path);
           if (!r.success && r.code) {
@@ -464,7 +464,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
   };
 
   const getTranscribingLabel = (): string => {
-    if (isOpenWhisprCloud) return t("notes.upload.transcribingCloud");
+    if (isLiquidFlowCloud) return t("notes.upload.transcribingCloud");
     if (useLocalWhisper) return t("notes.upload.transcribingLocal");
     return t("notes.upload.transcribingProvider", { provider: cloudTranscriptionProvider });
   };
@@ -501,7 +501,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
               requiresUpgrade={!!requiresUpgrade}
               fileTooLarge={fileTooLarge}
               isLargeFile={isLargeFile}
-              isOpenWhisprCloud={isOpenWhisprCloud}
+              isLiquidFlowCloud={isLiquidFlowCloud}
               byokTooLarge={byokTooLarge}
               requiresAccount={requiresAccount}
               isProUser={!!isProUser}
@@ -742,7 +742,7 @@ interface SelectedViewProps {
   requiresUpgrade: boolean;
   fileTooLarge: boolean;
   isLargeFile: boolean;
-  isOpenWhisprCloud: boolean;
+  isLiquidFlowCloud: boolean;
   byokTooLarge: boolean;
   requiresAccount: boolean;
   isProUser: boolean;
@@ -760,7 +760,7 @@ function SelectedView({
   requiresUpgrade,
   fileTooLarge,
   isLargeFile,
-  isOpenWhisprCloud,
+  isLiquidFlowCloud,
   byokTooLarge,
   requiresAccount,
   isProUser,
@@ -829,7 +829,7 @@ function SelectedView({
       )}
 
       {/* Cloud large file info (Pro user, will be chunked) */}
-      {isLargeFile && !requiresUpgrade && !fileTooLarge && isOpenWhisprCloud && (
+      {isLargeFile && !requiresUpgrade && !fileTooLarge && isLiquidFlowCloud && (
         <p className="text-xs text-foreground/20 text-center mb-3">
           {t("notes.upload.largeFileNote")}
         </p>
