@@ -5,31 +5,31 @@
 @theme {
   /* LiquidFlow Theme — registers color tokens with Tailwind v4.
      These are the light-mode defaults; .dark overrides them below. */
-  --color-primary: #2563eb;
+  --color-primary: #14a898;
   --color-primary-foreground: #ffffff;
   --color-secondary: #f5f5f5;
   --color-secondary-foreground: #171717;
   --color-muted: #f5f5f5;
   --color-muted-foreground: #525252;
-  --color-accent: oklch(0.55 0.22 285);
+  --color-accent: oklch(0.6 0.13 184);
   --color-accent-foreground: #ffffff;
   --color-destructive: #dc2626;
   --color-destructive-foreground: #ffffff;
   --color-border: #e5e5e5;
   --color-input: #f9f6f1;
-  --color-ring: #2563eb;
+  --color-ring: #14a898;
   --color-background: #ffffff;
   --color-foreground: #171717;
   --color-card: #ffffff;
   --color-card-foreground: #171717;
   --color-popover: #ffffff;
   --color-popover-foreground: #171717;
-  --color-link: #2563eb;
+  --color-link: #14a898;
   --color-success: #16a34a;
   --color-success-foreground: #ffffff;
   --color-warning: #d97706;
   --color-warning-foreground: #ffffff;
-  --color-info: #2563eb;
+  --color-info: #14a898;
   --color-info-foreground: #ffffff;
 
   /* Surface hierarchy — light mode equivalents */
@@ -42,7 +42,7 @@
   /* Border states — light mode equivalents */
   --color-border-subtle: #e5e5e5;
   --color-border-hover: #d4d4d4;
-  --color-border-active: #2563eb;
+  --color-border-active: #14a898;
 }
 
 :root {
@@ -83,44 +83,44 @@
   /* Dark mode — charcoal surfaces with clear elevation hierarchy
      Base L=0.22 (charcoal) with 0.05 steps between layers.
      Hue 260 (neutral blue) with minimal chroma for sophistication. */
-  --color-background: oklch(0.22 0.006 260);
+  --color-background: oklch(0.165 0.008 210);
   --color-foreground: oklch(0.93 0 0);
-  --color-card: oklch(0.27 0.008 260);
+  --color-card: oklch(0.225 0.009 210);
   --color-card-foreground: oklch(0.93 0 0);
-  --color-popover: oklch(0.29 0.009 260);
+  --color-popover: oklch(0.245 0.01 210);
   --color-popover-foreground: oklch(0.93 0 0);
-  --color-primary: oklch(0.65 0.2 260);
+  --color-primary: oklch(0.75 0.13 184);
   --color-primary-foreground: oklch(0.99 0 0);
-  --color-secondary: oklch(0.28 0.007 260);
+  --color-secondary: oklch(0.23 0.008 210);
   --color-secondary-foreground: oklch(0.9 0 0);
-  --color-muted: oklch(0.24 0.006 260);
+  --color-muted: oklch(0.19 0.008 210);
   --color-muted-foreground: oklch(0.65 0 0);
-  --color-accent: oklch(0.68 0.18 285);
+  --color-accent: oklch(0.75 0.13 184);
   --color-accent-foreground: oklch(0.99 0 0);
   --color-destructive: oklch(0.62 0.22 25);
   --color-destructive-foreground: oklch(0.99 0 0);
-  --color-border: oklch(0.35 0.007 260);
-  --color-input: oklch(0.19 0.005 260);
-  --color-ring: oklch(0.65 0.2 260);
+  --color-border: oklch(0.3 0.008 210);
+  --color-input: oklch(0.14 0.008 210);
+  --color-ring: oklch(0.75 0.13 184);
   --color-success: oklch(0.7 0.18 145);
   --color-success-foreground: oklch(0.99 0 0);
   --color-warning: oklch(0.75 0.15 70);
   --color-warning-foreground: oklch(0.15 0 0);
-  --color-info: oklch(0.68 0.18 240);
+  --color-info: oklch(0.72 0.12 184);
   --color-info-foreground: oklch(0.99 0 0);
 
   /* Surface hierarchy — charcoal depth system (0.22 → 0.33) */
-  --color-surface-0: oklch(0.22 0.006 260);
-  --color-surface-1: oklch(0.25 0.007 260);
-  --color-surface-2: oklch(0.27 0.008 260);
-  --color-surface-3: oklch(0.3 0.009 260);
-  --color-surface-raised: oklch(0.33 0.01 260);
+  --color-surface-0: oklch(0.165 0.008 210);
+  --color-surface-1: oklch(0.2 0.008 210);
+  --color-surface-2: oklch(0.225 0.009 210);
+  --color-surface-3: oklch(0.25 0.01 210);
+  --color-surface-raised: oklch(0.28 0.011 210);
 
   /* Border states */
-  --color-border-subtle: oklch(0.33 0.006 260);
-  --color-border-hover: oklch(0.42 0.01 260);
-  --color-border-active: oklch(0.5 0.15 260);
-  --color-link: oklch(0.67 0.1 250);
+  --color-border-subtle: oklch(0.28 0.008 210);
+  --color-border-hover: oklch(0.38 0.009 210);
+  --color-border-active: oklch(0.6 0.12 184);
+  --color-link: oklch(0.72 0.12 184);
 
   /* Card depth shadows — softer for charcoal, with top highlight for premium depth */
   --shadow-card: 0 1px 3px oklch(0 0 0 / 0.2), inset 0 1px 0 oklch(1 0 0 / 0.03);
@@ -131,7 +131,7 @@
   /* Premium effects */
   --shadow-metallic-dark: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 8px rgba(0, 0, 0, 0.2);
   --shadow-selected-glow:
-    inset 0 0 0 1px oklch(0.65 0.2 260 / 0.2), 0 0 16px -4px oklch(0.65 0.2 260 / 0.2);
+    inset 0 0 0 1px oklch(0.75 0.13 184 / 0.2), 0 0 16px -4px oklch(0.75 0.13 184 / 0.2);
   --shadow-card-hover-subtle: 0 2px 8px -2px rgba(0, 0, 0, 0.12);
 }
 
@@ -370,8 +370,8 @@ a:hover {
   height: 1px;
   background: linear-gradient(
     90deg,
-    oklch(0.65 0.2 260 / 0.5),
-    oklch(0.7 0.18 280 / 0.3),
+    oklch(0.75 0.13 184 / 0.5),
+    oklch(0.72 0.13 184 / 0.3),
     transparent 80%
   );
   pointer-events: none;
@@ -390,8 +390,8 @@ a:hover {
 
 /* Toast — opaque dark HUD surface, same in light & dark mode */
 .toast-surface {
-  background: oklch(0.15 0.006 260);
-  border: 1px solid oklch(0.25 0.006 260);
+  background: oklch(0.115 0.008 210);
+  border: 1px solid oklch(0.2 0.008 210);
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 0.04),
     0 8px 24px -4px oklch(0 0 0 / 0.5),
@@ -411,11 +411,11 @@ a:hover {
 @keyframes pulse-glow {
   0%,
   100% {
-    box-shadow: 0 0 6px oklch(0.65 0.2 260 / 0.4);
+    box-shadow: 0 0 6px oklch(0.75 0.13 184 / 0.4);
     opacity: 0.8;
   }
   50% {
-    box-shadow: 0 0 8px oklch(0.65 0.2 260 / 0.6);
+    box-shadow: 0 0 8px oklch(0.75 0.13 184 / 0.6);
     opacity: 1;
   }
 }
@@ -602,7 +602,7 @@ a:hover {
 .referral-mesh-bg::before {
   width: 300px;
   height: 300px;
-  background: oklch(0.65 0.2 260);
+  background: oklch(0.75 0.13 184);
   opacity: 0.04;
   top: -80px;
   right: -60px;
@@ -611,7 +611,7 @@ a:hover {
 .referral-mesh-bg::after {
   width: 250px;
   height: 250px;
-  background: oklch(0.6 0.18 180);
+  background: oklch(0.62 0.13 184);
   opacity: 0.04;
   bottom: -60px;
   left: -40px;
@@ -672,11 +672,11 @@ a:hover {
   border-radius: inherit;
   background: conic-gradient(
     from 180deg at 50% 50%,
-    oklch(0.65 0.2 260 / 0.2),
-    oklch(0.55 0.2 320 / 0.1),
-    oklch(0.6 0.18 180 / 0.15),
-    oklch(0.55 0.2 100 / 0.1),
-    oklch(0.65 0.2 260 / 0.2)
+    oklch(0.75 0.13 184 / 0.2),
+    oklch(0.6 0.13 184 / 0.1),
+    oklch(0.62 0.13 184 / 0.15),
+    oklch(0.6 0.13 184 / 0.1),
+    oklch(0.75 0.13 184 / 0.2)
   );
   z-index: -1;
   opacity: 0;
@@ -700,7 +700,7 @@ a:hover {
   left: 0;
   right: 0;
   height: 2px;
-  background: oklch(0.65 0.2 260 / 0.4);
+  background: oklch(0.75 0.13 184 / 0.4);
   transform: scaleX(0);
   transform-origin: left;
   transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s;
@@ -830,7 +830,7 @@ body:has(.agent-overlay-window) #root {
     background: linear-gradient(
       90deg,
       transparent 0%,
-      oklch(0.65 0.2 260 / 0.04) 50%,
+      oklch(0.75 0.13 184 / 0.04) 50%,
       transparent 100%
     );
     background-position: -100% 0;
@@ -1008,7 +1008,7 @@ body:has(.agent-overlay-window) #root {
 }
 
 .rich-text-editor-content ::selection {
-  background: oklch(0.62 0.22 260 / 0.15);
+  background: oklch(0.75 0.13 184 / 0.15);
 }
 
 /* Task list (checkboxes) */
