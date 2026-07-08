@@ -9,6 +9,7 @@ import WindowControls from "./components/WindowControls.tsx";
 import { Card, CardContent } from "./components/ui/card.tsx";
 import { useAuth } from "./hooks/useAuth";
 import { useTheme } from "./hooks/useTheme";
+import { LOCAL_ONLY } from "./lib/features";
 
 const ControlPanel = React.lazy(() => import("./components/ControlPanel.tsx"));
 const OnboardingFlow = React.lazy(() => import("./components/OnboardingFlow.tsx"));
@@ -72,6 +73,7 @@ function MainApp() {
 
     const onboardingCompleted = localStorage.getItem("onboardingCompleted") === "true";
     const authSkipped =
+      LOCAL_ONLY ||
       localStorage.getItem("authenticationSkipped") === "true" ||
       localStorage.getItem("skipAuth") === "true";
     const onboardingInProgress = localStorage.getItem("onboardingCurrentStep") !== null;
