@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/* LiquidFlow green-black design tokens */
+@theme {
+  --color-ink: #0d1013;
+  --color-surface: #14181b;
+  --color-card: #191d21;
+  --color-card2: #1f2429;
+  --color-line: #262c31;
+  --color-text: #eef1f0;
+  --color-muted: #8b9490;
+  --color-teal: #4ad6c4;
+  --color-teal-deep: #22948a;
+  --color-teal-soft: #10312d;
+  --font-display: Georgia, "Times New Roman", serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--color-ink);
+  color: var(--color-text);
+  font-family:
+    "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* thin, unobtrusive scrollbar that stays inside its container */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #333a40;
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #414951;
+  background-clip: content-box;
+}
