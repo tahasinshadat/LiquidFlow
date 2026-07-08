@@ -23,7 +23,7 @@ import WorkspaceSwitcher from "./WorkspaceSwitcher";
 import InviteTeammateDialog from "./InviteTeammateDialog";
 import CreateWorkspaceDialog from "./CreateWorkspaceDialog";
 import { useWorkspace } from "../hooks/useWorkspace";
-import { WORKSPACES_ENABLED } from "../lib/features";
+import { WORKSPACES_ENABLED, BILLING_ENABLED } from "../lib/features";
 
 const platform = getCachedPlatform();
 
@@ -73,8 +73,9 @@ export default function ControlPanelSidebar({
   const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false);
   const { active: activeWorkspace } = useWorkspace();
 
-  const showLimitBanner = authLoaded && isSignedIn && !isProUser && isOverLimit;
+  const showLimitBanner = BILLING_ENABLED && authLoaded && isSignedIn && !isProUser && isOverLimit;
   const showUpgradeBanner =
+    BILLING_ENABLED &&
     !showLimitBanner &&
     authLoaded &&
     (!isSignedIn || usageLoaded !== false) &&

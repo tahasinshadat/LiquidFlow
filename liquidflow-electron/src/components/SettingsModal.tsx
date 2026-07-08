@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import SidebarModal, { type SidebarItem } from "./ui/SidebarModal";
 import SettingsPage, { SettingsSectionType } from "./SettingsPage";
-import { WORKSPACES_ENABLED } from "../lib/features";
+import { WORKSPACES_ENABLED, ACCOUNTS_ENABLED, BILLING_ENABLED } from "../lib/features";
 
 export type { SettingsSectionType };
 
@@ -56,20 +56,28 @@ export default function SettingsModal({ open, onOpenChange, initialSection }: Se
   const { t } = useTranslation();
   const sidebarItems: SidebarItem<SettingsSectionType>[] = useMemo(
     () => [
-      {
-        id: "account",
-        label: t("settingsModal.sections.account.label"),
-        icon: UserCircle,
-        description: t("settingsModal.sections.account.description"),
-        group: t("settingsModal.groups.account"),
-      },
-      {
-        id: "plansBilling",
-        label: t("settingsModal.sections.plansBilling.label"),
-        icon: CreditCard,
-        description: t("settingsModal.sections.plansBilling.description"),
-        group: t("settingsModal.groups.account"),
-      },
+      ...(ACCOUNTS_ENABLED
+        ? [
+            {
+              id: "account" as const,
+              label: t("settingsModal.sections.account.label"),
+              icon: UserCircle,
+              description: t("settingsModal.sections.account.description"),
+              group: t("settingsModal.groups.account"),
+            },
+          ]
+        : []),
+      ...(BILLING_ENABLED
+        ? [
+            {
+              id: "plansBilling" as const,
+              label: t("settingsModal.sections.plansBilling.label"),
+              icon: CreditCard,
+              description: t("settingsModal.sections.plansBilling.description"),
+              group: t("settingsModal.groups.account"),
+            },
+          ]
+        : []),
       ...(WORKSPACES_ENABLED
         ? [
             {
@@ -128,9 +136,12 @@ export default function SettingsModal({ open, onOpenChange, initialSection }: Se
   );
 
   const resolveSection = (section: string | undefined): SettingsSectionType => {
-    if (!section) return "account";
+    if (!section) return "general";
     const resolved = (SECTION_ALIASES[section] ?? section) as SettingsSectionType;
-    if (resolved === "workspace" && !WORKSPACES_ENABLED) return "account";
+    // fall gated-off cloud/account sections back to General (local-only build)
+    if (resolved === "workspace" && !WORKSPACES_ENABLED) return "general";
+    if (resolved === "account" && !ACCOUNTS_ENABLED) return "general";
+    if (resolved === "plansBilling" && !BILLING_ENABLED) return "general";
     return resolved;
   };
 
