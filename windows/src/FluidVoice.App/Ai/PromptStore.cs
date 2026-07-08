@@ -179,7 +179,28 @@ Use the following selected context to improve your response:
     }
 
     public static (string SystemPrompt, string Body) ResolveDictationPrompt(string? appId)
-        => Resolve(PromptMode.Dictate, appId);
+    {
+        var (system, body) = Resolve(PromptMode.Dictate, appId);
+        return (system + DictionarySuffix(), body);
+    }
+
+    /// <summary>
+    /// Custom-dictionary spellings appended to the cleanup prompt (OpenWhispr's
+    /// dictionarySuffix): the LLM keeps user-taught names/jargon spelled exactly right
+    /// even when the STT engine got them phonetically close but wrong.
+    /// </summary>
+    private static string DictionarySuffix()
+    {
+        var words = Settings.Current.CustomDictionaryEntries
+            .Select(e => e.Replacement)
+            .Where(w => !string.IsNullOrWhiteSpace(w))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(80) // keep the prompt bounded for small local models
+            .ToList();
+        if (words.Count == 0) return "";
+        return "\n\nCustom dictionary (when any of these terms appear — possibly misspelled or " +
+               "split phonetically — use these exact spellings): " + string.Join(", ", words);
+    }
 
     private static string StripBasePrompt(PromptMode mode, string prompt)
     {

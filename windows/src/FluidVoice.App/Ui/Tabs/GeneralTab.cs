@@ -146,6 +146,56 @@ public sealed class GeneralTab : StackPanel
         // --- Behavior ---
         var bh = new StackPanel();
         bh.Children.Add(Theme.Heading("Behavior"));
+
+        // Silero VAD auto-stop (OpenWhispr port). The tiny model downloads on first enable.
+        var vadStatus = Theme.Caption("Ends the recording after you stop talking. Doesn't apply in Hold mode.");
+        bh.Children.Add(Theme.Toggle("Stop automatically after silence", s.VadAutoStopEnabled, v =>
+        {
+            s.VadAutoStopEnabled = v;
+            s.Save();
+            if (v && !FluidVoice.Audio.VadAutoStopMonitor.IsModelInstalled)
+            {
+                vadStatus.Text = "Downloading voice-detection model…";
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await FluidVoice.Audio.VadAutoStopMonitor.DownloadModelAsync(null, CancellationToken.None);
+                        await Dispatcher.BeginInvoke(() => vadStatus.Text = "Voice-detection model ready.");
+                    }
+                    catch (Exception ex)
+                    {
+                        await Dispatcher.BeginInvoke(() =>
+                            vadStatus.Text = $"Model download failed ({ex.Message}) — using the simpler level-based detector.");
+                    }
+                });
+            }
+        }));
+        var vadRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 2) };
+        vadRow.Children.Add(new TextBlock
+        {
+            Text = "Silence duration",
+            FontSize = 13,
+            Foreground = Theme.TextBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 10, 0),
+        });
+        var vadCombo = new ComboBox { Width = 130 };
+        var silenceChoices = new (string Label, double Secs)[]
+        {
+            ("1.5 seconds", 1.5), ("2 seconds", 2.0), ("2.5 seconds", 2.5), ("3 seconds", 3.0), ("5 seconds", 5.0),
+        };
+        foreach (var (label, _) in silenceChoices) vadCombo.Items.Add(label);
+        var vadIdx = Array.FindIndex(silenceChoices, c => Math.Abs(c.Secs - s.VadAutoStopSilenceSeconds) < 0.01);
+        vadCombo.SelectedIndex = vadIdx >= 0 ? vadIdx : 2;
+        vadCombo.SelectionChanged += (_, _) =>
+        {
+            if (vadCombo.SelectedIndex >= 0) { s.VadAutoStopSilenceSeconds = silenceChoices[vadCombo.SelectedIndex].Secs; s.Save(); }
+        };
+        vadRow.Children.Add(vadCombo);
+        bh.Children.Add(vadRow);
+        bh.Children.Add(vadStatus);
+
         bh.Children.Add(Theme.Toggle("Play start/stop sounds", s.EnableTranscriptionSounds, v => { s.EnableTranscriptionSounds = v; s.Save(); }));
         bh.Children.Add(Theme.Toggle("Pause media while dictating", s.PauseMediaDuringTranscription, v => { s.PauseMediaDuringTranscription = v; s.Save(); }));
         bh.Children.Add(Theme.Toggle("Copy transcription to clipboard", s.CopyTranscriptionToClipboard, v => { s.CopyTranscriptionToClipboard = v; s.Save(); }));

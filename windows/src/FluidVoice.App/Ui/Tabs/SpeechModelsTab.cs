@@ -125,6 +125,9 @@ public sealed class SpeechModelsTab : StackPanel
         chips.Children.Add(ModelChip(model.Engine.ToString()));
         chips.Children.Add(ModelChip(model.LanguageSupport));
         chips.Children.Add(ModelChip(model.SizeDisplay));
+        if (model.RamEstimate.Length > 0) chips.Children.Add(ModelChip(model.RamEstimate));
+        if (model.SupportsLivePreview || model.Engine == SpeechEngineKind.Parakeet)
+            chips.Children.Add(ModelChip("Live preview"));
         left.Children.Add(chips);
 
         var quality = new Grid();

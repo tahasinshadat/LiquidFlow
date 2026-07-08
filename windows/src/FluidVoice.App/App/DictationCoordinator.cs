@@ -31,6 +31,7 @@ public sealed class DictationCoordinator : IDictationControl
     private int _processingStop;
     private CancellationTokenSource? _partialCts;
     private Task? _partialTask;
+    private VadAutoStopMonitor? _vadMonitor;
     private FocusSnapshot? _focusAtStart;
     private string _lastPartial = "";
     private long _sessionId;
@@ -136,6 +137,16 @@ public sealed class DictationCoordinator : IDictationControl
         var engine = CurrentEngine;
         if (Settings.Current.EnableStreamingPreview && engine.IsReady && SpeechModels.Selected().SupportsLivePreview)
             StartPartialLoop(engine, _sessionId);
+
+        // Silero auto-stop (skipped in Hold mode — releasing the key is the stop there)
+        if (Settings.Current.VadAutoStopEnabled && Settings.Current.HotkeyMode != HotkeyActivationMode.Hold)
+        {
+            var session = _sessionId;
+            _vadMonitor = VadAutoStopMonitor.TryStart(
+                _recorder,
+                stillRecording: () => _activeMode != RecordingMode.None && session == _sessionId,
+                requestStop: RequestStopAndProcess);
+        }
 
         // lazily prepare the model while the user is speaking (mac: ensureAsrReady at stop)
         if (!engine.IsReady)
@@ -247,6 +258,8 @@ public sealed class DictationCoordinator : IDictationControl
             RecordingStateChanged?.Invoke(false);
 
             // 1) stop capture immediately, play the stop cue without waiting (ASRService.swift stop())
+            _vadMonitor?.Dispose();
+            _vadMonitor = null;
             var pcm = _recorder.Stop();
             SoundCues.PlayStop();
             MediaPauseService.ResumeIfWePaused();
@@ -403,6 +416,8 @@ public sealed class DictationCoordinator : IDictationControl
         var focus = _focusAtStart;
         _activeMode = RecordingMode.None;
         _partialCts?.Cancel();
+        _vadMonitor?.Dispose();
+        _vadMonitor = null;
         var pcm = _recorder.Stop();
         SoundCues.PlayStop();
         MediaPauseService.ResumeIfWePaused();

@@ -294,14 +294,38 @@ public sealed class MainWindow : Window
 
     private void PromptForNameIfNeeded()
     {
-        if (_didPromptForName || !string.IsNullOrWhiteSpace(Settings.Current.DisplayName)) return;
+        // First run gets the full OpenWhispr-style wizard (name, hotkey, model, AI);
+        // the lone name dialog only remains for upgraders who somehow lack a name.
+        if (_didPromptForName) return;
         _didPromptForName = true;
+        if (!Settings.Current.OnboardingCompleted)
+        {
+            RunSetupWizard();
+            return;
+        }
+        if (!string.IsNullOrWhiteSpace(Settings.Current.DisplayName)) return;
         var oldOpacity = Opacity;
         try
         {
             Opacity = 0.72;
             var dialog = new NamePromptDialog(FallbackFirstName()) { Owner = this };
             dialog.ShowDialog();
+        }
+        finally
+        {
+            Opacity = oldOpacity;
+            if (_current == "Home") Navigate("Home");
+        }
+    }
+
+    public void RunSetupWizard()
+    {
+        var oldOpacity = Opacity;
+        try
+        {
+            Opacity = 0.62;
+            var wizard = new OnboardingWindow { Owner = this };
+            wizard.ShowDialog();
         }
         finally
         {

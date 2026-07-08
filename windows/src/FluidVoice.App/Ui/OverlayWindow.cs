@@ -28,6 +28,8 @@ public sealed class OverlayWindow : Window
 {
     private readonly Canvas _barsCanvas = new();
     private readonly TextBlock _statusText = new();
+    private readonly TextBlock _elapsedText = new();
+    private DateTime _recordStart;
     private readonly TextBlock _previewText = new();
     private readonly Image _appIcon = new() { Width = 16, Height = 16, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
     private readonly Border _root;
@@ -112,6 +114,13 @@ public sealed class OverlayWindow : Window
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
         };
+        // elapsed recording timer (OpenWhispr-style): monospace digits so it doesn't jitter
+        _elapsedText.Text = "0:00";
+        _elapsedText.FontFamily = new FontFamily("Consolas");
+        _elapsedText.Foreground = new SolidColorBrush(Color.FromArgb(120, 255, 255, 255));
+        _elapsedText.VerticalAlignment = VerticalAlignment.Center;
+        _elapsedText.Margin = new Thickness(0, 0, 10, 0);
+        rightSide.Children.Add(_elapsedText);
         _statusText.Margin = new Thickness(0, 0, 10, 0);
         rightSide.Children.Add(_statusText);
         _cancelButton.Child = new TextBlock
@@ -241,6 +250,9 @@ public sealed class OverlayWindow : Window
         _mode = mode;
         _state = OverlayState.Recording;
         _previewText.Text = "";
+        _recordStart = DateTime.UtcNow;
+        _elapsedText.Text = "0:00";
+        _elapsedText.Visibility = Visibility.Visible;
         UpdateStatusLabel();
         RefreshBarBrushes();
         PositionOnActiveScreen();
@@ -253,6 +265,7 @@ public sealed class OverlayWindow : Window
     {
         _state = OverlayState.Processing;
         _statusText.Text = status;
+        _elapsedText.Visibility = Visibility.Collapsed;
         RefreshBarBrushes();
         if (!IsVisible)
         {
@@ -335,6 +348,9 @@ public sealed class OverlayWindow : Window
         double maxH = Math.Min(_layout.WaveH, 22);
         if (_state == OverlayState.Recording)
         {
+            var elapsed = DateTime.UtcNow - _recordStart;
+            var stamp = $"{(int)elapsed.TotalMinutes}:{elapsed.Seconds:00}";
+            if (_elapsedText.Text != stamp) _elapsedText.Text = stamp;
             // Perceptual boost: normalized speech levels sit ~0.2-0.5, which looked nearly
             // flat. Compress upward so normal talking visibly moves the bars.
             double boosted = Math.Pow(Math.Min(1.0, _level * 2.2), 0.55);

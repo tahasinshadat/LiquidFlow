@@ -270,6 +270,17 @@ public sealed class AccountSettingsTab : StackPanel
         };
         DockPanel.SetDock(save, Dock.Right);
         actions.Children.Add(save);
+        var rerun = Theme.SecondaryButton("Run setup wizard");
+        rerun.ToolTip = "Walk through hotkey, speech model, and AI setup again";
+        rerun.Click += (_, _) =>
+        {
+            var main = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
+            if (main is null) return;
+            Window.GetWindow(this)?.Close();
+            // open after the modal's ShowDialog stack unwinds
+            main.Dispatcher.BeginInvoke(main.RunSetupWizard);
+        };
+        actions.Children.Add(rerun);
         panel.Children.Add(actions);
 
         Children.Add(Theme.Panel(panel, new Thickness(24), new Thickness(0)));

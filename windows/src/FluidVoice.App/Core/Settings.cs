@@ -150,6 +150,12 @@ public sealed class Settings
     public float TranscriptionSoundVolume { get; set; } = 1.0f;
     public bool PauseMediaDuringTranscription { get; set; }
 
+    // ----- Voice activity detection (OpenWhispr-style auto-stop) -----
+    /// <summary>Stop dictation automatically after trailing silence (Silero VAD; off by default so thinking pauses never cut you off).</summary>
+    public bool VadAutoStopEnabled { get; set; }
+    /// <summary>Seconds of continuous silence (after speech) that end the recording.</summary>
+    public double VadAutoStopSilenceSeconds { get; set; } = 2.5;
+
     // ----- App behavior -----
     /// <summary>Bumped when a release wants to migrate existing settings once.</summary>
     public int SettingsRevision { get; set; }

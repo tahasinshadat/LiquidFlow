@@ -54,8 +54,31 @@ public sealed class HistoryTab : StackPanel
             return;
         }
 
+        // grouped by day bucket (OpenWhispr-style): Today / Yesterday / This Week / Earlier
+        string? currentGroup = null;
         foreach (var entry in entries)
+        {
+            var group = DateGroup(entry.Timestamp);
+            if (group != currentGroup)
+            {
+                currentGroup = group;
+                var eyebrow = Theme.Eyebrow(group);
+                eyebrow.Margin = new Thickness(2, 14, 0, 8);
+                Children.Add(eyebrow);
+            }
             Children.Add(EntryCard(entry));
+        }
+    }
+
+    private static string DateGroup(DateTime ts)
+    {
+        var today = DateTime.Today;
+        var day = ts.Date;
+        if (day == today) return "Today";
+        if (day == today.AddDays(-1)) return "Yesterday";
+        if (day > today.AddDays(-7)) return "This week";
+        if (day.Year == today.Year && day.Month == today.Month) return "This month";
+        return ts.ToString("MMMM yyyy");
     }
 
     private void Rebuild() => Build(_search.Text);
@@ -63,7 +86,10 @@ public sealed class HistoryTab : StackPanel
     private Border EntryCard(TranscriptionHistoryEntry entry)
     {
         var panel = new StackPanel();
-        var meta = $"{entry.Timestamp:g}  ·  {entry.AppName}  ·  {entry.WordCount} words";
+        var when = entry.Timestamp.Date >= DateTime.Today.AddDays(-1)
+            ? entry.Timestamp.ToString("t")   // inside Today/Yesterday groups the date is redundant
+            : entry.Timestamp.ToString("g");
+        var meta = $"{when}  ·  {entry.AppName}  ·  {entry.WordCount} words";
         if (entry.WasAIProcessed) meta += "  ·  AI";
         panel.Children.Add(new TextBlock { Text = meta, Foreground = Theme.SubtleBrush, FontSize = 11 });
         panel.Children.Add(new TextBlock

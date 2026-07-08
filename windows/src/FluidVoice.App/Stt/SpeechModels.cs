@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using FluidVoice.Core;
 
 namespace FluidVoice.Stt;
@@ -28,6 +28,9 @@ public sealed record SpeechModelInfo(
     string? Badge)
 {
     public SpeechEngineKind Engine { get; init; } = SpeechEngineKind.Whisper;
+
+    /// <summary>Approximate working-set while loaded (shown as a chip on the model card).</summary>
+    public string RamEstimate { get; init; } = "";
 
     /// <summary>Multi-file models: every file that must exist under LocalPath (a directory). Null for single-file Whisper models.</summary>
     public IReadOnlyList<ModelFile>? Files { get; init; }
@@ -101,31 +104,32 @@ public static class SpeechModels
         {
             Engine = SpeechEngineKind.Parakeet,
             Files = ParakeetFiles,
+            RamEstimate = "~1.5 GB RAM",
         },
         new("whisper-tiny", "Whisper Tiny", "Fast & Light",
             "Minimal resource usage. Fastest response on battery.",
-            77_691_713, "ggml-tiny.bin", "99 Languages", 0.90, 0.40, null),
+            77_691_713, "ggml-tiny.bin", "99 Languages", 0.90, 0.40, null) { RamEstimate = "~0.4 GB RAM" },
         new("whisper-base", "Whisper Base", "Standard Choice",
             "Good balance of speed and accuracy. Works on any PC.",
-            147_951_465, "ggml-base.bin", "99 Languages", 0.80, 0.60, "Default"),
+            147_951_465, "ggml-base.bin", "99 Languages", 0.80, 0.60, "Default") { RamEstimate = "~0.6 GB RAM" },
         new("whisper-small", "Whisper Small", "Balanced Speed & Accuracy",
             "Better accuracy than Base. Moderate resource usage.",
-            487_601_967, "ggml-small.bin", "99 Languages", 0.60, 0.70, "FluidVoice Pick"),
+            487_601_967, "ggml-small.bin", "99 Languages", 0.60, 0.70, "LiquidFlow Pick") { RamEstimate = "~1.2 GB RAM" },
         new("whisper-medium", "Whisper Medium", "Medium Quality",
             "High accuracy for demanding tasks. Requires more memory.",
             1_533_763_059, "ggml-medium.bin", "99 Languages", 0.40, 0.80, null)
-        { SupportsLivePreview = false },
+        { SupportsLivePreview = false, RamEstimate = "~2.8 GB RAM" },
         // NOTE: measured on Snapdragon X Elite — q5-quantized turbo decodes SLOWER than f16
         // (38s vs 26s for a 6.4s clip; the q5 kernels aren't NEON-optimized), so no quantized
         // variant is offered. For near-instant dictation use Parakeet; Small/Base for Whisper.
         new("whisper-large-turbo", "Whisper Large Turbo", "Accuracy over Speed",
             "Near-maximum accuracy, but heavy for CPU decoding (roughly 4x slower than real time on this class of device). For fast dictation use Parakeet or Whisper Small.",
             1_624_555_275, "ggml-large-v3-turbo.bin", "99 Languages", 0.25, 0.95, null)
-        { SupportsLivePreview = false },
+        { SupportsLivePreview = false, RamEstimate = "~3.0 GB RAM" },
         new("whisper-large", "Whisper Large", "Maximum Accuracy",
             "Best possible accuracy. Very slow on CPU — best for File Transcription rather than live dictation.",
             3_095_033_483, "ggml-large-v3.bin", "99 Languages", 0.10, 1.00, null)
-        { SupportsLivePreview = false },
+        { SupportsLivePreview = false, RamEstimate = "~4.8 GB RAM" },
     };
 
     public static SpeechModelInfo? ById(string id) => All.FirstOrDefault(m => m.Id == id);

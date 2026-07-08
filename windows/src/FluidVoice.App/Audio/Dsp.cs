@@ -12,6 +12,15 @@ public static class Dsp
     public const float MaxGain = 30f;       // whisper-quiet input gets up to ~30x
     public const float NoiseFloorRms = 0.0008f; // below this it's silence, not speech — don't amplify hiss
 
+    /// <summary>Root-mean-square level of a buffer (0 = silence).</summary>
+    public static float Rms(ReadOnlySpan<float> pcm)
+    {
+        if (pcm.Length == 0) return 0f;
+        double sumSq = 0;
+        for (int i = 0; i < pcm.Length; i++) sumSq += pcm[i] * pcm[i];
+        return (float)Math.Sqrt(sumSq / pcm.Length);
+    }
+
     /// <summary>Gain that would bring this buffer to the target RMS (1.0 = leave alone).</summary>
     public static float GainFor(ReadOnlySpan<float> pcm)
     {
