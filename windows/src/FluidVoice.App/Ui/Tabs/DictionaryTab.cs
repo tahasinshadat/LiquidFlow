@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
@@ -101,13 +101,13 @@ public sealed class DictionaryTab : StackPanel
             Foreground = Brushes.White,
             Margin = new Thickness(0, 0, 0, 16),
         };
-        title.Inlines.Add(new Run("Fluid spells the way "));
+        title.Inlines.Add(new Run("LiquidFlow spells the way "));
         title.Inlines.Add(new Run("you") { FontStyle = FontStyles.Italic });
         title.Inlines.Add(new Run(" do."));
         content.Children.Add(title);
         content.Children.Add(new TextBlock
         {
-            Text = "Teach FluidVoice names, jargon, casing, URLs, and phrases that should always come out exactly right.",
+            Text = "Teach LiquidFlow names, jargon, casing, URLs, and phrases that should always come out exactly right.",
             FontSize = 15,
             FontWeight = FontWeights.SemiBold,
             Foreground = Brushes.White,
@@ -124,7 +124,7 @@ public sealed class DictionaryTab : StackPanel
             Build();
         };
         chips.Children.Add(addWord);
-        foreach (var sample in new[] { "FluidVoice", "NVIDIA", "Claude.md", "Brookfield" })
+        foreach (var sample in new[] { "LiquidFlow", "NVIDIA", "Claude.md", "Brookfield" })
         {
             var chip = Theme.Pill(sample, new SolidColorBrush(Color.FromArgb(210, 239, 234, 226)), Theme.TextBrush, 14);
             chip.Margin = new Thickness(10, 0, 0, 0);

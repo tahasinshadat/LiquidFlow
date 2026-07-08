@@ -51,6 +51,13 @@ public static class Theme
     /// <summary>The user-selectable UI font (Preferences → Appearance). Applied window-wide.</summary>
     public static FontFamily UiFont => new(FontChoice.Resolve(Settings.Current.AppFont));
 
+    /// <summary>User-selectable content zoom, clamped so a bad settings value can't wreck layout.</summary>
+    public static double UiScale => Math.Clamp(Settings.Current.UiScale <= 0 ? 0.9 : Settings.Current.UiScale, 0.8, 1.25);
+
+    /// <summary>LayoutTransform for page bodies honoring the text-size setting.</summary>
+    public static Transform PageScale() =>
+        Math.Abs(UiScale - 1.0) < 0.001 ? Transform.Identity : new ScaleTransform(UiScale, UiScale);
+
     public static SolidColorBrush BgBrush => new(Bg);
     public static SolidColorBrush CardBrush => new(Card);
     public static SolidColorBrush TextBrush => new(Text);

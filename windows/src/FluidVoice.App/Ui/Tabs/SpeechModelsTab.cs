@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using FluidVoice.Core;
@@ -32,22 +32,16 @@ public sealed class SpeechModelsTab : StackPanel
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(240) });
 
-        var copy = new StackPanel();
-        copy.Children.Add(new TextBlock
-        {
-            Text = "Speech model",
-            FontSize = 22,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = Theme.TextBrush,
-            Margin = new Thickness(0, 0, 0, 8),
-        });
+        // (the hosting page/modal supplies the section title — no duplicate heading here)
+        var copy = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         copy.Children.Add(new TextBlock
         {
             Text = "Choose the local engine that turns speech into text. Parakeet is fastest for English; Whisper covers more languages.",
-            FontSize = 14,
+            FontSize = 13,
             Foreground = Theme.SubtleBrush,
             TextWrapping = TextWrapping.Wrap,
-            LineHeight = 20,
+            LineHeight = 19,
+            Margin = new Thickness(0, 0, 18, 0),
         });
         Grid.SetColumn(copy, 0);
         grid.Children.Add(copy);
@@ -226,9 +220,9 @@ public sealed class SpeechModelsTab : StackPanel
     private void Uninstall(SpeechModelInfo model, bool selected)
     {
         var note = selected
-            ? $"Uninstall {model.DisplayName}?\n\nIt is your selected model. FluidVoice will switch back to {SpeechModels.ById(SpeechModels.DefaultModelId)!.DisplayName}."
+            ? $"Uninstall {model.DisplayName}?\n\nIt is your selected model. LiquidFlow will switch back to {SpeechModels.ById(SpeechModels.DefaultModelId)!.DisplayName}."
             : $"Uninstall {model.DisplayName} and free {model.SizeDisplay}?";
-        if (MessageBox.Show(note, "FluidVoice", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        if (MessageBox.Show(note, "LiquidFlow", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
         try
         {

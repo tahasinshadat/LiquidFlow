@@ -1,4 +1,4 @@
-using System.Drawing;
+﻿using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using FluidVoice.Audio;
@@ -34,20 +34,20 @@ public sealed class TrayIcon : IDisposable
         _statusItem = new ToolStripMenuItem("Ready to Record") { Enabled = false };
         menu.Items.Add(_statusItem);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Open Fluid Voice", null, (_, _) => OpenRequested?.Invoke());
+        menu.Items.Add("Open LiquidFlow", null, (_, _) => OpenRequested?.Invoke());
         menu.Items.Add("Settings...", null, (_, _) => SettingsRequested?.Invoke());
         menu.Items.Add("Custom Dictionary", null, (_, _) => DictionaryRequested?.Invoke());
         _micMenu = new ToolStripMenuItem("Microphone");
         menu.Items.Add(_micMenu);
         menu.Items.Add("Check for Updates...", null, (_, _) => CheckUpdatesRequested?.Invoke());
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Quit Fluid Voice", null, (_, _) => QuitRequested?.Invoke());
+        menu.Items.Add("Quit LiquidFlow", null, (_, _) => QuitRequested?.Invoke());
         menu.Opening += (_, _) => RefreshMicMenu();
 
         _icon = new NotifyIcon
         {
             Icon = _idleIcon,
-            Text = "FluidVoice",
+            Text = "LiquidFlow",
             Visible = true,
             ContextMenuStrip = menu,
         };
@@ -61,7 +61,7 @@ public sealed class TrayIcon : IDisposable
         var hotkey = Settings.Current.PrimaryDictationShortcuts.FirstOrDefault()?.DisplayString ?? "not set";
         _statusItem.Text = recording ? $"Recording... ({hotkey})" : $"Ready to Record ({hotkey})";
         _icon.Icon = recording ? _recordingIcon : _idleIcon;
-        _icon.Text = recording ? "FluidVoice — Recording" : "FluidVoice";
+        _icon.Text = recording ? "LiquidFlow — Recording" : "LiquidFlow";
     }
 
     public void ShowBalloon(string title, string body)

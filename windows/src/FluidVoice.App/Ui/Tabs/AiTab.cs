@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using FluidVoice.Ai;
@@ -22,18 +22,11 @@ public sealed class AiTab : StackPanel
         Children.Clear();
         var s = Settings.Current;
 
+        // (the hosting page/modal supplies the section title — no duplicate heading here)
         Children.Add(new TextBlock
         {
-            Text = "AI enhancement",
-            FontSize = 22,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = Theme.TextBrush,
-            Margin = new Thickness(0, 20, 0, 8),
-        });
-        Children.Add(new TextBlock
-        {
-            Text = "Choose how FluidVoice cleans up capitalization, phrasing, and corrections after speech recognition.",
-            FontSize = 14,
+            Text = "Choose how LiquidFlow cleans up capitalization, phrasing, and corrections after speech recognition.",
+            FontSize = 13,
             Foreground = Theme.SubtleBrush,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 14),
@@ -43,7 +36,19 @@ public sealed class AiTab : StackPanel
         var enabled = !string.IsNullOrEmpty(s.SelectedProviderID);
         enablePanel.Children.Add(Theme.Toggle("Enable AI enhancement for dictation", enabled, v =>
         {
-            if (!v) { s.SelectedProviderID = ""; s.Save("ai"); Dispatcher.BeginInvoke(Build); }
+            if (v && string.IsNullOrEmpty(s.SelectedProviderID))
+            {
+                // default to the private on-device provider so the toggle visibly does something
+                s.SelectedProviderID = ProviderCatalog.FluidLocalId;
+                s.Save("ai");
+                Dispatcher.BeginInvoke(Build);
+            }
+            else if (!v && !string.IsNullOrEmpty(s.SelectedProviderID))
+            {
+                s.SelectedProviderID = "";
+                s.Save("ai");
+                Dispatcher.BeginInvoke(Build);
+            }
         }));
 
         enablePanel.Children.Add(Theme.Label("Provider"));
@@ -159,14 +164,14 @@ public sealed class AiTab : StackPanel
     private Border LocalAiCard()
     {
         var panel = new StackPanel();
-        panel.Children.Add(Theme.Heading("Fluid Local AI"));
+        panel.Children.Add(Theme.Heading("LiquidFlow Local AI"));
         panel.Children.Add(Theme.Caption("Runs a small local model for private cleanup. No dictation text leaves your PC when this provider is selected."));
 
         foreach (var m in LocalAiServer.Models)
             panel.Children.Add(LocalModelRow(m));
 
         if (LocalAiServer.IsRuntimeInstalled())
-            panel.Children.Add(Theme.Caption("llama.cpp runtime installed. The selected model starts on demand and stops when FluidVoice quits."));
+            panel.Children.Add(Theme.Caption("llama.cpp runtime installed. The selected model starts on demand and stops when LiquidFlow quits."));
         return Theme.Panel(panel, new Thickness(22), new Thickness(0, 0, 0, 16));
     }
 
@@ -230,7 +235,7 @@ public sealed class AiTab : StackPanel
                     Settings.Current.Save("localai");
                 }
                 catch (Exception ex) { Log.Warn("localai", ex.Message); }
-                Dispatcher.BeginInvoke(Build);
+                _ = Dispatcher.BeginInvoke(Build);
             };
             buttons.Children.Add(dl);
         }
@@ -254,7 +259,7 @@ public sealed class AiTab : StackPanel
             del.Click += (_, _) =>
             {
                 var gb = LocalAiServer.InstalledBytes(m) / 1024.0 / 1024 / 1024;
-                if (MessageBox.Show($"Uninstall {m.DisplayName} and free {gb:0.0} GB?", "FluidVoice",
+                if (MessageBox.Show($"Uninstall {m.DisplayName} and free {gb:0.0} GB?", "LiquidFlow",
                         MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
                 LocalAiServer.DeleteModel(m);
                 Dispatcher.BeginInvoke(Build);

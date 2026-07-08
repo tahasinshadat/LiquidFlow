@@ -157,6 +157,8 @@ public sealed class Settings
     public string AccentColor { get; set; } = "#3AC8C6"; // Cyan default (mac AccentColorOption)
     /// <summary>UI font display name (see Ui/FontChoice). "System" = Segoe UI Variable.</summary>
     public string AppFont { get; set; } = "System";
+    /// <summary>Content zoom for pages and settings (0.85–1.2). Default is slightly compact.</summary>
+    public double UiScale { get; set; } = 0.9;
     public bool LaunchAtStartup { get; set; } = true; // always-on dictation app
     public bool AutoUpdateCheckEnabled { get; set; } = true;
     public bool BetaReleasesEnabled { get; set; }

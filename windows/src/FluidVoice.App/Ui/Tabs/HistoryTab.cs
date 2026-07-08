@@ -31,7 +31,7 @@ public sealed class HistoryTab : StackPanel
         var clearBtn = new Button { Content = "Clear all", Padding = new Thickness(10, 5, 10, 5), HorizontalAlignment = HorizontalAlignment.Right };
         clearBtn.Click += (_, _) =>
         {
-            if (MessageBox.Show("Delete all transcription history?", "FluidVoice", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+            if (MessageBox.Show("Delete all transcription history?", "LiquidFlow", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
                 HistoryStore.ClearAll();
         };
         DockPanel.SetDock(clearBtn, Dock.Right);

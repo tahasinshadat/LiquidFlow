@@ -42,7 +42,7 @@ public sealed class GeneralTab : StackPanel
         AddPreset("Right Alt", HotkeyShortcut.RightAlt);
         AddPreset("Right Ctrl", HotkeyShortcut.RightCtrl);
         hk.Children.Add(presets);
-        hk.Children.Add(Theme.Caption("While FluidVoice is running, the Copilot key starts dictation instead of opening Copilot."));
+        hk.Children.Add(Theme.Caption("While LiquidFlow is running, the Copilot key starts dictation instead of opening Copilot."));
 
         hk.Children.Add(Theme.Label("Activation mode"));
         var modeCombo = new ComboBox { Width = 220, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 6) };
@@ -120,6 +120,27 @@ public sealed class GeneralTab : StackPanel
         };
         ap.Children.Add(fontCombo);
         ap.Children.Add(Theme.Caption("Changes the font across the whole app instantly."));
+
+        ap.Children.Add(Theme.Label("Text size"));
+        var sizeOptions = new (string Label, double Scale)[]
+        {
+            ("Compact (85%)", 0.85), ("Default (90%)", 0.9), ("Medium (100%)", 1.0),
+            ("Large (110%)", 1.1), ("Extra large (120%)", 1.2),
+        };
+        var scaleCombo = new ComboBox { Width = 220, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 2) };
+        foreach (var (label, _) in sizeOptions) scaleCombo.Items.Add(label);
+        var scaleIdx = Array.FindIndex(sizeOptions, o => Math.Abs(o.Scale - s.UiScale) < 0.01);
+        scaleCombo.SelectedIndex = scaleIdx >= 0 ? scaleIdx : 1;
+        scaleCombo.SelectionChanged += (_, _) =>
+        {
+            if (scaleCombo.SelectedIndex >= 0)
+            {
+                s.UiScale = sizeOptions[scaleCombo.SelectedIndex].Scale;
+                s.Save("font"); // font hint re-renders every page/modal at the new scale
+            }
+        };
+        ap.Children.Add(scaleCombo);
+        ap.Children.Add(Theme.Caption("Scales page content up or down."));
         Children.Add(Theme.Card2(ap));
 
         // --- Behavior ---

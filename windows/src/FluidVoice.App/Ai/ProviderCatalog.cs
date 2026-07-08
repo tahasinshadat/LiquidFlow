@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using FluidVoice.Core;
 
@@ -27,7 +27,7 @@ public static class ProviderCatalog
         new("openrouter", "OpenRouter", "https://openrouter.ai/api/v1", "openai/gpt-oss-20b", false),
         new("ollama", "Ollama", "http://localhost:11434/v1", "", true),
         new("lmstudio", "LM Studio", "http://localhost:1234/v1", "", true),
-        new(FluidLocalId, "Fluid Local AI (open)", "", "", true), // base URL resolved from LocalAiServer
+        new(FluidLocalId, "LiquidFlow Local AI", "", "", true), // base URL resolved from LocalAiServer
     };
 
     public static IEnumerable<ProviderInfo> All()

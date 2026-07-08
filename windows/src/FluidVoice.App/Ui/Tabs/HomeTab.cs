@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
@@ -180,7 +180,7 @@ public sealed class HomeTab : StackPanel
         var dictionaryFixes = Settings.Current.CustomDictionaryEntries.Count;
         var panel = new StackPanel();
         panel.Children.Add(StatNumber((aiFixes + dictionaryFixes).ToString("N0")));
-        panel.Children.Add(LabelCaps("Fixes made by Fluid"));
+        panel.Children.Add(LabelCaps("Fixes made by LiquidFlow"));
         panel.Children.Add(Theme.Divider(22, 18));
         panel.Children.Add(MiniStat($"{aiFixes:N0} AI-enhanced dictations"));
         panel.Children.Add(MiniStat($"{dictionaryFixes:N0} dictionary entries"));

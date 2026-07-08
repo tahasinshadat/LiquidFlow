@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using FluidVoice.App;
 using FluidVoice.Core;
 using FluidVoice.Input;
@@ -21,7 +21,7 @@ public static class Program
 
         if (args.Contains("--version"))
         {
-            Console.WriteLine("FluidVoice for Windows 1.6.2 (port of altic-dev/FluidVoice)");
+            Console.WriteLine("LiquidFlow for Windows 1.6.2 (port of altic-dev/FluidVoice)");
             return 0;
         }
         if (args.Contains("--selftest-stt"))
@@ -172,11 +172,11 @@ public static class Program
             var update = await App.Updater.CheckAsync(CancellationToken.None);
             if (update is null)
             {
-                if (interactive) Notifications.Show("FluidVoice", "You're on the latest version.");
+                if (interactive) Notifications.Show("LiquidFlow", "You're on the latest version.");
                 return;
             }
             Notifications.Show("Update available",
-                $"FluidVoice {update.Version} is available. Opening download…");
+                $"LiquidFlow {update.Version} is available. Opening download…");
             await App.Updater.DownloadAndRunAsync(update, CancellationToken.None);
         }
         catch (Exception ex)

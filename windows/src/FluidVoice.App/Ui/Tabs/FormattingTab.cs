@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using FluidVoice.Core;
 
@@ -13,7 +13,7 @@ public sealed class FormattingTab : StackPanel
 
         var fmt = new StackPanel();
         fmt.Children.Add(Theme.Heading("Formatting"));
-        fmt.Children.Add(Theme.Caption("Applied locally before FluidVoice types the result."));
+        fmt.Children.Add(Theme.Caption("Applied locally before LiquidFlow types the result."));
         fmt.Children.Add(Theme.Toggle("Convert spoken punctuation", s.AutoConvertPunctuationEnabled, v => { s.AutoConvertPunctuationEnabled = v; s.Save("fmt"); }));
         fmt.Children.Add(Theme.Toggle("Remove filler words", s.RemoveFillerWordsEnabled, v => { s.RemoveFillerWordsEnabled = v; s.Save("fmt"); }));
         Children.Add(Theme.Card2(fmt));

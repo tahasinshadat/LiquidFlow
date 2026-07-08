@@ -15,7 +15,7 @@ public sealed class SettingsModal : Window
 
     private sealed record SettingsSection(string Glyph, string Title, Func<UIElement> Build);
 
-    public SettingsModal()
+    public SettingsModal(string initialSection = "General")
     {
         Title = "Settings";
         Width = 980;
@@ -58,7 +58,7 @@ public sealed class SettingsModal : Window
         Grid.SetColumn(sidebar, 0);
         grid.Children.Add(sidebar);
 
-        var contentShell = new Grid { Margin = new Thickness(44, 42, 44, 34) };
+        var contentShell = new Grid { Margin = new Thickness(40, 38, 40, 30) };
         var scroller = new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -66,6 +66,7 @@ public sealed class SettingsModal : Window
             Content = _content,
         };
         contentShell.Children.Add(scroller);
+        WindowFx.RoundClip(shell, 18); // keep scrollbars inside the rounded shell
 
         var close = new Button
         {
@@ -90,7 +91,15 @@ public sealed class SettingsModal : Window
         shell.Child = grid;
         Content = shell;
 
-        Loaded += (_, _) => Select("General");
+        _currentSection = initialSection;
+        Loaded += (_, _) => Select(initialSection);
+        // dev seam: cycle every section once so a broken tab surfaces immediately in tests
+        if (Environment.GetEnvironmentVariable("FLUIDVOICE_SETTINGS_CYCLE") == "1")
+            Loaded += (_, _) => Dispatcher.BeginInvoke(() =>
+            {
+                foreach (var sec in _sections) Select(sec.Title);
+                Select(initialSection);
+            });
         KeyDown += (_, e) =>
         {
             if (e.Key == Key.Escape) Close();
@@ -125,7 +134,7 @@ public sealed class SettingsModal : Window
         var footer = new DockPanel { Margin = new Thickness(24, 0, 24, 24), LastChildFill = false };
         footer.Children.Add(new TextBlock
         {
-            Text = $"FluidVoice {App.Updater.ThisVersion}",
+            Text = $"LiquidFlow {App.Updater.ThisVersion}",
             FontSize = 12,
             Foreground = Theme.SubtleBrush,
             VerticalAlignment = VerticalAlignment.Bottom,
@@ -192,15 +201,15 @@ public sealed class SettingsModal : Window
         foreach (var (name, item) in _items)
             item.Background = name == section.Title ? new SolidColorBrush(Theme.SidebarSelected) : Brushes.Transparent;
 
-        var body = new StackPanel();
+        var body = new StackPanel { LayoutTransform = Theme.PageScale() };
         body.Children.Add(new TextBlock
         {
             Text = section.Title,
-            FontFamily = section.Title is "General" or "Account" ? Theme.DisplaySerif : new FontFamily("Segoe UI Variable Display, Segoe UI"),
-            FontSize = section.Title is "General" or "Account" ? 30 : 24,
-            FontWeight = section.Title is "General" or "Account" ? FontWeights.Normal : FontWeights.SemiBold,
+            FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI"),
+            FontSize = 21,
+            FontWeight = FontWeights.SemiBold,
             Foreground = Theme.TextBrush,
-            Margin = new Thickness(0, 0, 46, 26),
+            Margin = new Thickness(0, 0, 46, 22),
         });
         body.Children.Add(section.Build());
         _content.Content = body;

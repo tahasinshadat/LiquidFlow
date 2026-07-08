@@ -58,7 +58,10 @@ public static class Styles
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="Button">
-          <Grid>
+          <Grid RenderTransformOrigin="0.5,0.5">
+            <Grid.RenderTransform>
+              <ScaleTransform x:Name="PressScale" ScaleX="1" ScaleY="1"/>
+            </Grid.RenderTransform>
             <Border x:Name="Bg" Background="{TemplateBinding Background}"
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}"
@@ -70,10 +73,52 @@ public static class Styles
           </Grid>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="HoverLayer" Property="Opacity" Value="0.07"/>
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="HoverLayer" Storyboard.TargetProperty="Opacity"
+                                     To="0.07" Duration="0:0:0.10"/>
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="HoverLayer" Storyboard.TargetProperty="Opacity"
+                                     To="0" Duration="0:0:0.16"/>
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
-              <Setter TargetName="HoverLayer" Property="Opacity" Value="0.14"/>
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="HoverLayer" Storyboard.TargetProperty="Opacity"
+                                     To="0.14" Duration="0:0:0.05"/>
+                    <DoubleAnimation Storyboard.TargetName="PressScale" Storyboard.TargetProperty="ScaleX"
+                                     To="0.965" Duration="0:0:0.06"/>
+                    <DoubleAnimation Storyboard.TargetName="PressScale" Storyboard.TargetProperty="ScaleY"
+                                     To="0.965" Duration="0:0:0.06"/>
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="HoverLayer" Storyboard.TargetProperty="Opacity"
+                                     To="0.07" Duration="0:0:0.16"/>
+                    <DoubleAnimation Storyboard.TargetName="PressScale" Storyboard.TargetProperty="ScaleX"
+                                     To="1" Duration="0:0:0.14">
+                      <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                    <DoubleAnimation Storyboard.TargetName="PressScale" Storyboard.TargetProperty="ScaleY"
+                                     To="1" Duration="0:0:0.14">
+                      <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
               <Setter Property="Opacity" Value="0.45"/>
@@ -93,19 +138,53 @@ public static class Styles
       <Setter.Value>
         <ControlTemplate TargetType="CheckBox">
           <StackPanel Orientation="Horizontal" Background="Transparent">
-            <Border x:Name="Track" Width="38" Height="21" CornerRadius="10.5"
-                    Background="{TRACK}" VerticalAlignment="Center">
-              <Ellipse x:Name="Thumb" Width="15" Height="15" Fill="#E8E9EB"
-                       HorizontalAlignment="Left" Margin="3,0,3,0"/>
+            <Border x:Name="Track" Width="38" Height="21" CornerRadius="10.5" VerticalAlignment="Center">
+              <Border.Background>
+                <SolidColorBrush x:Name="TrackBrush" Color="{TRACK}"/>
+              </Border.Background>
+              <Ellipse x:Name="Thumb" Width="15" Height="15"
+                       HorizontalAlignment="Left" Margin="3,0,3,0">
+                <Ellipse.Fill>
+                  <SolidColorBrush x:Name="ThumbBrush" Color="#E8E9EB"/>
+                </Ellipse.Fill>
+                <Ellipse.RenderTransform>
+                  <TranslateTransform x:Name="ThumbShift" X="0"/>
+                </Ellipse.RenderTransform>
+              </Ellipse>
             </Border>
             <ContentPresenter Margin="10,0,0,0" VerticalAlignment="Center"
                               TextElement.Foreground="{TemplateBinding Foreground}"/>
           </StackPanel>
           <ControlTemplate.Triggers>
             <Trigger Property="IsChecked" Value="True">
-              <Setter TargetName="Track" Property="Background" Value="{ACCENT}"/>
-              <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/>
-              <Setter TargetName="Thumb" Property="Fill" Value="White"/>
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="ThumbShift" Storyboard.TargetProperty="X"
+                                     To="17" Duration="0:0:0.16">
+                      <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                    <ColorAnimation Storyboard.TargetName="TrackBrush" Storyboard.TargetProperty="Color"
+                                    To="{ACCENT}" Duration="0:0:0.16"/>
+                    <ColorAnimation Storyboard.TargetName="ThumbBrush" Storyboard.TargetProperty="Color"
+                                    To="#FFFFFF" Duration="0:0:0.16"/>
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="ThumbShift" Storyboard.TargetProperty="X"
+                                     To="0" Duration="0:0:0.16">
+                      <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                    <ColorAnimation Storyboard.TargetName="TrackBrush" Storyboard.TargetProperty="Color"
+                                    To="{TRACK}" Duration="0:0:0.16"/>
+                    <ColorAnimation Storyboard.TargetName="ThumbBrush" Storyboard.TargetProperty="Color"
+                                    To="#E8E9EB" Duration="0:0:0.16"/>
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
             </Trigger>
             <Trigger Property="IsMouseOver" Value="True">
               <Setter TargetName="Track" Property="Opacity" Value="0.9"/>

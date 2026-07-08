@@ -36,7 +36,6 @@ public sealed class MainWindow : Window
     private bool _didPromptForName;
     private ColumnDefinition? _railColumn;
     private Border? _brandMark;
-    private TextBlock? _brandLabel;
     private double SidebarWidth => _sidebarExpanded ? 252 : 66;
 
     private sealed record NavEntry(string Glyph, string Title, Func<UIElement> Page);
@@ -46,7 +45,7 @@ public sealed class MainWindow : Window
     {
         _commandService = commandService;
         _coordinator = coordinator;
-        Title = "FluidVoice";
+        Title = "LiquidFlow";
         Width = 1240;
         Height = 820;
         MinWidth = 980;
@@ -62,23 +61,11 @@ public sealed class MainWindow : Window
             new("", "Insights", () => new HomeTab()),
             new("", "Dictionary", () => new DictionaryTab()),
             new("", "History", () => new HistoryTab()),
-            new("", "AI Settings", () => Stack(new SpeechModelsTab(), new AiTab())),
-            new("", "Command Mode", BuildCommandModePage),
-            new("", "Write Mode", BuildWriteModePage),
-            new("", "File Transcription", BuildFileTranscriptionPage),
-            // rail pins these to the bottom (Wispr-style)
-            new("", "Preferences", () => Stack(new GeneralTab(), new FormattingTab())),
+            new("", "Scratchpad", BuildScratchpadPage),
+            // rail pins these to the bottom (Wispr-style); Settings opens the modal, no page of its own
+            new("", "Settings", () => new TextBlock()),
             new("", "Feedback", BuildFeedbackPage),
         };
-
-        var aiIndex = _entries.FindIndex(e => e.Title == "AI Settings");
-        if (aiIndex >= 0)
-            _entries[aiIndex] = new NavEntry(_entries[aiIndex].Glyph, "Models", () => Stack(new SpeechModelsTab(), new AiTab()));
-
-        var scratchGlyph = _entries.FirstOrDefault(e => e.Title == "Command Mode")?.Glyph ?? "S";
-        _entries.RemoveAll(e => e.Title is "Command Mode" or "Write Mode" or "File Transcription");
-        var insertIndex = _entries.FindIndex(e => e.Title == "Preferences");
-        _entries.Insert(insertIndex >= 0 ? insertIndex : _entries.Count, new NavEntry(scratchGlyph, "Scratchpad", BuildScratchpadPage));
 
         var root = new Grid { Background = new SolidColorBrush(Theme.Bg) };
         _railColumn = new ColumnDefinition { Width = new GridLength(SidebarWidth) };
@@ -86,7 +73,7 @@ public sealed class MainWindow : Window
         root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
         // ----- icon rail (12px symmetric margin centers the 42px items in the 66px collapsed column) -----
-        _rail = new DockPanel { Margin = new Thickness(12, 18, 12, 18), LastChildFill = false };
+        _rail = new DockPanel { Margin = new Thickness(12, 2, 12, 16), LastChildFill = false };
         BuildRailContent();
         Grid.SetColumn(_rail, 0);
         root.Children.Add(_rail);
@@ -96,19 +83,32 @@ public sealed class MainWindow : Window
         {
             Background = Theme.SurfaceBrush,
             CornerRadius = new CornerRadius(18),
-            Margin = new Thickness(0, 12, 14, 12),
+            Margin = new Thickness(0, 0, 14, 14),
             BorderBrush = Theme.HairlineBrush,
             BorderThickness = new Thickness(1),
         };
         _content.Padding = new Thickness(0);
         sheet.Child = _content;
+        WindowFx.RoundClip(_content, 17); // scrollbar stays inside the rounded sheet
         Grid.SetColumn(sheet, 1);
         root.Children.Add(sheet);
 
-        Content = root;
+        // ----- in-app titlebar above everything (part of the design, not an appended bar) -----
+        var outer = new Grid { Background = new SolidColorBrush(Theme.Bg) };
+        outer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        outer.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        var titlebar = WindowFx.InstallChrome(this, "LiquidFlow");
+        outer.Children.Add((UIElement)titlebar);
+        Grid.SetRow(root, 1);
+        outer.Children.Add(root);
+
+        Content = outer;
         SmoothScroll.Attach(_content);
         Navigate("Home");
         Loaded += (_, _) => PromptForNameIfNeeded();
+        // dev seam: FLUIDVOICE_OPEN_SETTINGS=1 opens the settings modal on launch (screenshot tests)
+        if (Environment.GetEnvironmentVariable("FLUIDVOICE_OPEN_SETTINGS") == "1")
+            Loaded += (_, _) => Dispatcher.BeginInvoke(() => ShowSettingsDialog());
         HistoryStore.HistoryChanged += () => Dispatcher.BeginInvoke(() =>
         {
             if (_current == "Home") Navigate("Home");
@@ -117,6 +117,7 @@ public sealed class MainWindow : Window
         {
             Background = new SolidColorBrush(Theme.Bg);
             root.Background = new SolidColorBrush(Theme.Bg);
+            outer.Background = new SolidColorBrush(Theme.Bg);
             sheet.Background = Theme.SurfaceBrush;
             sheet.BorderBrush = Theme.HairlineBrush;
             // theme/font swaps must re-render the whole surface (colors are snapshotted per control)
@@ -128,58 +129,43 @@ public sealed class MainWindow : Window
         });
     }
 
-    public void SelectTab(string title) => Navigate(
-        title switch
+    public void SelectTab(string title)
+    {
+        switch (title)
         {
-            "Welcome" => "Home",
-            "General" => "Preferences",
-            "Stats" => "Insights",
-            "Command Mode" or "Write Mode" or "File Transcription" => "Scratchpad",
-            "AI Settings" => "Models",
-            _ => title,
-        });
+            case "General" or "Preferences" or "Settings": ShowSettingsDialog("General"); break;
+            case "AI Settings" or "Models" or "Speech Models": ShowSettingsDialog("Speech Models"); break;
+            case "Welcome": Navigate("Home"); break;
+            case "Stats": Navigate("Insights"); break;
+            case "Command Mode" or "Write Mode" or "File Transcription": Navigate("Scratchpad"); break;
+            default: Navigate(title); break;
+        }
+    }
 
     private UIElement BrandMark()
     {
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
-        // center the 28px app-icon art inside the 42px leading box so it aligns with the nav glyphs
-        var markHost = new Border
+        // hamburger toggle — the app icon + name live in the titlebar now, so the rail
+        // doesn't repeat them (glyph box matches nav items so everything lines up)
+        _brandMark = new Border
         {
             Width = 42,
             Height = 42,
-            Child = new Image
+            HorizontalAlignment = HorizontalAlignment.Left,
+            CornerRadius = new CornerRadius(10),
+            Background = Brushes.Transparent,
+            ToolTip = _sidebarExpanded ? "Collapse sidebar" : "Expand sidebar",
+            Cursor = Cursors.Hand,
+            Child = new TextBlock
             {
-                Width = 28,
-                Height = 28,
-                Source = WindowFx.AppIcon,
+                Text = ((char)0xE700).ToString(), // GlobalNavButton
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 15,
+                Foreground = Theme.TextBrush,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
             },
         };
-        row.Children.Add(markHost);
-        _brandLabel = new TextBlock
-        {
-            Text = "FluidVoice",
-            FontSize = 17,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = Theme.TextBrush,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(6, 0, 0, 0),
-            Visibility = _sidebarExpanded ? Visibility.Visible : Visibility.Collapsed,
-        };
-        row.Children.Add(_brandLabel);
-
-        _brandMark = new Border
-        {
-            Width = _sidebarExpanded ? 220 : 42,
-            Height = 42,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            CornerRadius = new CornerRadius(12),
-            Background = Brushes.Transparent,
-            ToolTip = _sidebarExpanded ? "Collapse sidebar" : "Expand sidebar",
-            Cursor = Cursors.Hand,
-            Child = row,
-        };
+        AttachHoverFx(_brandMark, () => false);
         _brandMark.MouseLeftButtonUp += (_, _) => SetSidebarExpanded(!_sidebarExpanded);
         return _brandMark;
     }
@@ -195,6 +181,7 @@ public sealed class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Width = 42, // matches the collapsed item width so the glyph never shifts on expand
+            TextAlignment = TextAlignment.Center, // Width alone left-aligns the glyph inside the box
         };
         var label = new TextBlock
         {
@@ -224,13 +211,31 @@ public sealed class MainWindow : Window
         };
         item.MouseLeftButtonUp += (_, _) =>
         {
-            if (entry.Title == "Preferences") ShowSettingsDialog();
+            if (entry.Title == "Settings") ShowSettingsDialog();
             else Navigate(entry.Title);
         };
-        item.MouseEnter += (_, _) => { if (_current != entry.Title) item.Background = new SolidColorBrush(Theme.SidebarSelected) { Opacity = 0.6 }; };
-        item.MouseLeave += (_, _) => { if (_current != entry.Title) item.Background = Brushes.Transparent; };
+        AttachHoverFx(item, () => _current == entry.Title);
         _navItems[entry.Title] = item;
         return item;
+    }
+
+    /// <summary>Soft fade-in/out hover highlight (no instant color jumps).</summary>
+    private static void AttachHoverFx(Border item, Func<bool> isSelected)
+    {
+        var hover = new SolidColorBrush(Theme.SidebarSelected) { Opacity = 0 };
+        item.MouseEnter += (_, _) =>
+        {
+            if (isSelected()) return;
+            item.Background = hover;
+            hover.BeginAnimation(Brush.OpacityProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(0.7, TimeSpan.FromMilliseconds(110)));
+        };
+        item.MouseLeave += (_, _) =>
+        {
+            if (isSelected()) return;
+            hover.BeginAnimation(Brush.OpacityProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(0, TimeSpan.FromMilliseconds(160)));
+        };
     }
 
     private DockPanel? _rail;
@@ -246,7 +251,7 @@ public sealed class MainWindow : Window
         topGroup.Children.Add(BrandMark());
         topGroup.Children.Add(new Border { Height = 18, Background = Brushes.Transparent });
         foreach (var e in _entries)
-            (e.Title is "Preferences" or "Feedback" ? bottomGroup : topGroup).Children.Add(NavItem(e));
+            (e.Title is "Settings" or "Feedback" ? bottomGroup : topGroup).Children.Add(NavItem(e));
         DockPanel.SetDock(topGroup, Dock.Top);
         DockPanel.SetDock(bottomGroup, Dock.Bottom);
         _rail.Children.Add(topGroup);
@@ -264,25 +269,20 @@ public sealed class MainWindow : Window
         if (_railColumn is not null)
             _railColumn.Width = new GridLength(SidebarWidth);
         if (_brandMark is not null)
-        {
-            _brandMark.Width = _sidebarExpanded ? 220 : 42;
             _brandMark.ToolTip = _sidebarExpanded ? "Collapse sidebar" : "Expand sidebar";
-        }
-        if (_brandLabel is not null)
-            _brandLabel.Visibility = _sidebarExpanded ? Visibility.Visible : Visibility.Collapsed;
         foreach (var label in _navLabels)
             label.Visibility = _sidebarExpanded ? Visibility.Visible : Visibility.Collapsed;
         foreach (var border in _navItems.Values)
             border.Width = _sidebarExpanded ? 220 : 42;
     }
 
-    private void ShowSettingsDialog()
+    private void ShowSettingsDialog(string section = "General")
     {
         var oldOpacity = Opacity;
         try
         {
             Opacity = 0.62;
-            var dialog = new SettingsModal { Owner = this };
+            var dialog = new SettingsModal(section) { Owner = this };
             dialog.ShowDialog();
         }
         finally
@@ -312,9 +312,14 @@ public sealed class MainWindow : Window
 
     private void Navigate(string title)
     {
-        if (title == "Preferences")
+        if (title is "Preferences" or "Settings")
         {
             ShowSettingsDialog();
+            return;
+        }
+        if (title is "Models" or "AI Settings" or "Speech Models")
+        {
+            ShowSettingsDialog("Speech Models");
             return;
         }
 
@@ -325,9 +330,10 @@ public sealed class MainWindow : Window
 
         var page = new StackPanel
         {
-            Margin = new Thickness(44, 38, 44, 40),
+            Margin = new Thickness(44, 34, 44, 40),
             MaxWidth = entry.Title == "Home" ? 1120 : 1080,
             HorizontalAlignment = HorizontalAlignment.Center, // content stays centered in the sheet
+            LayoutTransform = Theme.PageScale(),              // user text-size setting
         };
         if (entry.Title != "Home") page.Children.Add(PageHeader(entry.Title));
         page.Children.Add(entry.Page());
@@ -337,12 +343,12 @@ public sealed class MainWindow : Window
 
     private static UIElement PageHeader(string title) => new TextBlock
     {
-        Text = title == "Preferences" ? "Settings" : title,
-        FontSize = title == "Preferences" ? 30 : 24,
-        FontWeight = title == "Preferences" ? FontWeights.Normal : FontWeights.SemiBold,
-        FontFamily = title == "Preferences" ? Theme.DisplaySerif : new FontFamily("Segoe UI Variable Display, Segoe UI"),
+        Text = title,
+        FontSize = 21,
+        FontWeight = FontWeights.SemiBold,
+        FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI"),
         Foreground = new SolidColorBrush(Theme.Text),
-        Margin = new Thickness(0, 0, 0, 20),
+        Margin = new Thickness(0, 0, 0, 18),
     };
 
     private static StackPanel Stack(params UIElement[] children)
@@ -389,8 +395,8 @@ public sealed class MainWindow : Window
         Grid.SetColumn(main, 0);
         columns.Children.Add(main);
 
+        // stats live on the Insights page only (no repeated information across pages)
         var side = new StackPanel();
-        side.Children.Add(BuildStatsPanel());
         side.Children.Add(BuildVoiceProfilePanel(model, setupDone));
         Grid.SetColumn(side, 1);
         columns.Children.Add(side);
@@ -443,12 +449,12 @@ public sealed class MainWindow : Window
         var headline = new TextBlock
         {
             FontFamily = Theme.DisplaySerif,
-            FontSize = 31,
+            FontSize = 28,
             Foreground = Brushes.White,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 8),
         };
-        headline.Inlines.Add(new Run("Make Fluid sound like "));
+        headline.Inlines.Add(new Run("Make LiquidFlow sound like "));
         headline.Inlines.Add(new Run("you") { FontStyle = FontStyles.Italic });
         content.Children.Add(headline);
         content.Children.Add(new TextBlock
@@ -521,33 +527,11 @@ public sealed class MainWindow : Window
     {
         var messages = new[]
         {
-            "Ready when you are. Speak naturally and FluidVoice will clean up the rest.",
+            "Ready when you are. Speak naturally and LiquidFlow will clean up the rest.",
             "Your voice workspace is ready. Start dictating in any app.",
-            "Keep your hands on the work. FluidVoice will handle the words.",
+            "Keep your hands on the work. LiquidFlow will handle the words.",
         };
         return messages[DateTime.Today.DayOfYear % messages.Length];
-    }
-
-    private UIElement BuildStatsPanel()
-    {
-        var panel = new StackPanel();
-        void Stat(string value, string label, bool first = false)
-        {
-            panel.Children.Add(new TextBlock
-            {
-                Text = value,
-                FontFamily = Theme.StatSerif,
-                FontSize = 31,
-                Foreground = new SolidColorBrush(Theme.Text),
-                Margin = new Thickness(0, first ? 0 : 15, 0, 0),
-            });
-            panel.Children.Add(new TextBlock { Text = label, FontSize = 13, Foreground = new SolidColorBrush(Theme.Text) });
-        }
-        var total = HistoryStore.TotalWords;
-        Stat(total >= 1000 ? $"{total / 1000.0:0.#}K" : total.ToString(), "total words", first: true);
-        Stat(Settings.Current.UserTypingWPM.ToString(), "typing wpm");
-        Stat(HistoryStore.CurrentStreakDays.ToString(), "day streak");
-        return Theme.Panel(panel, new Thickness(26, 24, 26, 24), new Thickness(0, 0, 0, 18));
     }
 
     private UIElement BuildVoiceProfilePanel(SpeechModelInfo model, bool setupDone)
@@ -563,7 +547,7 @@ public sealed class MainWindow : Window
         });
         panel.Children.Add(new TextBlock
         {
-            Text = setupDone ? "Updates as FluidVoice learns from your dictation." : "Complete setup to start building personal insights.",
+            Text = setupDone ? "Updates as LiquidFlow learns from your dictation." : "Complete setup to start building personal insights.",
             FontSize = 12.5,
             Foreground = Theme.SubtleBrush,
             TextWrapping = TextWrapping.Wrap,
@@ -785,7 +769,7 @@ public sealed class MainWindow : Window
 
         bool micOk = AudioRecorder.ListInputDevices().Count > 0;
         setup.Children.Add(SetupRow(
-            "Microphone Available", "FluidVoice can see an input device",
+            "Microphone Available", "LiquidFlow can see an input device",
             micOk,
             micOk ? null : ("Open Settings", () => TryOpen("ms-settings:privacy-microphone"))));
 
@@ -1172,7 +1156,7 @@ public sealed class MainWindow : Window
         var card = new StackPanel();
         card.Children.Add(new TextBlock
         {
-            Text = "Found a bug or have an idea? FluidVoice is open source (GPLv3).",
+            Text = "Found a bug or have an idea? LiquidFlow is open source (GPLv3).",
             Foreground = new SolidColorBrush(Theme.SubtleText), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10),
         });
         var b1 = PrimaryButton("Open GitHub Issues");
@@ -1186,7 +1170,7 @@ public sealed class MainWindow : Window
         card.Children.Add(b3);
         card.Children.Add(new TextBlock
         {
-            Text = $"\nFluidVoice for Windows {App.Updater.ThisVersion} — port of altic-dev/FluidVoice (GPLv3).",
+            Text = $"\nLiquidFlow for Windows {App.Updater.ThisVersion} — based on altic-dev/FluidVoice (GPLv3).",
             Foreground = new SolidColorBrush(Theme.SubtleText), FontSize = 11, TextWrapping = TextWrapping.Wrap,
         });
         page.Children.Add(BigCard(card));

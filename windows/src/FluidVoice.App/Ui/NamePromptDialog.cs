@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -12,7 +12,7 @@ public sealed class NamePromptDialog : Window
 
     public NamePromptDialog(string suggestedName)
     {
-        Title = "Welcome to FluidVoice";
+        Title = "Welcome to LiquidFlow";
         Width = 430;
         Height = 330;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -39,7 +39,7 @@ public sealed class NamePromptDialog : Window
         var panel = new StackPanel();
         panel.Children.Add(new TextBlock
         {
-            Text = "Welcome to FluidVoice",
+            Text = "Welcome to LiquidFlow",
             FontFamily = Theme.DisplaySerif,
             FontSize = 30,
             Foreground = Theme.TextBrush,
@@ -47,7 +47,7 @@ public sealed class NamePromptDialog : Window
         });
         panel.Children.Add(new TextBlock
         {
-            Text = "What should FluidVoice call you?",
+            Text = "What should LiquidFlow call you?",
             FontSize = 15,
             Foreground = Theme.SubtleBrush,
             TextWrapping = TextWrapping.Wrap,
