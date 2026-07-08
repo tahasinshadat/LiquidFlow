@@ -2,23 +2,30 @@ import { createAuthClient } from "better-auth/react";
 import { ssoClient } from "@better-auth/sso/client";
 import { OPENWHISPR_API_URL } from "../config/constants";
 import { openExternalLink } from "../utils/externalLinks";
+import { LOCAL_ONLY } from "./features";
 
 export const AUTH_URL = import.meta.env.VITE_AUTH_URL || "https://auth.openwhispr.com";
-export const authClient = createAuthClient({
-  baseURL: AUTH_URL,
-  plugins: [ssoClient()],
-  fetchOptions: {
-    auth: {
-      type: "Bearer",
-      token: async () => (await window.electronAPI?.authGetToken?.()) ?? "",
-    },
-    headers: { "x-openwhispr-source": "desktop" },
-    onSuccess: async (ctx: { response: Response }) => {
-      const newToken = ctx.response.headers.get("set-auth-token");
-      if (newToken) await window.electronAPI?.authSetToken?.(newToken);
-    },
-  },
-});
+
+// Local-only build has NO accounts: don't create an auth client at all, so nothing
+// ever talks to an auth server, useAuth() always reports signed-out, and every
+// sign-in path below short-circuits. This is the root of "remove all auth stuff".
+export const authClient = LOCAL_ONLY
+  ? null
+  : createAuthClient({
+      baseURL: AUTH_URL,
+      plugins: [ssoClient()],
+      fetchOptions: {
+        auth: {
+          type: "Bearer",
+          token: async () => (await window.electronAPI?.authGetToken?.()) ?? "",
+        },
+        headers: { "x-openwhispr-source": "desktop" },
+        onSuccess: async (ctx: { response: Response }) => {
+          const newToken = ctx.response.headers.get("set-auth-token");
+          if (newToken) await window.electronAPI?.authSetToken?.(newToken);
+        },
+      },
+    });
 
 export type SocialProvider = "google" | "microsoft" | "apple";
 
@@ -130,6 +137,10 @@ export async function deleteAccount(): Promise<{ error?: Error }> {
 }
 
 export async function signOut(): Promise<void> {
+  if (!authClient) {
+    markSignedOutState();
+    return;
+  }
   try {
     await authClient.signOut();
     if (window.electronAPI?.authClearSession) {
@@ -173,6 +184,7 @@ export async function withSessionRefresh<T>(operation: () => Promise<T>): Promis
 const DESKTOP_OAUTH_CALLBACK_URL = "https://openwhispr.com/auth/desktop-callback";
 
 export async function signInWithSocial(provider: SocialProvider): Promise<{ error?: Error }> {
+  if (!authClient) return {}; // local-only: no accounts
   try {
     const isElectron = Boolean((window as any).electronAPI);
 
@@ -197,6 +209,7 @@ export async function signInWithSocial(provider: SocialProvider): Promise<{ erro
 }
 
 export async function signInWithSSO(email: string): Promise<{ error?: Error }> {
+  if (!authClient) return {}; // local-only: no accounts
   try {
     const isElectron = Boolean((window as any).electronAPI);
 
@@ -221,6 +234,7 @@ export async function signInWithSSO(email: string): Promise<{ error?: Error }> {
 }
 
 export async function requestPasswordReset(email: string): Promise<{ error?: Error }> {
+  if (!authClient) return {}; // local-only: no accounts
   try {
     await authClient.requestPasswordReset({
       email: email.trim(),
