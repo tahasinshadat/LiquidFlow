@@ -69,13 +69,21 @@ class ParakeetWsServer {
     this.modelName = modelName;
     this.modelDir = modelDir;
 
+    // Parakeet's INT8 transducer is memory-bandwidth bound: on this class of chip
+    // (e.g. Snapdragon X Elite, 12 clustered cores) throughput PEAKS at ~3 threads
+    // and REGRESSES past 4 as cross-cluster sync + bandwidth contention dominate.
+    // Benchmarked on-device: 3 threads beat 4 by ~24% on a 4s clip (393ms→299ms)
+    // and never lost; 6/8 threads were 2-3x slower. So cap at 3, not 4. Also uses
+    // less power. (GPU/NPU is not available for the transducer in this engine —
+    // --provider only offers cpu/cuda/coreml — so CPU thread count is the lever.)
+    const numThreads = Math.max(1, Math.min(3, Math.floor(os.cpus().length * 0.75)));
     const args = [
       `--tokens=${path.join(modelDir, "tokens.txt")}`,
       `--encoder=${path.join(modelDir, "encoder.int8.onnx")}`,
       `--decoder=${path.join(modelDir, "decoder.int8.onnx")}`,
       `--joiner=${path.join(modelDir, "joiner.int8.onnx")}`,
       `--port=${this.port}`,
-      `--num-threads=${Math.max(1, Math.min(4, Math.floor(os.cpus().length * 0.75)))}`,
+      `--num-threads=${numThreads}`,
     ];
 
     debugLogger.debug("Starting parakeet WS server", { port: this.port, modelName, args });
