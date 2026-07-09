@@ -6,7 +6,7 @@ const debugLogger = require("./debugLogger");
 const os = require("os");
 const {
   findAvailablePort,
-  resolveBinaryPath,
+  resolveArchBinaryPath,
   gracefulStopProcess,
 } = require("../utils/serverUtils");
 const { getSafeTempDir } = require("./safeTempDir");
@@ -33,13 +33,12 @@ class ParakeetWsServer {
   getWsBinaryPath() {
     if (this.cachedWsBinaryPath) return this.cachedWsBinaryPath;
 
-    const platformArch = `${process.platform}-${process.arch}`;
-    const binaryName =
-      process.platform === "win32"
-        ? `sherpa-onnx-ws-${platformArch}.exe`
-        : `sherpa-onnx-ws-${platformArch}`;
-
-    const resolved = resolveBinaryPath(binaryName);
+    // Prefer the native arm64 sherpa-onnx build on Windows-on-ARM (runs natively
+    // even inside an x64-emulated Electron shell), then fall back to x64.
+    const ext = process.platform === "win32" ? ".exe" : "";
+    const resolved = resolveArchBinaryPath(
+      (arch) => `sherpa-onnx-ws-${process.platform}-${arch}${ext}`
+    );
     if (resolved) this.cachedWsBinaryPath = resolved;
     return resolved;
   }

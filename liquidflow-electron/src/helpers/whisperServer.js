@@ -7,7 +7,7 @@ const os = require("os");
 const { app } = require("electron");
 const debugLogger = require("./debugLogger");
 const { killProcess } = require("../utils/process");
-const { isPortAvailable } = require("../utils/serverUtils");
+const { isPortAvailable, getEngineArchPriority } = require("../utils/serverUtils");
 const { getSafeTempDir } = require("./safeTempDir");
 const { convertToWav } = require("./ffmpegUtils");
 const sidecarPidFile = require("./sidecarPidFile");
@@ -270,37 +270,35 @@ class WhisperServerManager extends EventEmitter {
   }
 
   getServerBinaryPath(options = {}) {
+    const platform = process.platform;
+    const ext = platform === "win32" ? ".exe" : "";
+    // On Windows-on-ARM there is no native arm64 whisper.cpp build, so we fall
+    // back to the x64 binary (which runs under emulation). Parakeet is the native
+    // ARM64 default engine; whisper stays available as an emulated alternative.
+    const archs = getEngineArchPriority();
+
     if (options.preferCuda) {
-      const ext = process.platform === "win32" ? ".exe" : "";
-      const cudaBinary = `whisper-server-${process.platform}-${process.arch}-cuda${ext}`;
-      const cudaPath = path.join(app.getPath("userData"), "bin", cudaBinary);
-      if (fs.existsSync(cudaPath)) return cudaPath;
+      for (const arch of archs) {
+        const cudaBinary = `whisper-server-${platform}-${arch}-cuda${ext}`;
+        const cudaPath = path.join(app.getPath("userData"), "bin", cudaBinary);
+        if (fs.existsSync(cudaPath)) return cudaPath;
+      }
     }
 
     if (this.cachedServerBinaryPath) return this.cachedServerBinaryPath;
 
-    const platform = process.platform;
-    const arch = process.arch;
-    const platformArch = `${platform}-${arch}`;
-    const binaryName =
-      platform === "win32"
-        ? `whisper-server-${platformArch}.exe`
-        : `whisper-server-${platformArch}`;
     const genericName = platform === "win32" ? "whisper-server.exe" : "whisper-server";
+    const binDirs = [];
+    if (process.resourcesPath) binDirs.push(path.join(process.resourcesPath, "bin"));
+    binDirs.push(path.join(__dirname, "..", "..", "resources", "bin"));
 
     const candidates = [];
-
-    if (process.resourcesPath) {
-      candidates.push(
-        path.join(process.resourcesPath, "bin", binaryName),
-        path.join(process.resourcesPath, "bin", genericName)
-      );
+    for (const dir of binDirs) {
+      for (const arch of archs) {
+        candidates.push(path.join(dir, `whisper-server-${platform}-${arch}${ext}`));
+      }
+      candidates.push(path.join(dir, genericName));
     }
-
-    candidates.push(
-      path.join(__dirname, "..", "..", "resources", "bin", binaryName),
-      path.join(__dirname, "..", "..", "resources", "bin", genericName)
-    );
 
     for (const candidate of candidates) {
       if (fs.existsSync(candidate)) {

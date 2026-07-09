@@ -834,12 +834,14 @@ function invalidateApiKeyCaches(
 
 export const useSettingsStore = create<SettingsState>()((set, get) => ({
   uiLanguage: normalizeUiLanguage(isBrowser ? localStorage.getItem("uiLanguage") : null),
-  useLocalWhisper: readBoolean("useLocalWhisper", false),
+  // LiquidFlow is local-first (no cloud accounts), matching the native app: default
+  // to on-device transcription with NVIDIA Parakeet (fast native ARM64 engine).
+  useLocalWhisper: readBoolean("useLocalWhisper", true),
   whisperModel: readString("whisperModel", "base"),
-  localTranscriptionProvider: (readString("localTranscriptionProvider", "whisper") === "nvidia"
+  localTranscriptionProvider: (readString("localTranscriptionProvider", "nvidia") === "nvidia"
     ? "nvidia"
     : "whisper") as LocalTranscriptionProvider,
-  parakeetModel: readString("parakeetModel", ""),
+  parakeetModel: readString("parakeetModel", "parakeet-tdt-0.6b-v3"),
   allowOpenAIFallback: readBoolean("allowOpenAIFallback", false),
   allowLocalFallback: readBoolean("allowLocalFallback", false),
   fallbackWhisperModel: readString("fallbackWhisperModel", "base"),

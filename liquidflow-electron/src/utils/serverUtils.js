@@ -53,6 +53,42 @@ function resolveBinaryPath(binaryName) {
   return null;
 }
 
+// True CPU architecture of the machine, even when the Electron shell is running
+// under x64 emulation on Windows-on-ARM. A native ARM64 child .exe (sherpa-onnx,
+// whisper) launches and runs natively regardless of the parent's arch, so the STT
+// engines get real ARM64 speed even inside an x64-emulated app. Windows sets
+// PROCESSOR_ARCHITEW6432=ARM64 for a WOW64/emulated x64 process; a native arm64
+// process reports process.arch === "arm64".
+function getMachineArch() {
+  if (process.arch === "arm64") return "arm64";
+  if (process.platform === "win32") {
+    const emulated = (
+      process.env.PROCESSOR_ARCHITEW6432 ||
+      process.env.PROCESSOR_ARCHITECTURE ||
+      ""
+    ).toUpperCase();
+    if (emulated === "ARM64") return "arm64";
+  }
+  return process.arch;
+}
+
+// Architectures to try, most-preferred first, for a native engine binary. On ARM
+// hardware we prefer a native arm64 build and fall back to x64 (which runs under
+// emulation) when no arm64 binary is bundled for that engine.
+function getEngineArchPriority() {
+  return getMachineArch() === "arm64" ? ["arm64", "x64"] : [process.arch];
+}
+
+// Resolve the first existing binary across the arch-priority list. `makeName(arch)`
+// builds the platform-arch-specific file name for a given arch.
+function resolveArchBinaryPath(makeName) {
+  for (const arch of getEngineArchPriority()) {
+    const resolved = resolveBinaryPath(makeName(arch));
+    if (resolved) return resolved;
+  }
+  return null;
+}
+
 async function gracefulStopProcess(proc) {
   killProcessGroup(proc, "SIGTERM");
 
@@ -78,5 +114,8 @@ module.exports = {
   findAvailablePort,
   isPortAvailable,
   resolveBinaryPath,
+  getMachineArch,
+  getEngineArchPriority,
+  resolveArchBinaryPath,
   gracefulStopProcess,
 };
