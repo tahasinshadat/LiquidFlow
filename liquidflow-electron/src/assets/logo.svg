@@ -1,24 +1,38 @@
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="lfBg" x1="24" y1="24" x2="232" y2="232" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#4AD6C4"/>
-      <stop offset="1" stop-color="#147C74"/>
+    <linearGradient id="lfAir" x1="128" y1="16" x2="128" y2="120" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E0F7F3"/><stop offset="1" stop-color="#C1EBE3"/>
     </linearGradient>
-    <linearGradient id="lfGlass" x1="128" y1="16" x2="128" y2="150" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFFFFF" stop-opacity="0.18"/>
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    <linearGradient id="lfWater" x1="128" y1="110" x2="128" y2="240" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3FBEB0"/><stop offset="1" stop-color="#0A4A46"/>
     </linearGradient>
+    <clipPath id="lfSquircle"><rect x="16" y="16" width="224" height="224" rx="66"/></clipPath>
   </defs>
-  <rect x="16" y="16" width="224" height="224" rx="66" fill="url(#lfBg)"/>
-  <rect x="16" y="16" width="224" height="122" rx="66" fill="url(#lfGlass)"/>
-  <!-- ripples (water = sound waves) -->
-  <g stroke="#FFFFFF" fill="none" stroke-linecap="round" stroke-width="7">
-    <path d="M92 170 A 36 15 0 0 0 164 170" opacity="0.92"/>
-    <path d="M72 174 A 56 23 0 0 0 184 174" opacity="0.6"/>
-    <path d="M54 178 A 74 31 0 0 0 202 178" opacity="0.38"/>
+  <g clip-path="url(#lfSquircle)">
+    <rect x="16" y="16" width="224" height="110" fill="url(#lfAir)"/>
+    <!-- underwater with wavy surface -->
+    <path d="M16 114 C 66 104, 128 124, 240 110 L 240 240 L 16 240 Z" fill="url(#lfWater)"/>
+    <!-- light shafts -->
+    <g fill="#FFFFFF" opacity="0.08">
+      <path d="M88 112 L 74 240 L 104 240 Z"/>
+      <path d="M150 110 L 138 240 L 170 240 Z"/>
+      <path d="M196 111 L 188 240 L 214 240 Z"/>
+    </g>
+    <!-- current waves -->
+    <g stroke="#FFFFFF" fill="none" stroke-linecap="round" stroke-width="3" opacity="0.22">
+      <path d="M44 158 C 90 150, 150 166, 212 156"/>
+      <path d="M50 194 C 96 186, 156 202, 206 192"/>
+    </g>
+    <!-- rising bubbles -->
+    <g fill="#FFFFFF">
+      <circle cx="96" cy="200" r="7" fill-opacity="0.22" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="2"/>
+      <circle cx="106" cy="172" r="5" fill-opacity="0.2" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="1.5"/>
+      <circle cx="112" cy="150" r="3.4" fill-opacity="0.18"/>
+      <circle cx="166" cy="208" r="6" fill-opacity="0.22" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="1.8"/>
+      <circle cx="176" cy="182" r="4.2" fill-opacity="0.2"/>
+      <circle cx="182" cy="160" r="3" fill-opacity="0.18"/>
+    </g>
+    <!-- bright surface meniscus -->
+    <path d="M16 114 C 66 104, 128 124, 240 110" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="4" fill="none" stroke-linecap="round"/>
   </g>
-  <!-- water droplet -->
-  <path d="M128 44 C 145 72 163 93 163 111 A 35 35 0 1 1 93 111 C 93 93 111 72 128 44 Z"
-        fill="#FFFFFF" fill-opacity="0.98"/>
-  <ellipse cx="118" cy="106" rx="10" ry="15" fill="#4AD6C4" fill-opacity="0.28"/>
 </svg>
