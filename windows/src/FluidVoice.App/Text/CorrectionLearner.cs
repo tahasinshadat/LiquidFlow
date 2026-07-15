@@ -64,6 +64,108 @@ public static class CorrectionLearner
         return true;
     }
 
+    /// <summary>
+    /// The user manually edited a past transcription. Turn the word-level changes into dictionary
+    /// rules so the same fix sticks next time: substitutions become trigger→replacement entries and
+    /// cleanly-removed distinctive words become delete entries. Immediate (no repetition threshold —
+    /// the user is explicit here). Returns what was added (To == "" means a deletion rule).
+    /// </summary>
+    public static List<(string From, string To)> LearnFromManualEdit(string oldText, string newText)
+    {
+        var added = new List<(string, string)>();
+        try
+        {
+            var a = Tokenize(oldText);
+            var b = Tokenize(newText);
+            if (a.Count == 0) return added;
+
+            var (subs, dels, changedFrac) = DiffEdits(a, b);
+            if (changedFrac > 0.5) return added; // a rewrite, not targeted corrections
+
+            foreach (var (from, to) in subs)
+            {
+                var cf = StripPunct(from);
+                var ct = StripPunct(to);
+                if (cf.Length < 2 || ct.Length < 1) continue;
+                if (cf.Equals(ct, StringComparison.OrdinalIgnoreCase)) continue;
+                if (!IsWordLike(cf) || !IsWordLike(ct)) continue;
+                // skip trivial short function-word swaps unless it's a proper-noun fix
+                if (!char.IsUpper(ct[0]) && ct.Length < 4) continue;
+                if (AddSubstitution(cf, ct)) added.Add((cf, ct));
+            }
+            foreach (var word in dels)
+            {
+                var cw = StripPunct(word);
+                if (cw.Length < 4 || !IsWordLike(cw)) continue; // only distinctive words become delete rules
+                if (AddDeletion(cw)) added.Add((cw, ""));
+            }
+            if (added.Count > 0) Settings.Current.Save("dictionary-edit");
+        }
+        catch { /* best effort — never break the edit */ }
+        return added;
+    }
+
+    private static bool AddSubstitution(string from, string to)
+    {
+        var s = Settings.Current;
+        bool already = s.CustomDictionaryEntries.Any(e => !e.Delete &&
+            e.Replacement.Equals(to, StringComparison.OrdinalIgnoreCase) &&
+            e.Triggers.Any(t => t.Equals(from, StringComparison.OrdinalIgnoreCase)));
+        if (already) return false;
+        s.CustomDictionaryEntries.Add(new CustomDictionaryEntry
+        {
+            Triggers = new List<string> { from },
+            Replacement = to,
+        });
+        return true;
+    }
+
+    private static bool AddDeletion(string word)
+    {
+        var s = Settings.Current;
+        bool already = s.CustomDictionaryEntries.Any(e => e.Delete &&
+            e.Triggers.Any(t => t.Equals(word, StringComparison.OrdinalIgnoreCase)));
+        if (already) return false;
+        s.CustomDictionaryEntries.Add(new CustomDictionaryEntry
+        {
+            Triggers = new List<string> { word },
+            Replacement = "",
+            Delete = true,
+        });
+        return true;
+    }
+
+    /// <summary>LCS alignment returning substitutions, pure deletions, and the changed fraction.</summary>
+    private static (List<(string, string)> Subs, List<string> Dels, double ChangedFrac) DiffEdits(List<string> a, List<string> b)
+    {
+        int n = a.Count, m = b.Count;
+        var lcs = new int[n + 1, m + 1];
+        for (int i = n - 1; i >= 0; i--)
+            for (int j = m - 1; j >= 0; j--)
+                lcs[i, j] = a[i].Equals(b[j], StringComparison.OrdinalIgnoreCase)
+                    ? lcs[i + 1, j + 1] + 1
+                    : Math.Max(lcs[i + 1, j], lcs[i, j + 1]);
+
+        var subs = new List<(string, string)>();
+        var dels = new List<string>();
+        int changed = 0, x = 0, y = 0;
+        while (x < n && y < m)
+        {
+            if (a[x].Equals(b[y], StringComparison.OrdinalIgnoreCase)) { x++; y++; continue; }
+            if (lcs[x + 1, y] >= lcs[x, y + 1])
+            {
+                // a[x] removed here; pair with b[y] as a substitution when b[y] is new at this spot
+                if (!ExistsLater(a, x + 1, b[y]) && lcs[x + 1, y + 1] >= lcs[x + 1, y]) { subs.Add((a[x], b[y])); y++; }
+                else dels.Add(a[x]);
+                x++; changed++;
+            }
+            else { y++; changed++; } // insertion — not a dictionary rule
+        }
+        while (x < n) { dels.Add(a[x]); x++; changed++; }
+        changed += m - y;
+        return (subs, dels, (double)changed / Math.Max(1, Math.Max(n, m)));
+    }
+
     // ---- diff ----
 
     /// <summary>

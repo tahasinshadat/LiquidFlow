@@ -87,6 +87,20 @@ public static class HistoryStore
         HistoryChanged?.Invoke();
     }
 
+    /// <summary>Replace the (typed) text of an existing entry — used when the user edits a past
+    /// transcription to fix or delete a word.</summary>
+    public static void UpdateEntry(Guid id, string newProcessedText)
+    {
+        lock (Sync)
+        {
+            var entry = Entries.FirstOrDefault(e => e.Id == id);
+            if (entry is null) return;
+            entry.ProcessedText = newProcessedText;
+            Persist();
+        }
+        HistoryChanged?.Invoke();
+    }
+
     public static void DeleteEntries(IEnumerable<Guid> ids)
     {
         var idSet = ids.ToHashSet();

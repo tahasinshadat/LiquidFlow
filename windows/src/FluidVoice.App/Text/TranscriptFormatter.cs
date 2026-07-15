@@ -48,8 +48,12 @@ public static class TranscriptFormatter
     public static string ApplyCustomDictionary(string text)
     {
         var cache = GetDictionaryCache();
+        if (cache.Count == 0) return text;
         foreach (var (pattern, replacement) in cache)
             text = pattern.Replace(text, replacement);
+        // deletion rules can leave a doubled or edge space — tidy it (only the dictation
+        // pipeline calls this, and its output is the final text, so trimming is safe here)
+        text = Regex.Replace(text, "[ \\t]{2,}", " ").Trim();
         return text;
     }
 
@@ -61,16 +65,27 @@ public static class TranscriptFormatter
             var cache = new List<(Regex, string)>();
             foreach (var entry in Settings.Current.CustomDictionaryEntries)
             {
-                if (string.IsNullOrWhiteSpace(entry.Replacement)) continue;
+                // A delete entry removes the trigger word; otherwise it needs a replacement.
+                if (!entry.Delete && string.IsNullOrWhiteSpace(entry.Replacement)) continue;
                 foreach (var trigger in entry.Triggers)
                 {
                     var trimmed = trigger.Trim();
                     if (trimmed.Length == 0) continue;
                     try
                     {
-                        var regex = new Regex($@"\b{Regex.Escape(trimmed)}\b",
-                            RegexOptions.IgnoreCase | RegexOptions.Compiled);
-                        cache.Add((regex, entry.Replacement.Replace("$", "$$")));
+                        if (entry.Delete)
+                        {
+                            // remove the word plus one adjacent space so no double-gap is left
+                            var regex = new Regex($@"\s?\b{Regex.Escape(trimmed)}\b",
+                                RegexOptions.IgnoreCase | RegexOptions.Compiled);
+                            cache.Add((regex, ""));
+                        }
+                        else
+                        {
+                            var regex = new Regex($@"\b{Regex.Escape(trimmed)}\b",
+                                RegexOptions.IgnoreCase | RegexOptions.Compiled);
+                            cache.Add((regex, entry.Replacement.Replace("$", "$$")));
+                        }
                     }
                     catch (Exception ex)
                     {

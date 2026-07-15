@@ -19,6 +19,9 @@ public sealed class CustomDictionaryEntry
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public List<string> Triggers { get; set; } = new();
     public string Replacement { get; set; } = "";
+    /// <summary>When true, the trigger words are DELETED from transcripts (Replacement is ignored).
+    /// Set when the user removes a word from a transcription and asks to fix it everywhere.</summary>
+    public bool Delete { get; set; }
 }
 
 /// <summary>

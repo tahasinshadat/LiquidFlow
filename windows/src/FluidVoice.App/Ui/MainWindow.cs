@@ -774,6 +774,28 @@ public sealed class MainWindow : Window
 
     private StackPanel? _feedRows;
 
+    /// <summary>Edit a past transcription (fix/delete words); optionally teach the change to the dictionary.</summary>
+    private void EditEntry(TranscriptionHistoryEntry entry)
+    {
+        var oldText = entry.ProcessedText;
+        var dlg = new EditTranscriptDialog(oldText) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var newText = dlg.ResultText;
+        if (newText == oldText) return;
+
+        HistoryStore.UpdateEntry(entry.Id, newText);
+        if (dlg.AddToDictionary)
+        {
+            var learned = Text.CorrectionLearner.LearnFromManualEdit(oldText, newText);
+            if (learned.Count > 0)
+            {
+                Text.TranscriptFormatter.InvalidateDictionaryCache();
+                var summary = string.Join(", ", learned.Select(p => p.To.Length == 0 ? $"remove “{p.From}”" : $"“{p.From}”→“{p.To}”").Take(4));
+                App.Notifications.Show("Dictionary updated", $"Now fixing: {summary}");
+            }
+        }
+    }
+
     private void RebuildFeedRows()
     {
         if (_feedRows is null) return;
@@ -856,6 +878,7 @@ public sealed class MainWindow : Window
             return b;
         }
         actions.Children.Add(ActionIcon("", "Copy", () => ClipboardService.SetText(entry.ProcessedText)));
+        actions.Children.Add(ActionIcon(((char)0xE70F).ToString(), "Edit / fix words", () => EditEntry(entry)));
         actions.Children.Add(ActionIcon("", "Delete", () => HistoryStore.DeleteEntries(new[] { entry.Id })));
         Grid.SetColumn(actions, 2);
         grid.Children.Add(actions);
