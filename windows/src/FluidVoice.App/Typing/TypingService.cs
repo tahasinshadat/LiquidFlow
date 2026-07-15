@@ -44,9 +44,14 @@ public static class TypingService
 
             NativeInput.ReleaseStuckModifiers();
 
-            bool ok = mode == TextInsertionMode.ReliablePaste
-                ? InsertViaClipboardPaste(text) || InsertDirect(text)
-                : InsertDirect(text) || InsertViaClipboardPaste(text) || InsertCharByChar(text);
+            bool ok = mode switch
+            {
+                TextInsertionMode.ReliablePaste => InsertViaClipboardPaste(text) || InsertDirect(text),
+                // Typing effect: type it out char-by-char at the chosen speed, falling back to an
+                // instant paste if the per-char path fails (e.g. an app that rejects synthetic keys).
+                TextInsertionMode.TypeOut => InsertTypeOut(text) || InsertViaClipboardPaste(text),
+                _ => InsertDirect(text) || InsertViaClipboardPaste(text) || InsertCharByChar(text),
+            };
 
             if (ok)
             {
@@ -113,6 +118,36 @@ public static class TypingService
         catch (Exception ex)
         {
             Log.Warn("typing", $"Clipboard paste failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// "Typing effect" insertion: emit each character via SendInput with a per-char delay derived
+    /// from Settings.TypingSpeed (0 = slow typewriter ≈60ms/char, 100 = instant). At 100 we defer
+    /// to the instant paths so the fastest setting is genuinely instant, matching the slider label.
+    /// </summary>
+    private static bool InsertTypeOut(string text)
+    {
+        int speed = Math.Clamp(Settings.Current.TypingSpeed, 0, 100);
+        if (speed >= 100)
+            return InsertViaClipboardPaste(text) || InsertDirect(text);
+
+        int delayMs = (int)Math.Round((100 - speed) * 0.6); // speed 0 → 60ms, 90 → 6ms, 99 → ~1ms
+        try
+        {
+            foreach (var c in text)
+            {
+                if (c == '\r') continue;
+                if (!NativeInput.SendUnicodeChar(c)) return false;
+                if (delayMs > 0) Thread.Sleep(delayMs);
+            }
+            Log.Info("typing", $"Typed {text.Length} chars via typing effect (speed {speed}, {delayMs}ms/char)");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("typing", $"Typing effect failed: {ex.Message}");
             return false;
         }
     }

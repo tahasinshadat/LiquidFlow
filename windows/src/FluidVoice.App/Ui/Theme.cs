@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using FluidVoice.Core;
 
 namespace FluidVoice.Ui;
@@ -233,6 +234,61 @@ public static class Theme
         }
         track.Child = grid;
         return track;
+    }
+
+    /// <summary>
+    /// A labelled slider with a live value readout. <paramref name="onChange"/> is debounced
+    /// (~180ms after the last move) so dragging doesn't hammer Settings.Save(); the readout
+    /// still updates in real time. <paramref name="format"/> renders the value (e.g. "72 px").
+    /// </summary>
+    public static UIElement Slider(double min, double max, double value, Action<double> onChange,
+        Func<double, string>? format = null, double width = 300)
+    {
+        format ??= v => ((int)Math.Round(v)).ToString();
+
+        var row = new Grid { Margin = new Thickness(0, 2, 0, 6), HorizontalAlignment = HorizontalAlignment.Left };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var slider = new System.Windows.Controls.Slider
+        {
+            Minimum = min,
+            Maximum = max,
+            Value = Math.Clamp(value, min, max),
+            Width = width,
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = AccentBrush,
+            IsMoveToPointEnabled = true,
+            SmallChange = Math.Max(1, (max - min) / 100),
+            LargeChange = Math.Max(1, (max - min) / 10),
+        };
+        var readout = new TextBlock
+        {
+            Foreground = SubtleBrush,
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(14, 0, 0, 0),
+            MinWidth = 52,
+            Text = format(slider.Value),
+        };
+
+        var debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
+        double pending = slider.Value;
+        debounce.Tick += (_, _) => { debounce.Stop(); onChange(pending); };
+        slider.ValueChanged += (_, e) =>
+        {
+            pending = e.NewValue;
+            readout.Text = format(e.NewValue);
+            debounce.Stop();
+            debounce.Start();
+        };
+
+        Grid.SetColumn(slider, 0);
+        Grid.SetColumn(readout, 1);
+        row.Children.Add(slider);
+        row.Children.Add(readout);
+        return row;
     }
 
     public static CheckBox Toggle(string label, bool value, Action<bool> onChange)

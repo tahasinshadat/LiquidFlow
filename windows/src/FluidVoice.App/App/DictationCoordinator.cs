@@ -191,7 +191,10 @@ public sealed class DictationCoordinator : IDictationControl
         float sessionGain = 0; // AGC for whispered speech: fixed once we've heard ~1s
         while (!ct.IsCancellationRequested && _activeMode != RecordingMode.None && session == _sessionId)
         {
-            await Task.Delay(TimeSpan.FromSeconds(0.2), ct).ContinueWith(_ => { });
+            // Feed the streaming recognizer often so the live preview tracks speech closely
+            // (~12 updates/sec). The transducer only decodes when a full chunk is buffered, so a
+            // tighter tick cuts display lag without extra decode work. Was 0.2s (felt laggy).
+            await Task.Delay(TimeSpan.FromSeconds(0.08), ct).ContinueWith(_ => { });
             if (ct.IsCancellationRequested || _activeMode == RecordingMode.None) break;
             var fresh = _recorder.SnapshotFrom(cursor);
             if (fresh.Length == 0) continue;

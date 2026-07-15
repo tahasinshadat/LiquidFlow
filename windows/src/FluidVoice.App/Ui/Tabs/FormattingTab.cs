@@ -50,16 +50,39 @@ public sealed class FormattingTab : StackPanel
         typing.Children.Add(Theme.Heading("Text insertion"));
         typing.Children.Add(Theme.Label("Method"));
         var combo = new ComboBox { Width = 320, HorizontalAlignment = HorizontalAlignment.Left };
-        combo.Items.Add("Clipboard-free insert (fastest)");
-        combo.Items.Add("Clipboard paste (most compatible)");
-        combo.SelectedIndex = s.TextInsertionMode == TextInsertionMode.ReliablePaste ? 1 : 0;
+        combo.Items.Add("Clipboard-free insert (fastest)");   // Standard
+        combo.Items.Add("Clipboard paste (most compatible)"); // ReliablePaste
+        combo.Items.Add("Typing effect (types it out)");       // TypeOut
+        combo.SelectedIndex = s.TextInsertionMode switch
+        {
+            TextInsertionMode.ReliablePaste => 1,
+            TextInsertionMode.TypeOut => 2,
+            _ => 0,
+        };
+
+        // Speed control for the typing effect — only relevant when "Typing effect" is chosen.
+        var speedPanel = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
+        speedPanel.Children.Add(Theme.Label("Typing speed"));
+        speedPanel.Children.Add(Theme.Slider(0, 100, s.TypingSpeed,
+            v => { s.TypingSpeed = (int)Math.Round(v); s.Save("typing"); },
+            v => (int)Math.Round(v) >= 100 ? "Instant" : $"{(int)Math.Round(v)}"));
+        speedPanel.Children.Add(Theme.Caption("100 = instant. Lower it to watch the text type out character by character."));
+        speedPanel.Visibility = s.TextInsertionMode == TextInsertionMode.TypeOut ? Visibility.Visible : Visibility.Collapsed;
+
         combo.SelectionChanged += (_, _) =>
         {
-            s.TextInsertionMode = combo.SelectedIndex == 1 ? TextInsertionMode.ReliablePaste : TextInsertionMode.Standard;
+            s.TextInsertionMode = combo.SelectedIndex switch
+            {
+                1 => TextInsertionMode.ReliablePaste,
+                2 => TextInsertionMode.TypeOut,
+                _ => TextInsertionMode.Standard,
+            };
             s.Save("typing");
+            speedPanel.Visibility = combo.SelectedIndex == 2 ? Visibility.Visible : Visibility.Collapsed;
         };
         typing.Children.Add(combo);
         typing.Children.Add(Theme.Caption("Use clipboard paste if a Windows app drops characters during direct insertion."));
+        typing.Children.Add(speedPanel);
         Children.Add(Theme.Card2(typing));
     }
 }

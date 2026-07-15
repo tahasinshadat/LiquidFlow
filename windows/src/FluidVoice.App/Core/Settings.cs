@@ -8,7 +8,7 @@ namespace FluidVoice.Core;
 public enum HotkeyActivationMode { Toggle, Hold, Automatic }
 public enum OverlaySize { Pill, Small, Medium, Large }
 public enum OverlayPosition { Top, Bottom }
-public enum TextInsertionMode { Standard, ReliablePaste }
+public enum TextInsertionMode { Standard, ReliablePaste, TypeOut }
 public enum ThemePreference { System, Light, Dark }
 public enum PromptMode { Dictate, Edit }
 public enum PromptRoutingScope { AllApps, SelectedAppsOnly }
@@ -87,7 +87,9 @@ public sealed class Settings
     // ----- Overlay -----
     public OverlaySize OverlaySize { get; set; } = OverlaySize.Medium;
     public OverlayPosition OverlayPosition { get; set; } = OverlayPosition.Bottom;
-    public double OverlayBottomOffset { get; set; } = 50.0;
+    /// <summary>Gap (px) between the bar and the chosen screen edge. Lower = closer to the edge
+    /// (i.e. lower on screen for the default Bottom position). Adjustable in Settings → General.</summary>
+    public double OverlayBottomOffset { get; set; } = 28.0;
     public int TranscriptionPreviewCharLimit { get; set; } = 150;
     public bool EnableStreamingPreview { get; set; } = true;
 
@@ -103,6 +105,9 @@ public sealed class Settings
     // and reliable everywhere. "Clipboard-free" remains selectable for apps that need it.
     // (mac defaults to .standard because CGEvent unicode is reliable there — see PARITY.md.)
     public TextInsertionMode TextInsertionMode { get; set; } = TextInsertionMode.ReliablePaste;
+    /// <summary>Speed of the "Typing effect" insertion mode: 0 = slow typewriter, 100 = instant.
+    /// Only applies when <see cref="TextInsertionMode"/> is <see cref="TextInsertionMode.TypeOut"/>.</summary>
+    public int TypingSpeed { get; set; } = 85;
     public bool CopyTranscriptionToClipboard { get; set; }
 
     // ----- Formatting pipeline (defaults verified true in SettingsStore.swift:3571,3579) -----
@@ -227,6 +232,14 @@ public sealed class Settings
                     {
                         if (Current.Theme == ThemePreference.System) Current.Theme = ThemePreference.Light;
                         Current.SettingsRevision = 1;
+                        Current.Save("migration");
+                    }
+                    // rev 2: the bar now sits a touch lower by default. The offset had no UI before,
+                    // so anyone still on the old 50px default gets nudged down once (customizers keep theirs).
+                    if (Current.SettingsRevision < 2)
+                    {
+                        if (Math.Abs(Current.OverlayBottomOffset - 50.0) < 0.01) Current.OverlayBottomOffset = 28.0;
+                        Current.SettingsRevision = 2;
                         Current.Save("migration");
                     }
                     return;

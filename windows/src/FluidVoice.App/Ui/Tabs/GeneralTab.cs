@@ -93,6 +93,13 @@ public sealed class GeneralTab : StackPanel
             if (Enum.TryParse<OverlayPosition>((string)posCombo.SelectedItem, out var p)) { s.OverlayPosition = p; s.Save("overlay"); }
         };
         ov.Children.Add(posCombo);
+
+        ov.Children.Add(Theme.Label("Distance from screen edge"));
+        ov.Children.Add(Theme.Slider(8, 320, s.OverlayBottomOffset,
+            v => { s.OverlayBottomOffset = Math.Round(v); s.Save("overlay"); },
+            v => $"{(int)Math.Round(v)} px"));
+        ov.Children.Add(Theme.Caption("How far the bar sits from the screen edge. Lower = closer to the edge (a bit lower on screen, for the default Bottom position)."));
+
         ov.Children.Add(Theme.Toggle("Show live transcription preview", s.EnableStreamingPreview, v => { s.EnableStreamingPreview = v; s.Save("overlay"); }));
         Children.Add(Theme.Card2(ov));
 
