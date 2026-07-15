@@ -195,6 +195,11 @@ public sealed class Settings
     public bool LaunchAtStartup { get; set; } = true; // always-on dictation app
     public bool AutoUpdateCheckEnabled { get; set; } = true;
     public bool BetaReleasesEnabled { get; set; }
+    /// <summary>Folder to watch for newer installers (FluidVoice-Setup-&lt;version&gt;-&lt;arch&gt;.exe).
+    /// When set, the app checks it alongside GitHub releases and shows an in-app "Update" button
+    /// when a higher version appears. Empty = folder checking off. Defaults to Documents\FluidVoice Updates.</summary>
+    public string UpdateFolderPath { get; set; } =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FluidVoice Updates");
     public bool OnboardingCompleted { get; set; }
     public string DisplayName { get; set; } = "";
     /// <summary>Welcome-page "Setup Tested Successfully" checkmark.</summary>

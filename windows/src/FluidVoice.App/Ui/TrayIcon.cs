@@ -18,11 +18,14 @@ public sealed class TrayIcon : IDisposable
     private readonly Icon _recordingIcon;
     private readonly ToolStripMenuItem _statusItem;
     private readonly ToolStripMenuItem _micMenu;
+    private readonly ToolStripMenuItem _updateItem;
 
     public event Action? OpenRequested;
     public event Action? SettingsRequested;
     public event Action? DictionaryRequested;
     public event Action? CheckUpdatesRequested;
+    public event Action? InstallUpdateRequested;
+    public event Action? BalloonClicked;
     public event Action? QuitRequested;
 
     public TrayIcon()
@@ -39,6 +42,15 @@ public sealed class TrayIcon : IDisposable
         menu.Items.Add("Custom Dictionary", null, (_, _) => DictionaryRequested?.Invoke());
         _micMenu = new ToolStripMenuItem("Microphone");
         menu.Items.Add(_micMenu);
+        // Green "install now" item — hidden until an update is found (SetUpdateAvailable).
+        _updateItem = new ToolStripMenuItem("Install update")
+        {
+            Visible = false,
+            ForeColor = Color.FromArgb(31, 122, 106),
+            Font = new Font(SystemFonts.MenuFont ?? SystemFonts.DefaultFont, FontStyle.Bold),
+        };
+        _updateItem.Click += (_, _) => InstallUpdateRequested?.Invoke();
+        menu.Items.Add(_updateItem);
         menu.Items.Add("Check for Updates...", null, (_, _) => CheckUpdatesRequested?.Invoke());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Quit LiquidFlow", null, (_, _) => QuitRequested?.Invoke());
@@ -52,8 +64,28 @@ public sealed class TrayIcon : IDisposable
             ContextMenuStrip = menu,
         };
         _icon.DoubleClick += (_, _) => OpenRequested?.Invoke();
+        _icon.BalloonTipClicked += (_, _) => BalloonClicked?.Invoke();
 
         UpdateStatus(false);
+    }
+
+    /// <summary>Show/hide the tray "Install update" item (called when the update state changes).</summary>
+    public void SetUpdateAvailable(string? version)
+    {
+        void Apply()
+        {
+            if (string.IsNullOrEmpty(version))
+            {
+                _updateItem.Visible = false;
+            }
+            else
+            {
+                _updateItem.Text = $"⬆  Install update ({version})";
+                _updateItem.Visible = true;
+            }
+        }
+        if (_icon.ContextMenuStrip is { } strip && strip.InvokeRequired) strip.Invoke(Apply);
+        else Apply();
     }
 
     public void UpdateStatus(bool recording)

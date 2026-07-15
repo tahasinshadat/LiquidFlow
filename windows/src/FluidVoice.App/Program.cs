@@ -105,6 +105,15 @@ public static class Program
         tray.SettingsRequested += () => app.Dispatcher.BeginInvoke(() => ShowMain(mainWindow, "General"));
         tray.DictionaryRequested += () => app.Dispatcher.BeginInvoke(() => ShowMain(mainWindow, "Dictionary"));
         tray.CheckUpdatesRequested += () => _ = CheckForUpdatesAsync(interactive: true);
+        tray.InstallUpdateRequested += () => _ = App.UpdateCoordinator.InstallAsync();
+        // Clicking the "Update available" toast installs it.
+        tray.BalloonClicked += () => { if (App.UpdateCoordinator.Pending is not null) _ = App.UpdateCoordinator.InstallAsync(); };
+        // Surface the update state on the tray item + the in-app banner whenever it changes.
+        App.UpdateCoordinator.Changed += info => app.Dispatcher.BeginInvoke(() =>
+        {
+            tray.SetUpdateAvailable(info?.Version);
+            mainWindow.SetUpdateAvailable(info);
+        });
         tray.QuitRequested += () => app.Dispatcher.BeginInvoke(() =>
         {
             tray.Dispose();
@@ -152,6 +161,7 @@ public static class Program
 
         if (Settings.Current.AutoUpdateCheckEnabled)
             _ = CheckForUpdatesAsync(interactive: false);
+        App.UpdateCoordinator.StartPeriodicChecks(); // re-checks hourly (respects the auto-check toggle)
 
         // Dev seam: show the overlay with sample content for visual checks (no recording, no typing).
         if (Environment.GetEnvironmentVariable("FLUIDVOICE_OVERLAY_PREVIEW") == "1")
@@ -170,25 +180,8 @@ public static class Program
         return 0;
     }
 
-    private static async Task CheckForUpdatesAsync(bool interactive)
-    {
-        try
-        {
-            var update = await App.Updater.CheckAsync(CancellationToken.None);
-            if (update is null)
-            {
-                if (interactive) Notifications.Show("LiquidFlow", "You're on the latest version.");
-                return;
-            }
-            Notifications.Show("Update available",
-                $"LiquidFlow {update.Version} is available. Opening download…");
-            await App.Updater.DownloadAndRunAsync(update, CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            Log.Warn("app", $"Update check failed: {ex.Message}");
-        }
-    }
+    private static Task CheckForUpdatesAsync(bool interactive) =>
+        App.UpdateCoordinator.RefreshAsync(interactive);
 
     private static void ShowMain(MainWindow window, string? tab = null)
     {

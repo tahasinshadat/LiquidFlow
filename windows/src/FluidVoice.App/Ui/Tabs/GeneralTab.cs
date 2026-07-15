@@ -214,6 +214,36 @@ public sealed class GeneralTab : StackPanel
         bh.Children.Add(Theme.Toggle("Launch at startup", s.LaunchAtStartup, v => { s.LaunchAtStartup = v; s.Save(); StartupManager.Apply(v); }));
         bh.Children.Add(Theme.Toggle("Check for updates automatically", s.AutoUpdateCheckEnabled, v => { s.AutoUpdateCheckEnabled = v; s.Save(); }));
         bh.Children.Add(Theme.Toggle("Include beta releases", s.BetaReleasesEnabled, v => { s.BetaReleasesEnabled = v; s.Save(); }));
+
+        bh.Children.Add(Theme.Label("Update folder"));
+        var updRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
+        var pathBox = new TextBox
+        {
+            Width = 330,
+            Text = s.UpdateFolderPath,
+            Padding = new Thickness(8, 5, 8, 5),
+            VerticalContentAlignment = VerticalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        pathBox.LostFocus += (_, _) => { s.UpdateFolderPath = pathBox.Text.Trim(); s.Save("update"); };
+        var browse = Theme.SecondaryButton("Browse…");
+        browse.Margin = new Thickness(8, 0, 0, 0);
+        browse.VerticalAlignment = VerticalAlignment.Center;
+        browse.Click += (_, _) =>
+        {
+            var dlg = new Microsoft.Win32.OpenFolderDialog { Title = "Choose the folder to watch for updates" };
+            if (dlg.ShowDialog() == true) { pathBox.Text = dlg.FolderName; s.UpdateFolderPath = dlg.FolderName; s.Save("update"); }
+        };
+        var checkNow = Theme.SecondaryButton("Check now");
+        checkNow.Margin = new Thickness(8, 0, 0, 0);
+        checkNow.VerticalAlignment = VerticalAlignment.Center;
+        checkNow.Click += (_, _) => _ = FluidVoice.App.UpdateCoordinator.RefreshAsync(interactive: true);
+        updRow.Children.Add(pathBox);
+        updRow.Children.Add(browse);
+        updRow.Children.Add(checkNow);
+        bh.Children.Add(updRow);
+        bh.Children.Add(Theme.Caption("Drop new FluidVoice-Setup-<version>-<arch>.exe builds in this folder. When a newer one appears, an Update button + notification show up — click to install."));
+
         Children.Add(Theme.Card2(bh));
     }
 

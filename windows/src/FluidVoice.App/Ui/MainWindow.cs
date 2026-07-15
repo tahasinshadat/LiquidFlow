@@ -95,12 +95,19 @@ public sealed class MainWindow : Window
 
         // ----- in-app titlebar above everything (part of the design, not an appended bar) -----
         var outer = new Grid { Background = new SolidColorBrush(Theme.Bg) };
-        outer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        outer.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        outer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // titlebar
+        outer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // update banner
+        outer.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // content
         var titlebar = WindowFx.InstallChrome(this, "LiquidFlow");
+        Grid.SetRow((UIElement)titlebar, 0);
         outer.Children.Add((UIElement)titlebar);
-        Grid.SetRow(root, 1);
+        _updateBanner = BuildUpdateBanner();
+        Grid.SetRow(_updateBanner, 1);
+        outer.Children.Add(_updateBanner);
+        Grid.SetRow(root, 2);
         outer.Children.Add(root);
+        // reflect any update already found before this window was wired up
+        SetUpdateAvailable(App.UpdateCoordinator.Pending);
 
         Content = outer;
         SmoothScroll.Attach(_content);
@@ -127,6 +134,84 @@ public sealed class MainWindow : Window
                 Navigate(_current);
             }
         });
+    }
+
+    private Border? _updateBanner;
+    private TextBlock? _updateBannerLabel;
+
+    private Border BuildUpdateBanner()
+    {
+        _updateBannerLabel = new TextBlock
+        {
+            Foreground = Brushes.White,
+            FontSize = 13,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextWrapping = TextWrapping.Wrap,
+        };
+        var install = new Button
+        {
+            Content = "Install now",
+            Padding = new Thickness(14, 5, 14, 5),
+            Margin = new Thickness(14, 0, 6, 0),
+            Background = Brushes.White,
+            Foreground = new SolidColorBrush(Theme.Green),
+            BorderThickness = new Thickness(0),
+            Cursor = Cursors.Hand,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        install.Click += (_, _) => _ = App.UpdateCoordinator.InstallAsync();
+        var later = new Button
+        {
+            Content = "Later",
+            Padding = new Thickness(10, 5, 10, 5),
+            Background = Brushes.Transparent,
+            Foreground = Brushes.White,
+            BorderThickness = new Thickness(0),
+            Cursor = Cursors.Hand,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        later.Click += (_, _) => { if (_updateBanner is not null) _updateBanner.Visibility = Visibility.Collapsed; };
+
+        var row = new DockPanel { Margin = new Thickness(20, 0, 14, 0) };
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        actions.Children.Add(install);
+        actions.Children.Add(later);
+        DockPanel.SetDock(actions, Dock.Right);
+        row.Children.Add(actions);
+        var glyphAndText = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        glyphAndText.Children.Add(new TextBlock
+        {
+            Text = "", // Download glyph
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+            FontSize = 15,
+            Foreground = Brushes.White,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 10, 0),
+        });
+        glyphAndText.Children.Add(_updateBannerLabel);
+        row.Children.Add(glyphAndText);
+
+        return new Border
+        {
+            Background = new SolidColorBrush(Theme.Green),
+            Padding = new Thickness(0, 9, 0, 9),
+            Visibility = Visibility.Collapsed,
+            Child = row,
+        };
+    }
+
+    /// <summary>Show/hide the in-app "update available" banner (driven by UpdateCoordinator).</summary>
+    public void SetUpdateAvailable(UpdateInfo? info)
+    {
+        if (_updateBanner is null || _updateBannerLabel is null) return;
+        if (info is null)
+        {
+            _updateBanner.Visibility = Visibility.Collapsed;
+            return;
+        }
+        _updateBannerLabel.Text = $"LiquidFlow {info.Version} is available.";
+        _updateBanner.Visibility = Visibility.Visible;
     }
 
     public void SelectTab(string title)

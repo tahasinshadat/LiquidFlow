@@ -1,10 +1,16 @@
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using FluidVoice.Core;
 
 namespace FluidVoice.App;
 
-public sealed record UpdateInfo(string Version, string Notes, string DownloadUrl, bool IsPrerelease);
+public sealed record UpdateInfo(string Version, string Notes, string DownloadUrl, bool IsPrerelease)
+{
+    /// <summary>Set when the installer is already a local file (from the watched update folder);
+    /// DownloadAndRunAsync then runs it in place instead of downloading.</summary>
+    public string? LocalFile { get; init; }
+}
 
 /// <summary>
 /// Update check against GitHub releases (SimpleUpdater.swift): stable vs beta
@@ -23,7 +29,61 @@ public static class Updater
         Http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
     }
 
+    /// <summary>
+    /// Check every configured source (the watched local folder + GitHub releases) and return the
+    /// single highest available version above the running one, or null if we're current.
+    /// </summary>
     public static async Task<UpdateInfo?> CheckAsync(CancellationToken ct)
+    {
+        var local = CheckLocalFolder(Settings.Current.UpdateFolderPath);
+        var github = await CheckGitHubAsync(ct);
+        if (local is null) return github;
+        if (github is null) return local;
+        // both found → prefer the higher version
+        var lv = ParseVersion(local.Version);
+        var gv = ParseVersion(github.Version);
+        return (gv is not null && lv is not null && gv > lv) ? github : local;
+    }
+
+    /// <summary>
+    /// Scan a folder for a newer installer named FluidVoice-Setup-&lt;version&gt;-&lt;arch&gt;.exe. This is the
+    /// "watch a directory" update source: drop a fresh build in the folder and the app offers it.
+    /// </summary>
+    public static UpdateInfo? CheckLocalFolder(string? folder)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) return null;
+            var arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture ==
+                       System.Runtime.InteropServices.Architecture.Arm64 ? "arm64" : "x64";
+            var current = ParseVersion(ThisVersion);
+            UpdateInfo? best = null;
+            Version? bestVer = null;
+            foreach (var file in Directory.EnumerateFiles(folder, "FluidVoice-Setup-*.exe"))
+            {
+                var name = Path.GetFileNameWithoutExtension(file);
+                var m = Regex.Match(name, @"^FluidVoice-Setup-(\d+(?:\.\d+)+)-(arm64|x64)$", RegexOptions.IgnoreCase);
+                if (!m.Success) continue;
+                if (!m.Groups[2].Value.Equals(arch, StringComparison.OrdinalIgnoreCase)) continue;
+                var ver = ParseVersion(m.Groups[1].Value);
+                if (ver is null || ver <= current) continue;
+                if (bestVer is not null && ver <= bestVer) continue;
+                bestVer = ver;
+                best = new UpdateInfo(m.Groups[1].Value, "Local build in your update folder.", file, false)
+                {
+                    LocalFile = file,
+                };
+            }
+            return best;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("updater", $"Local update-folder scan failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static async Task<UpdateInfo?> CheckGitHubAsync(CancellationToken ct)
     {
         try
         {
@@ -69,16 +129,24 @@ public static class Updater
     {
         try
         {
-            var tmp = Path.Combine(Path.GetTempPath(), $"FluidVoice-Setup-{update.Version}.exe");
-            await using (var resp = await Http.GetStreamAsync(update.DownloadUrl, ct))
-            await using (var file = File.Create(tmp))
+            string installer;
+            if (!string.IsNullOrEmpty(update.LocalFile) && File.Exists(update.LocalFile))
+            {
+                installer = update.LocalFile; // already local (watched folder) — run it in place
+            }
+            else
+            {
+                installer = Path.Combine(Path.GetTempPath(), $"FluidVoice-Setup-{update.Version}.exe");
+                await using var resp = await Http.GetStreamAsync(update.DownloadUrl, ct);
+                await using var file = File.Create(installer);
                 await resp.CopyToAsync(file, ct);
+            }
 
             // Silent in-place update: the installer detects the existing install, closes the
             // running app, replaces files in the same folder, and relaunches it (see FluidVoice.iss).
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                FileName = tmp,
+                FileName = installer,
                 Arguments = "/SILENT /NORESTART /SUPPRESSMSGBOXES",
                 UseShellExecute = true,
             });
