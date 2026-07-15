@@ -87,7 +87,9 @@ public sealed class ParakeetEngine : ISpeechEngine
         config.ModelConfig.Transducer.Decoder = Path.Combine(dir, "decoder.int8.onnx");
         config.ModelConfig.Transducer.Joiner = Path.Combine(dir, "joiner.int8.onnx");
         config.ModelConfig.Tokens = Path.Combine(dir, "tokens.txt");
-        config.ModelConfig.NumThreads = 2; // tiny model; leave cores for the offline decode at stop
+        // 3 threads: the offline decode only runs at stop (not during live preview), so the
+        // streaming model can use a bit more CPU to stay ahead of speech and keep latency low.
+        config.ModelConfig.NumThreads = 3;
         config.ModelConfig.Provider = "cpu";
         config.DecodingMethod = "greedy_search";
         // Segment on pauses so the per-segment decoder state stays small during long

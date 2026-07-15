@@ -134,6 +134,10 @@ public sealed class MainWindow : Window
                 RebuildRail();
                 Navigate(_current);
             }
+            else if (hint == "home" && _current == "Home")
+            {
+                Navigate("Home"); // reflect the setup-checklist toggle immediately
+            }
         });
     }
 
@@ -499,7 +503,9 @@ public sealed class MainWindow : Window
         var model = SpeechModels.Selected();
         bool setupDone = model.IsDownloaded && Settings.Current.SetupTested;
         main.Children.Add(BuildHomeHero(model, setupDone));
-        if (!setupDone)
+        // The setup checklist + how-to are opt-in (Settings → General); hidden by default so
+        // Home stays clean once you're up and running.
+        if (!setupDone && Settings.Current.ShowHomeSetup)
             main.Children.Add(BuildSetupStrip(model));
         main.Children.Add(BuildFeed());
         Grid.SetColumn(main, 0);

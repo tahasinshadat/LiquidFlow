@@ -191,10 +191,11 @@ public sealed class DictationCoordinator : IDictationControl
         float sessionGain = 0; // AGC for whispered speech: fixed once we've heard ~1s
         while (!ct.IsCancellationRequested && _activeMode != RecordingMode.None && session == _sessionId)
         {
-            // Feed the streaming recognizer often so the live preview tracks speech closely
-            // (~12 updates/sec). The transducer only decodes when a full chunk is buffered, so a
-            // tighter tick cuts display lag without extra decode work. Was 0.2s (felt laggy).
-            await Task.Delay(TimeSpan.FromSeconds(0.08), ct).ContinueWith(_ => { });
+            // Feed the streaming recognizer very often (~25 updates/sec) so the live preview shows
+            // the most recent word as soon as the model emits it. The transducer only decodes when
+            // a full chunk is buffered, so a tight tick cuts the "waiting for the next poll" latency
+            // without extra decode work. (Streaming ASR still has a small inherent floor.)
+            await Task.Delay(TimeSpan.FromSeconds(0.04), ct).ContinueWith(_ => { });
             if (ct.IsCancellationRequested || _activeMode == RecordingMode.None) break;
             var fresh = _recorder.SnapshotFrom(cursor);
             if (fresh.Length == 0) continue;
@@ -213,13 +214,14 @@ public sealed class DictationCoordinator : IDictationControl
     {
         while (!ct.IsCancellationRequested && _activeMode != RecordingMode.None && session == _sessionId)
         {
-            await Task.Delay(TimeSpan.FromSeconds(0.6), ct).ContinueWith(_ => { });
+            await Task.Delay(TimeSpan.FromSeconds(0.4), ct).ContinueWith(_ => { });
             if (ct.IsCancellationRequested || _activeMode == RecordingMode.None) break;
             var samples = _recorder.SnapshotAll();
             if (samples.Length < AudioRecorder.TargetSampleRate) continue; // min 1s
-            // cap the live-preview decode window so stop latency stays bounded;
-            // the preview shows the tail of the text anyway
-            const int maxPreviewSamples = 25 * AudioRecorder.TargetSampleRate;
+            // Cap the live-preview decode window: a smaller window keeps each re-decode fast
+            // (so the preview tracks recent speech instead of lagging behind), and the preview
+            // shows the tail of the text anyway. Only used when the streaming model is absent.
+            const int maxPreviewSamples = 12 * AudioRecorder.TargetSampleRate;
             if (samples.Length > maxPreviewSamples)
                 samples = samples[^maxPreviewSamples..];
             var partial = await engine.TryTranscribePartialAsync(Dsp.Normalize(samples), ct);

@@ -211,6 +211,7 @@ public sealed class GeneralTab : StackPanel
         bh.Children.Add(Theme.Toggle("Play start/stop sounds", s.EnableTranscriptionSounds, v => { s.EnableTranscriptionSounds = v; s.Save(); }));
         bh.Children.Add(Theme.Toggle("Pause media while dictating", s.PauseMediaDuringTranscription, v => { s.PauseMediaDuringTranscription = v; s.Save(); }));
         bh.Children.Add(Theme.Toggle("Copy transcription to clipboard", s.CopyTranscriptionToClipboard, v => { s.CopyTranscriptionToClipboard = v; s.Save(); }));
+        bh.Children.Add(Theme.Toggle("Show setup checklist & how-to on Home", s.ShowHomeSetup, v => { s.ShowHomeSetup = v; s.Save("home"); }));
         bh.Children.Add(Theme.Toggle("Launch at startup", s.LaunchAtStartup, v => { s.LaunchAtStartup = v; s.Save(); StartupManager.Apply(v); }));
         bh.Children.Add(Theme.Toggle("Check for updates automatically", s.AutoUpdateCheckEnabled, v => { s.AutoUpdateCheckEnabled = v; s.Save(); }));
         bh.Children.Add(Theme.Toggle("Include beta releases", s.BetaReleasesEnabled, v => { s.BetaReleasesEnabled = v; s.Save(); }));

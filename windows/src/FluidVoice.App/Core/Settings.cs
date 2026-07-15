@@ -208,6 +208,9 @@ public sealed class Settings
     public string UpdateFolderPath { get; set; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FluidVoice Updates");
     public bool OnboardingCompleted { get; set; }
+    /// <summary>Show the "Quick Setup" checklist + "How to Use" panels on Home. Off by default —
+    /// they're first-run aids and clutter once you're going; the hero still links to setup.</summary>
+    public bool ShowHomeSetup { get; set; }
     public string DisplayName { get; set; } = "";
     /// <summary>Welcome-page "Setup Tested Successfully" checkmark.</summary>
     public bool SetupTested { get; set; }
