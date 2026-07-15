@@ -61,6 +61,7 @@ public sealed class MainWindow : Window
             new("", "Insights", () => new HomeTab()),
             new("", "Dictionary", () => new DictionaryTab()),
             new("", "History", () => new HistoryTab()),
+            new(((char)0xE716).ToString(), "Meetings", () => new MeetingsTab(_coordinator)),
             new("", "Scratchpad", BuildScratchpadPage),
             // rail pins these to the bottom (Wispr-style); Settings opens the modal, no page of its own
             new("", "Settings", () => new TextBlock()),

@@ -169,6 +169,10 @@ public sealed class Settings
     public float TranscriptionSoundVolume { get; set; } = 1.0f;
     public bool PauseMediaDuringTranscription { get; set; }
 
+    // ----- Meeting notes -----
+    /// <summary>Include the microphone (you) in meeting capture, mixed with system audio (everyone else).</summary>
+    public bool MeetingIncludeMic { get; set; } = true;
+
     // ----- Voice activity detection (OpenWhispr-style auto-stop) -----
     /// <summary>Stop dictation automatically after trailing silence (Silero VAD; off by default so thinking pauses never cut you off).</summary>
     public bool VadAutoStopEnabled { get; set; }
