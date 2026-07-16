@@ -5,16 +5,18 @@
     <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
+    <!-- Namespaces/RootNamespace stay FluidVoice (internal, invisible) to avoid churn; the
+         user-facing identity (exe, product) is LiquidFlow. -->
     <RootNamespace>FluidVoice</RootNamespace>
-    <AssemblyName>FluidVoice</AssemblyName>
+    <AssemblyName>LiquidFlow</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <RuntimeIdentifiers>win-arm64;win-x64</RuntimeIdentifiers>
     <Platforms>AnyCPU;ARM64;x64</Platforms>
-    <Version>1.7.3</Version>
-    <Product>FluidVoice for Windows</Product>
+    <Version>1.7.4</Version>
+    <Product>LiquidFlow</Product>
     <Company>FluidVoice contributors</Company>
     <Copyright>GPLv3 — port of altic-dev/FluidVoice</Copyright>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>

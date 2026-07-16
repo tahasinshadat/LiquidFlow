@@ -5,8 +5,26 @@ namespace FluidVoice.Core;
 /// <summary>Well-known data locations. Mirrors the mac app's use of Application Support / Caches.</summary>
 public static class AppPaths
 {
-    public static string DataDir { get; } =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FluidVoice");
+    public static string DataDir { get; } = ResolveDataDir();
+
+    /// <summary>
+    /// Data now lives in %LOCALAPPDATA%\LiquidFlow. On first run after the FluidVoice→LiquidFlow
+    /// rename, move the old folder over: a same-volume Directory.Move is instant and atomic and
+    /// preserves settings, history, models, and audio. If it can't (locked or cross-volume), keep
+    /// using the old folder so no data is ever lost.
+    /// </summary>
+    private static string ResolveDataDir()
+    {
+        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var newDir = Path.Combine(local, "LiquidFlow");
+        var oldDir = Path.Combine(local, "FluidVoice");
+        if (!Directory.Exists(newDir) && Directory.Exists(oldDir))
+        {
+            try { Directory.Move(oldDir, newDir); }
+            catch { return oldDir; }
+        }
+        return newDir;
+    }
 
     public static string SettingsFile => Path.Combine(DataDir, "settings.json");
     public static string HistoryFile => Path.Combine(DataDir, "history.json");

@@ -19,7 +19,7 @@ public sealed record UpdateInfo(string Version, string Notes, string DownloadUrl
 /// </summary>
 public static class Updater
 {
-    // Point this at your fork's releases. Assets should be named FluidVoice-Setup-<version>-<arch>.exe
+    // Point this at your fork's releases. Assets should be named LiquidFlow-Setup-<version>-<arch>.exe
     public const string Repo = "altic-dev/FluidVoice-Windows";
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30) };
 
@@ -46,7 +46,7 @@ public static class Updater
     }
 
     /// <summary>
-    /// Scan a folder for a newer installer named FluidVoice-Setup-&lt;version&gt;-&lt;arch&gt;.exe. This is the
+    /// Scan a folder for a newer installer named LiquidFlow-Setup-&lt;version&gt;-&lt;arch&gt;.exe. This is the
     /// "watch a directory" update source: drop a fresh build in the folder and the app offers it.
     /// </summary>
     public static UpdateInfo? CheckLocalFolder(string? folder)
@@ -59,10 +59,10 @@ public static class Updater
             var current = ParseVersion(ThisVersion);
             UpdateInfo? best = null;
             Version? bestVer = null;
-            foreach (var file in Directory.EnumerateFiles(folder, "FluidVoice-Setup-*.exe"))
+            foreach (var file in Directory.EnumerateFiles(folder, "LiquidFlow-Setup-*.exe"))
             {
                 var name = Path.GetFileNameWithoutExtension(file);
-                var m = Regex.Match(name, @"^FluidVoice-Setup-(\d+(?:\.\d+)+)-(arm64|x64)$", RegexOptions.IgnoreCase);
+                var m = Regex.Match(name, @"^LiquidFlow-Setup-(\d+(?:\.\d+)+)-(arm64|x64)$", RegexOptions.IgnoreCase);
                 if (!m.Success) continue;
                 if (!m.Groups[2].Value.Equals(arch, StringComparison.OrdinalIgnoreCase)) continue;
                 var ver = ParseVersion(m.Groups[1].Value);
@@ -136,7 +136,7 @@ public static class Updater
             }
             else
             {
-                installer = Path.Combine(Path.GetTempPath(), $"FluidVoice-Setup-{update.Version}.exe");
+                installer = Path.Combine(Path.GetTempPath(), $"LiquidFlow-Setup-{update.Version}.exe");
                 await using var resp = await Http.GetStreamAsync(update.DownloadUrl, ct);
                 await using var file = File.Create(installer);
                 await resp.CopyToAsync(file, ct);

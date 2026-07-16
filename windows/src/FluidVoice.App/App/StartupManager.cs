@@ -7,7 +7,8 @@ namespace FluidVoice.App;
 public static class StartupManager
 {
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string ValueName = "FluidVoice";
+    private const string ValueName = "LiquidFlow";
+    private const string LegacyValueName = "FluidVoice"; // pre-rename autostart entry
 
     public static void Apply(bool enabled)
     {
@@ -15,6 +16,8 @@ public static class StartupManager
         {
             using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
             if (key is null) return;
+            // Always clear the old FluidVoice autostart so it can't launch the removed exe.
+            try { key.DeleteValue(LegacyValueName, throwOnMissingValue: false); } catch { }
             if (enabled)
             {
                 var exe = Environment.ProcessPath ?? System.Reflection.Assembly.GetExecutingAssembly().Location;

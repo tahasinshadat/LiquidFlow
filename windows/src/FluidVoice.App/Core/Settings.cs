@@ -202,11 +202,11 @@ public sealed class Settings
     public bool LaunchAtStartup { get; set; } = true; // always-on dictation app
     public bool AutoUpdateCheckEnabled { get; set; } = true;
     public bool BetaReleasesEnabled { get; set; }
-    /// <summary>Folder to watch for newer installers (FluidVoice-Setup-&lt;version&gt;-&lt;arch&gt;.exe).
+    /// <summary>Folder to watch for newer installers (LiquidFlow-Setup-&lt;version&gt;-&lt;arch&gt;.exe).
     /// When set, the app checks it alongside GitHub releases and shows an in-app "Update" button
-    /// when a higher version appears. Empty = folder checking off. Defaults to Documents\FluidVoice Updates.</summary>
+    /// when a higher version appears. Empty = folder checking off. Defaults to Documents\LiquidFlow Updates.</summary>
     public string UpdateFolderPath { get; set; } =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FluidVoice Updates");
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "LiquidFlow Updates");
     public bool OnboardingCompleted { get; set; }
     /// <summary>Show the "Quick Setup" checklist + "How to Use" panels on Home. Off by default —
     /// they're first-run aids and clutter once you're going; the hero still links to setup.</summary>
@@ -255,6 +255,15 @@ public sealed class Settings
                     {
                         if (Math.Abs(Current.OverlayBottomOffset - 50.0) < 0.01) Current.OverlayBottomOffset = 28.0;
                         Current.SettingsRevision = 2;
+                        Current.Save("migration");
+                    }
+                    // FluidVoice → LiquidFlow rename: repoint the update folder if it's still the old
+                    // default (idempotent; only rewrites the untouched default path).
+                    var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                    if (string.Equals(Current.UpdateFolderPath, Path.Combine(docs, "FluidVoice Updates"),
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        Current.UpdateFolderPath = Path.Combine(docs, "LiquidFlow Updates");
                         Current.Save("migration");
                     }
                     return;

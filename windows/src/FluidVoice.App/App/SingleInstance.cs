@@ -10,8 +10,8 @@ namespace FluidVoice.App;
 /// </summary>
 public sealed class SingleInstance : IDisposable
 {
-    private const string MutexName = @"Local\FluidVoice.SingleInstance";
-    private const string EventName = @"Local\FluidVoice.Activate";
+    private const string MutexName = @"Local\LiquidFlow.SingleInstance";
+    private const string EventName = @"Local\LiquidFlow.Activate";
 
     private readonly Mutex _mutex;
     private EventWaitHandle? _activateEvent;

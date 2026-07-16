@@ -243,7 +243,7 @@ public sealed class GeneralTab : StackPanel
         updRow.Children.Add(browse);
         updRow.Children.Add(checkNow);
         bh.Children.Add(updRow);
-        bh.Children.Add(Theme.Caption("Drop new FluidVoice-Setup-<version>-<arch>.exe builds in this folder. When a newer one appears, an Update button + notification show up — click to install."));
+        bh.Children.Add(Theme.Caption("Drop new LiquidFlow-Setup-<version>-<arch>.exe builds in this folder. When a newer one appears, an Update button + notification show up — click to install."));
 
         Children.Add(Theme.Card2(bh));
     }

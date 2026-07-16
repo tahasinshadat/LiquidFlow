@@ -38,7 +38,7 @@ foreach ($arch in $Arches) {
     if ($LASTEXITCODE -ne 0) { throw "ISCC failed for $arch" }
 
     # also produce a portable zip
-    $zip = Join-Path $dist "FluidVoice-portable-$Version-$arch.zip"
+    $zip = Join-Path $dist "LiquidFlow-portable-$Version-$arch.zip"
     if (Test-Path $zip) { Remove-Item $zip }
     Compress-Archive -Path "$pub\*" -DestinationPath $zip
     Write-Host "==> Portable zip: $zip" -ForegroundColor Green
