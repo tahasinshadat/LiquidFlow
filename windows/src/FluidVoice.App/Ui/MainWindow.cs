@@ -266,7 +266,7 @@ public sealed class MainWindow : Window
         {
             Text = entry.Glyph,
             FontFamily = new FontFamily("Segoe MDL2 Assets"),
-            FontSize = 16,
+            FontSize = 15,
             Foreground = new SolidColorBrush(Theme.Text),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
@@ -276,7 +276,7 @@ public sealed class MainWindow : Window
         var label = new TextBlock
         {
             Text = entry.Title,
-            FontSize = 15,
+            FontSize = 13.5,
             FontWeight = FontWeights.SemiBold,
             Foreground = Theme.TextBrush,
             VerticalAlignment = VerticalAlignment.Center,
