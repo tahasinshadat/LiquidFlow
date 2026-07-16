@@ -196,7 +196,10 @@ public sealed class HomeTab : StackPanel
         left.Children.Add(LabelCaps("Total words dictated"));
         header.Children.Add(left);
         var monthWords = HistoryStore.DailyWordCounts(30).Sum(d => d.Words);
-        var badge = Theme.Pill($"{monthWords:N0} this month", Brushes.White, Theme.TextBrush);
+        // Soft on-brand badge (was a plain white pill that floated oddly in the corner).
+        var badge = Theme.Pill($"{monthWords:N0} this month", Theme.GreenSoftBrush, Theme.GreenBrush, 11.5);
+        badge.VerticalAlignment = VerticalAlignment.Top;
+        badge.Margin = new Thickness(0, 4, 0, 0);
         DockPanel.SetDock(badge, Dock.Right);
         header.Children.Add(badge);
         panel.Children.Add(header);
