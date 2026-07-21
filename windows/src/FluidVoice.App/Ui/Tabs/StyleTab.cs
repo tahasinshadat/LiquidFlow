@@ -48,7 +48,7 @@ public sealed class StyleTab : StackPanel
         if (!Settings.Current.StyleWizardCompleted)
         {
             var hero = BuildHero();
-            ((Border)hero).Margin = new Thickness(0, 0, 0, 26);
+            hero.Margin = new Thickness(0, 0, 0, 26);
             Children.Add(hero);
         }
         else
@@ -58,9 +58,9 @@ public sealed class StyleTab : StackPanel
         Children.Add(StyleCards.BuildRow(context, large: false, onPicked: Build));
     }
 
-    private UIElement BuildHero()
+    private Border BuildHero()
     {
-        var content = new StackPanel { Margin = new Thickness(40, 28, 40, 28), VerticalAlignment = VerticalAlignment.Center };
+        var content = new StackPanel { Margin = PageChrome.HeroPadding, VerticalAlignment = VerticalAlignment.Center };
         var title = new TextBlock { FontFamily = Theme.DisplaySerif, FontSize = 30, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 10) };
         title.Inlines.Add(new Run("Make LiquidFlow sound like "));
         title.Inlines.Add(new Run("you") { FontStyle = FontStyles.Italic });
@@ -82,13 +82,12 @@ public sealed class StyleTab : StackPanel
         };
         content.Children.Add(start);
         var hero = PageChrome.DarkHero(content);
-        ((Border)hero).MinHeight = 190;
         return hero;
     }
 
     private static UIElement BuildContextBanner(string context)
     {
-        var copy = new StackPanel { Margin = new Thickness(40, 28, 40, 28), VerticalAlignment = VerticalAlignment.Center };
+        var copy = new StackPanel { Margin = PageChrome.HeroPadding, VerticalAlignment = VerticalAlignment.Center };
         var title = new TextBlock { FontFamily = Theme.DisplaySerif, FontSize = 24, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 8) };
         title.Inlines.Add(new Run(context switch
         {
@@ -113,8 +112,7 @@ public sealed class StyleTab : StackPanel
         dock.Children.Add(cluster);
         dock.Children.Add(copy);
         var hero = PageChrome.DarkHero(dock);
-        ((Border)hero).MinHeight = 190;
-        ((Border)hero).Margin = new Thickness(0, 0, 0, 26);
+        hero.Margin = new Thickness(0, 0, 0, 26);
         return hero;
     }
 
@@ -122,7 +120,7 @@ public sealed class StyleTab : StackPanel
     {
         var host = new StackPanel();
 
-        var copy = new StackPanel { Margin = new Thickness(40, 28, 40, 28), VerticalAlignment = VerticalAlignment.Center };
+        var copy = new StackPanel { Margin = PageChrome.HeroPadding, VerticalAlignment = VerticalAlignment.Center };
         copy.Children.Add(new TextBlock
         {
             Text = "Auto Cleanup applies to all your dictations",
@@ -148,8 +146,7 @@ public sealed class StyleTab : StackPanel
             TextWrapping = TextWrapping.Wrap,
         });
         var hero = PageChrome.DarkHero(copy);
-        ((Border)hero).MinHeight = 190;
-        ((Border)hero).Margin = new Thickness(0, 0, 0, 26);
+        hero.Margin = new Thickness(0, 0, 0, 26);
         host.Children.Add(hero);
 
         var current = CurrentCleanupLevel();
@@ -185,6 +182,7 @@ public sealed class StyleTab : StackPanel
                 FontFamily = Theme.DisplaySerif,
                 FontSize = 25,
                 Foreground = Theme.TextBrush,
+                TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 0, 0, 8),
             };
             Grid.SetRow(titleBlock, 0);

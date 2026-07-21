@@ -30,13 +30,21 @@ public sealed class SnippetsTab : StackPanel
 
     private UIElement BuildHero()
     {
-        var content = new StackPanel { Margin = new Thickness(40, 28, 40, 28), VerticalAlignment = VerticalAlignment.Center };
+        // Balance the copy and examples into two columns so this banner uses the same
+        // shared height as Dictionary and Style instead of growing uniquely tall.
+        var content = new Grid { Margin = PageChrome.HeroPadding };
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var copy = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         var title = new TextBlock { FontFamily = Theme.DisplaySerif, FontSize = 30, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 12) };
         title.Inlines.Add(new Run("The stuff "));
         title.Inlines.Add(new Run("you") { FontStyle = FontStyles.Italic });
         title.Inlines.Add(new Run(" shouldn’t have to re-type."));
-        content.Children.Add(title);
-        content.Children.Add(new TextBlock
+        title.TextWrapping = TextWrapping.Wrap;
+        copy.Children.Add(title);
+        copy.Children.Add(new TextBlock
         {
             Text = "Save text you type often — an email, intro, or prompt — then say a word to drop it in instantly.",
             FontSize = 14.5,
@@ -46,35 +54,50 @@ public sealed class SnippetsTab : StackPanel
             Margin = new Thickness(0, 0, 0, 20),
         });
 
-        // illustrative example rows (chip -> chip)
-        content.Children.Add(ExampleRow("“my LinkedIn”", "https://www.linkedin.com/in/john-doe/"));
-        content.Children.Add(ExampleRow("“rewrite prompt”", "Rewrite this to be more concise…"));
-        content.Children.Add(ExampleRow("“intro email”", "Hey, would love to find some time to chat later…"));
-
         var add = PageChrome.HeroPill("Add new snippet");
-        add.Margin = new Thickness(0, 14, 0, 0);
         add.MouseLeftButtonUp += (_, _) => AddBlankSnippet();
-        content.Children.Add(add);
+        copy.Children.Add(add);
+        Grid.SetColumn(copy, 0);
+        content.Children.Add(copy);
+
+        var examples = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        examples.Children.Add(ExampleRow("“my LinkedIn”", "https://www.linkedin.com/in/john-doe/"));
+        examples.Children.Add(ExampleRow("“rewrite prompt”", "Rewrite this to be more concise…"));
+        examples.Children.Add(ExampleRow("“intro email”", "Hey, would love to find some time to chat later…"));
+        Grid.SetColumn(examples, 2);
+        content.Children.Add(examples);
 
         var hero = PageChrome.DarkHero(content);
-        ((Border)hero).MinHeight = 190;
-        ((Border)hero).Margin = new Thickness(0, 0, 0, 26);
+        hero.Margin = new Thickness(0, 0, 0, 26);
         return hero;
     }
 
     private static UIElement ExampleRow(string trigger, string text)
     {
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
-        row.Children.Add(PageChrome.HeroChip(trigger, italic: true));
-        row.Children.Add(new TextBlock
+        var row = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var triggerChip = PageChrome.HeroChip(trigger, italic: true);
+        Grid.SetColumn(triggerChip, 0);
+        row.Children.Add(triggerChip);
+
+        var arrow = new TextBlock
         {
             Text = "→",
             Foreground = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)),
             FontSize = 15,
+            HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(10, 0, 10, 0),
-        });
-        row.Children.Add(PageChrome.HeroChip(text));
+        };
+        Grid.SetColumn(arrow, 1);
+        row.Children.Add(arrow);
+
+        var textChip = PageChrome.HeroChip(text);
+        textChip.HorizontalAlignment = HorizontalAlignment.Stretch;
+        Grid.SetColumn(textChip, 2);
+        row.Children.Add(textChip);
         return row;
     }
 

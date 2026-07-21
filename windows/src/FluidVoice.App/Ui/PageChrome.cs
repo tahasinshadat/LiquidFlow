@@ -12,6 +12,13 @@ namespace FluidVoice.Ui;
 /// </summary>
 public static class PageChrome
 {
+    // One set of layout measurements for every hub page. Keeping these here prevents
+    // individual screens from quietly acquiring their own width, padding, or hero size.
+    public const double PageMaxWidth = 1150;
+    public const double HeroMinHeight = 230;
+    public static Thickness PageMargin => new(30, 30, 30, 40);
+    public static Thickness HeroPadding => new(40, 28, 40, 28);
+
     /// <summary>Title (+ optional Beta chip) with an optional black action pill on the right.</summary>
     public static UIElement HeaderRow(string title, string? action, Action? onAction, bool beta = false)
     {
@@ -140,7 +147,7 @@ public static class PageChrome
     }
 
     /// <summary>Near-black rounded hero with soft, blurred warm/cool color fields.</summary>
-    public static UIElement DarkHero(UIElement content, double corner = 16)
+    public static Border DarkHero(UIElement content, double corner = 16)
     {
         var grid = new Grid { ClipToBounds = true };
         grid.Children.Add(new Border
@@ -187,7 +194,12 @@ public static class PageChrome
             Background = new RadialGradientBrush(Color.FromArgb(150, 103, 55, 37), Color.FromArgb(0, 103, 55, 37)),
         });
         grid.Children.Add(content);
-        return new Border { CornerRadius = new CornerRadius(corner), Child = grid };
+        return new Border
+        {
+            CornerRadius = new CornerRadius(corner),
+            MinHeight = HeroMinHeight,
+            Child = grid,
+        };
     }
 
     /// <summary>Translucent chip used inside dark heroes.</summary>

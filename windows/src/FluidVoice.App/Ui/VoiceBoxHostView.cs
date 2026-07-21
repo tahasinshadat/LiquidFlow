@@ -129,6 +129,16 @@ public sealed class VoiceBoxHostView : Grid
             // before VoiceBox starts so the profiles are there on its very first paint.
             await VoiceBoxManager.SeedPresetVoicesAsync();
 
+            // Boot the AI backend FIRST (headless). The VoiceBox shell reuses a running
+            // server on its port, so this turns the slow cold boot into a quick attach.
+            // Normally the LiquidFlow-startup pre-warm has already done this and the wait is ~0.
+            if (!VoiceBoxManager.IsServerUp() && VoiceBoxManager.PrewarmServer(force: true))
+            {
+                SetStatus("Warming up VoiceBox's AI engine… (one-time per session; opens instantly while warm)", -1);
+                for (int i = 0; i < 360 && !VoiceBoxManager.IsServerUp(); i++)
+                    await Task.Delay(500, _cts.Token);
+            }
+
             SetStatus("Starting VoiceBox…", -1);
             var hwnd = await LaunchAndFindWindowAsync(exe, _cts.Token);
             if (hwnd == IntPtr.Zero)
@@ -199,12 +209,12 @@ public sealed class VoiceBoxHostView : Grid
         {
             Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true });
         }
-        for (int i = 0; i < 60; i++) // up to ~30s: Tauri + Python backend take a moment on first run
+        for (int i = 0; i < 240; i++) // up to ~60s; with a warm backend the window shows in seconds
         {
             ct.ThrowIfCancellationRequested();
             var proc = Process.GetProcessesByName(processName).FirstOrDefault(p => p.MainWindowHandle != IntPtr.Zero);
             if (proc is not null) return proc.MainWindowHandle;
-            await Task.Delay(500, ct);
+            await Task.Delay(250, ct);
         }
         return IntPtr.Zero;
     }

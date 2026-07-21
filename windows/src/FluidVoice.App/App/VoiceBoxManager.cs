@@ -24,6 +24,65 @@ public static class VoiceBoxManager
 
     public static string? FindExecutable() => VoiceBoxLocator.FindExecutable();
 
+    // ── Backend pre-warm ───────────────────────────────────────────────────
+    // The slow part of "opening VoiceBox" is voicebox-server.exe (its Python AI backend,
+    // x64 under emulation here). VoiceBox's desktop shell REUSES any voicebox-server
+    // already listening on its fixed port, so booting the server headless ahead of time
+    // makes the tab open in seconds.
+
+    /// <summary>VoiceBox's fixed backend port (SERVER_PORT in its Tauri shell).</summary>
+    public const int ServerPort = 17493;
+
+    /// <summary>Quick TCP probe: is a VoiceBox backend already listening?</summary>
+    public static bool IsServerUp()
+    {
+        try
+        {
+            using var c = new System.Net.Sockets.TcpClient();
+            return c.ConnectAsync("127.0.0.1", ServerPort).Wait(300) && c.Connected;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Start voicebox-server.exe headless (no window) with the exact arguments the
+    /// VoiceBox shell would use. Returns true if the server is up or was just spawned.
+    /// `--parent-pid` ties its lifetime to LiquidFlow, so nothing is left orphaned.</summary>
+    public static bool PrewarmServer(bool force = false)
+    {
+        try
+        {
+            if (!force && !Settings.Current.VoiceBoxPrewarmEnabled) return false;
+            if (IsServerUp()) return true;
+            var exe = FindExecutable();
+            if (exe is null) return false;
+            var server = Path.Combine(Path.GetDirectoryName(exe)!, "voicebox-server.exe");
+            if (!File.Exists(server)) return false;
+            var dataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "sh.voicebox.app");
+            Directory.CreateDirectory(dataDir);
+            var psi = new ProcessStartInfo(server)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WorkingDirectory = Path.GetDirectoryName(server)!,
+            };
+            psi.ArgumentList.Add("--data-dir");
+            psi.ArgumentList.Add(dataDir);
+            psi.ArgumentList.Add("--port");
+            psi.ArgumentList.Add(ServerPort.ToString());
+            psi.ArgumentList.Add("--parent-pid");
+            psi.ArgumentList.Add(Environment.ProcessId.ToString());
+            Process.Start(psi);
+            Log.Info("voicebox", "Pre-warming VoiceBox's AI backend (headless) so the tab opens fast");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("voicebox", $"VoiceBox pre-warm failed: {ex.Message}");
+            return false;
+        }
+    }
+
     /// <summary>
     /// Ensure VoiceBox is installed: find it, or download the latest Windows setup and run it
     /// silently. Reports (phase, fraction 0..1 or -1 for indeterminate).

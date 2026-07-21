@@ -31,7 +31,7 @@ public sealed class DictionaryTab : StackPanel
     private UIElement BuildBanner()
     {
         // Warm, blurred-photo-inspired banner matching the rest of the hub.
-        var grid = new Grid { MinHeight = 190, ClipToBounds = true };
+        var grid = new Grid { MinHeight = PageChrome.HeroMinHeight, ClipToBounds = true };
         grid.Children.Add(new Border
         {
             CornerRadius = new CornerRadius(18),
@@ -59,7 +59,7 @@ public sealed class DictionaryTab : StackPanel
             },
         });
 
-        var content = new StackPanel { Margin = new Thickness(40, 28, 40, 28), VerticalAlignment = VerticalAlignment.Center };
+        var content = new StackPanel { Margin = PageChrome.HeroPadding, VerticalAlignment = VerticalAlignment.Center };
         var title = new TextBlock { FontFamily = Theme.DisplaySerif, FontSize = 28, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 12) };
         title.Inlines.Add(new Run("LiquidFlow spells the way "));
         title.Inlines.Add(new Run("you") { FontStyle = FontStyles.Italic });

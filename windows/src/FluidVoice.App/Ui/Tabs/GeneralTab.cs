@@ -103,6 +103,18 @@ public sealed class GeneralTab : StackPanel
         ov.Children.Add(Theme.Toggle("Show live transcription preview", s.EnableStreamingPreview, v => { s.EnableStreamingPreview = v; s.Save("overlay"); }));
         Children.Add(Theme.Card2(ov));
 
+        // --- VoiceBox ---
+        var vbx = new StackPanel();
+        vbx.Children.Add(Theme.Heading("VoiceBox"));
+        vbx.Children.Add(Theme.Toggle("Keep VoiceBox's AI engine warm in the background", s.VoiceBoxPrewarmEnabled, v =>
+        {
+            s.VoiceBoxPrewarmEnabled = v;
+            s.Save("voicebox");
+            if (v) App.VoiceBoxManager.PrewarmServer();
+        }));
+        vbx.Children.Add(Theme.Caption("Starts VoiceBox's engine quietly when LiquidFlow launches, so the VoiceBox tab opens in seconds instead of a cold boot. Costs some idle memory — turn off to free it."));
+        Children.Add(Theme.Card2(vbx));
+
         // --- Appearance ---
         var ap = new StackPanel();
         ap.Children.Add(Theme.Heading("Appearance"));

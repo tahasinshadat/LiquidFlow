@@ -187,6 +187,14 @@ public static class Program
             t.Start();
         }
 
+        // Pre-warm VoiceBox's AI backend (headless) shortly after startup so the VoiceBox
+        // tab opens in seconds. Delayed so it never competes with LiquidFlow's own boot.
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(20));
+            App.VoiceBoxManager.PrewarmServer();
+        });
+
         Log.Info("app", $"FluidVoice started (hotkey: {Settings.Current.PrimaryDictationShortcuts.FirstOrDefault()?.DisplayString})");
         app.Run();
         return 0;

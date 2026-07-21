@@ -27,6 +27,7 @@ public sealed class MainWindow : Window
     {
         VerticalScrollBarVisibility = ScrollBarVisibility.Visible,
         HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+        HorizontalContentAlignment = HorizontalAlignment.Stretch,
     };
     private readonly Dictionary<string, Border> _navItems = new();
     private readonly List<TextBlock> _navLabels = new();
@@ -490,17 +491,21 @@ public sealed class MainWindow : Window
         }
         _content.VerticalScrollBarVisibility = ScrollBarVisibility.Visible; // reserved lane on normal pages
 
+        // A centered StackPanel with only MaxWidth is shrink-wrapped by WPF to its
+        // current child's desired width. That made pages—and even Style sub-tabs—jump.
         var page = new StackPanel
         {
-            Margin = new Thickness(30, 30, 30, 40),
-            MaxWidth = 1150, // identical on every page so switching tabs never shifts content
-            HorizontalAlignment = HorizontalAlignment.Center, // content stays centered in the sheet
-            LayoutTransform = Theme.PageScale(),              // user text-size setting
+            Margin = PageChrome.PageMargin,
+            MaxWidth = PageChrome.PageMaxWidth,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            LayoutTransform = Theme.PageScale(),
         };
         if (entry.Title is not ("Dictation" or "Snippets" or "Scratchpad" or "Dictionary" or "Meetings" or "Transforms" or "VoiceBox"))
             page.Children.Add(PageHeader(entry.Title));
         page.Children.Add(entry.Page());
-        _content.Content = page;
+        var pageHost = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch };
+        pageHost.Children.Add(page);
+        _content.Content = pageHost;
         _content.ScrollToTop();
     }
 

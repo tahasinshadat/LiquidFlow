@@ -169,8 +169,7 @@ public sealed class TransformsTab : StackPanel
         dock.Children.Add(content);
 
         var hero = PageChrome.DarkHero(dock);
-        ((Border)hero).MinHeight = 190;
-        ((Border)hero).Margin = new Thickness(0, 0, 0, 26);
+        hero.Margin = new Thickness(0, 0, 0, 26);
         return hero;
     }
 

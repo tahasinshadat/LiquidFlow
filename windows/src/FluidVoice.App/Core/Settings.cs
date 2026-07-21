@@ -139,6 +139,9 @@ public sealed class Settings
     /// <summary>"Light + formatting" cleanup: collapse repeated words and turn spoken
     /// enumerations ("first… then… finally…") into bullet lists. Local, no AI.</summary>
     public bool AutoFormatStructureEnabled { get; set; }
+    /// <summary>Boot VoiceBox's AI backend quietly at LiquidFlow startup so the VoiceBox
+    /// tab opens in seconds instead of a cold multi-minute boot (uses idle RAM).</summary>
+    public bool VoiceBoxPrewarmEnabled { get; set; } = true;
     public List<CustomDictionaryEntry> CustomDictionaryEntries { get; set; } = new();
     public bool GaavRemoveTrailingPeriodEnabled { get; set; }
     public bool GaavLowercaseFirstLetterEnabled { get; set; }
