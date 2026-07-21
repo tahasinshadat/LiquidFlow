@@ -24,6 +24,17 @@ public sealed class CustomDictionaryEntry
     public bool Delete { get; set; }
 }
 
+/// <summary>A saved post-dictation transform: a named rewrite prompt on a Win+Alt+N hotkey.</summary>
+public sealed class TransformDef
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Name { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string Prompt { get; set; } = "";
+    /// <summary>1-9 → global hotkey Win+Alt+&lt;Slot&gt;.</summary>
+    public int Slot { get; set; } = 1;
+}
+
 /// <summary>A voice snippet: say the trigger word/phrase and the full text is inserted instead.</summary>
 public sealed class Snippet
 {
@@ -180,6 +191,11 @@ public sealed class Settings
     public float TranscriptionSoundVolume { get; set; } = 1.0f;
     public bool PauseMediaDuringTranscription { get; set; }
 
+    // ----- Transforms (post-dictation rewrites on Win+Alt+N) -----
+    public bool TransformsEnabled { get; set; } = true;
+    public List<TransformDef> Transforms { get; set; } = new();
+    public bool TransformsSeeded { get; set; }
+
     // ----- Snippets (say a word, insert saved text) -----
     public List<Snippet> Snippets { get; set; } = new();
 
@@ -268,6 +284,7 @@ public sealed class Settings
                         Current.SettingsRevision = 1;
                         Current.Save("migration");
                     }
+                    SeedDefaultTransforms();
                     // rev 2: the bar now sits a touch lower by default. The offset had no UI before,
                     // so anyone still on the old 50px default gets nudged down once (customizers keep theirs).
                     if (Current.SettingsRevision < 2)
@@ -294,6 +311,27 @@ public sealed class Settings
             Log.Error("settings", "Failed to load settings; using defaults", ex);
         }
         Current = new Settings();
+    }
+
+    /// <summary>Seed the two reference transforms once (also used by "Reset to defaults").</summary>
+    public static void SeedDefaultTransforms()
+    {
+        if (Current.TransformsSeeded || Current.Transforms.Count > 0) return;
+        Current.Transforms.Add(new TransformDef
+        {
+            Name = "Polish",
+            Description = "Improve clarity and conciseness",
+            Prompt = "Polish this text: improve clarity and conciseness while keeping the meaning, tone, and level of formality. Do not add new content.",
+            Slot = 1,
+        });
+        Current.Transforms.Add(new TransformDef
+        {
+            Name = "Prompt Engineer",
+            Description = "Constructs optimal prompts",
+            Prompt = "Rewrite this into a well-structured prompt for an AI model: a clear objective, the key context, explicit constraints, and the desired output format.",
+            Slot = 2,
+        });
+        Current.TransformsSeeded = true;
     }
 
     public void Save(string changedHint = "")

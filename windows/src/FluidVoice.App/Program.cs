@@ -98,6 +98,16 @@ public static class Program
                 await rewriteService.ApplyInstructionAsync(text, CancellationToken.None);
             }).Task.Unwrap();
 
+        // Transforms: Win+Alt+N applies the saved rewrite prompt to the current selection.
+        hotkeys.TransformRequested += id => app.Dispatcher.BeginInvoke(async () =>
+        {
+            var def = Settings.Current.Transforms.FirstOrDefault(t => t.Id == id);
+            if (def is null) return;
+            rewriteService.BeginSession(FocusTracker.Capture());
+            rewriteWindow.OpenForSession();
+            await rewriteService.ApplyInstructionAsync(def.Prompt, CancellationToken.None);
+        });
+
         overlay.CancelRequested += () => coordinator.RequestCancel();
         Notifications.ShowHandler = (title, body) => tray.ShowBalloon(title, body);
         coordinator.RecordingStateChanged += recording =>

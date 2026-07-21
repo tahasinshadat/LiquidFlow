@@ -474,7 +474,7 @@ public sealed class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Center, // content stays centered in the sheet
             LayoutTransform = Theme.PageScale(),              // user text-size setting
         };
-        if (entry.Title is not ("Dictation" or "Snippets" or "Scratchpad" or "Dictionary" or "Meetings"))
+        if (entry.Title is not ("Dictation" or "Snippets" or "Scratchpad" or "Dictionary" or "Meetings" or "Transforms"))
             page.Children.Add(PageHeader(entry.Title));
         page.Children.Add(entry.Page());
         _content.Content = page;

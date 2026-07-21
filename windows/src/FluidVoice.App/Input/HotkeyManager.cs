@@ -70,6 +70,9 @@ public sealed class HotkeyManager : IDisposable
     public volatile bool CaptureMode;
     /// <summary>Raised (hook thread) with the raw shortcut when CaptureMode is on and a key/mouse is pressed.</summary>
     public event Action<HotkeyShortcut>? ShortcutCaptured;
+    /// <summary>A transform hotkey (Win+Alt+N) fired; arg = TransformDef.Id.</summary>
+    public event Action<string>? TransformRequested;
+    private List<(HotkeyShortcut Shortcut, string TransformId)> _transformShortcuts = new();
 
     public HotkeyManager(KeyboardHook hook, IDictationControl control)
     {
@@ -96,6 +99,11 @@ public sealed class HotkeyManager : IDisposable
         _recordingBindings = list;
         _cancelShortcut = s.CancelRecordingShortcut;
         _pasteLastShortcut = s.PasteLastTranscriptionShortcutEnabled ? s.PasteLastTranscriptionShortcut : null;
+        _transformShortcuts = s.TransformsEnabled
+            ? s.Transforms.Where(t => t.Slot is >= 1 and <= 9)
+                .Select(t => (new HotkeyShortcut { VirtualKey = 0x30 + t.Slot, Modifiers = ModMask.Win | ModMask.Alt }, t.Id))
+                .ToList()
+            : new();
         _activation = s.HotkeyMode;
     }
 
@@ -192,6 +200,16 @@ public sealed class HotkeyManager : IDisposable
             _control.RequestPasteLast();
             _swallowedDownVks.Add(vk);
             return true;
+        }
+
+        foreach (var (sc, transformId) in _transformShortcuts)
+        {
+            if (Matches(sc, vk, mods))
+            {
+                TransformRequested?.Invoke(transformId);
+                _swallowedDownVks.Add(vk);
+                return true;
+            }
         }
 
         var rec = FindRegularBinding(vk, mods);

@@ -118,16 +118,146 @@ public sealed class StyleTab : StackPanel
         return hero;
     }
 
-    private static UIElement BuildAutoCleanup()
+    private UIElement BuildAutoCleanup()
+    {
+        var host = new StackPanel();
+
+        var copy = new StackPanel { Margin = new Thickness(40, 28, 40, 28), VerticalAlignment = VerticalAlignment.Center };
+        copy.Children.Add(new TextBlock
+        {
+            Text = "Auto Cleanup applies to all your dictations",
+            FontFamily = Theme.DisplaySerif,
+            FontSize = 27,
+            Foreground = Brushes.White,
+            Margin = new Thickness(0, 0, 0, 10),
+        });
+        copy.Children.Add(new TextBlock
+        {
+            Text = "Choose the level of cleanup that's automatically applied every time, across all apps.",
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromArgb(232, 255, 255, 255)),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 8),
+        });
+        copy.Children.Add(new TextBlock
+        {
+            Text = "Your original dictation is never lost — open any entry on the Dictation tab to edit or restore it.",
+            FontSize = 13.5,
+            Foreground = new SolidColorBrush(Color.FromArgb(205, 255, 255, 255)),
+            TextWrapping = TextWrapping.Wrap,
+        });
+        var hero = PageChrome.DarkHero(copy);
+        ((Border)hero).MinHeight = 170;
+        ((Border)hero).Margin = new Thickness(0, 0, 0, 26);
+        host.Children.Add(hero);
+
+        var grid = new Grid();
+        for (int i = 0; i < 3; i++)
+        {
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            if (i < 2) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
+        }
+        var current = CurrentCleanupLevel();
+        var levels = new (string Key, string Title, string Desc, string Sample)[]
+        {
+            ("none", "None", "Transcribes exactly what you said, including mistakes",
+                "hey joey, we still on for coffee or? I think we maybe should leave earlier to make it there in time there might um be traffic. What are you thinking?"),
+            ("light", "Light", "Cleans up filler words and grammar",
+                "Hey Joey, are we still on for coffee? I think we should leave earlier to make it there in time. There might be traffic. What are you thinking?"),
+            ("medium", "Medium", "Edits for clarity and conciseness (uses your AI provider)",
+                "Hey Joey, are we still on for coffee? We should leave earlier; there might be traffic. What do you think?"),
+        };
+        for (int i = 0; i < levels.Length; i++)
+        {
+            var (key, title, desc, sample) = levels[i];
+            var panel = new StackPanel();
+            panel.Children.Add(new TextBlock
+            {
+                Text = title,
+                FontFamily = Theme.DisplaySerif,
+                FontSize = 25,
+                Foreground = Theme.TextBrush,
+                Margin = new Thickness(0, 0, 0, 8),
+            });
+            panel.Children.Add(new TextBlock
+            {
+                Text = desc,
+                FontSize = 13.5,
+                Foreground = Theme.SubtleBrush,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 60),
+            });
+            panel.Children.Add(new Border
+            {
+                Background = Theme.GreenSoftBrush,
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(12),
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Child = new TextBlock
+                {
+                    Text = sample,
+                    FontSize = 12.5,
+                    FontStyle = FontStyles.Italic,
+                    Foreground = Theme.TextBrush,
+                    TextWrapping = TextWrapping.Wrap,
+                },
+            });
+
+            bool selected = key == current;
+            var card = new Border
+            {
+                Background = new SolidColorBrush(Theme.CardInner),
+                BorderBrush = selected ? Theme.AccentBrush : Theme.HairlineBrush,
+                BorderThickness = new Thickness(selected ? 2 : 1),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(20, 18, 20, 20),
+                MinHeight = 330,
+                Cursor = Cursors.Hand,
+                Child = panel,
+            };
+            var k = key;
+            card.MouseLeftButtonUp += (_, _) => { ApplyCleanupLevel(k); Build(); };
+            Grid.SetColumn(card, i * 2);
+            grid.Children.Add(card);
+        }
+        host.Children.Add(grid);
+
+        if (CurrentCleanupLevel() == "medium" && !Ai.ProviderCatalog.IsConfigured(Settings.Current.SelectedProviderID))
+            host.Children.Add(Theme.Caption("Medium uses your AI provider — configure one under Settings → AI Enhancement."));
+        return host;
+    }
+
+    private static string CurrentCleanupLevel()
     {
         var s = Settings.Current;
-        var panel = new StackPanel();
-        panel.Children.Add(Theme.Heading("Auto cleanup"));
-        panel.Children.Add(Theme.Caption("Applied to every dictation before styling — all on-device."));
-        panel.Children.Add(Theme.Toggle("Remove filler words (um, uh…)", s.RemoveFillerWordsEnabled, v => { s.RemoveFillerWordsEnabled = v; s.Save("fmt"); }));
-        panel.Children.Add(Theme.Toggle("Convert spoken punctuation (\"comma\", \"new line\")", s.AutoConvertPunctuationEnabled, v => { s.AutoConvertPunctuationEnabled = v; s.Save("fmt"); }));
-        panel.Children.Add(Theme.Toggle("Learn recurring corrections into the dictionary", s.AutoLearnCorrections, v => { s.AutoLearnCorrections = v; s.Save("fmt"); }));
-        return Theme.Card2(panel);
+        if (!s.DictationPromptOff && !string.IsNullOrEmpty(s.SelectedProviderID)) return "medium";
+        if (s.RemoveFillerWordsEnabled || s.AutoConvertPunctuationEnabled) return "light";
+        return "none";
+    }
+
+    private static void ApplyCleanupLevel(string level)
+    {
+        var s = Settings.Current;
+        switch (level)
+        {
+            case "none":
+                s.RemoveFillerWordsEnabled = false;
+                s.AutoConvertPunctuationEnabled = false;
+                s.DictationPromptOff = true;
+                break;
+            case "light":
+                s.RemoveFillerWordsEnabled = true;
+                s.AutoConvertPunctuationEnabled = true;
+                s.DictationPromptOff = true;
+                break;
+            default: // medium
+                s.RemoveFillerWordsEnabled = true;
+                s.AutoConvertPunctuationEnabled = true;
+                s.DictationPromptOff = false;
+                break;
+        }
+        s.Save("cleanup");
     }
 }
 
