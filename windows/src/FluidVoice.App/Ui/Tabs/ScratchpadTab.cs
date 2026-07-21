@@ -9,11 +9,12 @@ namespace FluidVoice.Ui;
 
 /// <summary>
 /// Scratchpad: quick notes you want to come back to. Hero + "Start new note" + a Recents
-/// grid of note cards; notes open in the floating NoteWindow (dictate straight into it).
+/// history; notes open in the detached notes workspace (dictate straight into it).
 /// </summary>
 public sealed class ScratchpadTab : StackPanel
 {
-    private readonly WrapPanel _recents = new();
+    private readonly StackPanel _recents = new();
+    private string _search = "";
 
     public ScratchpadTab()
     {
@@ -143,13 +144,56 @@ public sealed class ScratchpadTab : StackPanel
 
     private UIElement BuildRecentsHeader()
     {
-        var dock = new DockPanel { Margin = new Thickness(2, 0, 2, 14) };
-        var icons = new StackPanel { Orientation = Orientation.Horizontal };
-        icons.Children.Add(PageChrome.IconButton("", "Search notes", null));
-        icons.Children.Add(PageChrome.IconButton("", "New note", () => NoteWindow.OpenNote(null)));
-        icons.Children.Add(PageChrome.IconButton("", "Notes are stored locally", null));
-        DockPanel.SetDock(icons, Dock.Right);
-        dock.Children.Add(icons);
+        var dock = new DockPanel { Margin = new Thickness(2, 0, 2, 14), MinHeight = 38 };
+        var tools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var searchHost = new Border
+        {
+            Background = Brushes.Transparent,
+            CornerRadius = new CornerRadius(9),
+            Padding = new Thickness(8, 0, 8, 0),
+            Width = 250,
+            Height = 36,
+            Margin = new Thickness(0, 0, 8, 0),
+        };
+        var searchGrid = new Grid();
+        searchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
+        searchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var searchIcon = Theme.Glyph("\uE721", 15, Theme.SubtleBrush);
+        Grid.SetColumn(searchIcon, 0);
+        searchGrid.Children.Add(searchIcon);
+        var search = new TextBox
+        {
+            BorderThickness = new Thickness(0),
+            Background = Brushes.Transparent,
+            FontSize = 13.5,
+            Padding = new Thickness(0),
+            VerticalContentAlignment = VerticalAlignment.Center,
+            ToolTip = "Search your notes",
+        };
+        var placeholder = new TextBlock
+        {
+            Text = "Search your notes",
+            FontSize = 13.5,
+            Foreground = Theme.SubtleBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+            IsHitTestVisible = false,
+        };
+        search.TextChanged += (_, _) =>
+        {
+            _search = search.Text;
+            placeholder.Visibility = search.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+            RebuildRecents();
+        };
+        Grid.SetColumn(search, 1);
+        Grid.SetColumn(placeholder, 1);
+        searchGrid.Children.Add(search);
+        searchGrid.Children.Add(placeholder);
+        searchHost.Child = searchGrid;
+        tools.Children.Add(searchHost);
+        tools.Children.Add(PageChrome.IconButton("\uE710", "New note", () => NoteWindow.OpenNote(null)));
+        tools.Children.Add(PageChrome.IconButton("\uE753", "Notes are stored locally", null));
+        DockPanel.SetDock(tools, Dock.Right);
+        dock.Children.Add(tools);
         dock.Children.Add(new TextBlock
         {
             Text = "Recents",
@@ -167,28 +211,47 @@ public sealed class ScratchpadTab : StackPanel
     private void RebuildRecents()
     {
         _recents.Children.Clear();
-        var notes = NotesStore.All;
+        var notes = NotesStore.All
+            .Where(note => _search.Trim().Length == 0 ||
+                           note.Title.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                           note.Body.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase))
+            .ToList();
         if (notes.Count == 0)
         {
             _recents.Children.Add(new TextBlock
             {
-                Text = "No notes found",
+                Text = _search.Length > 0 ? "No matching notes" : "No notes found",
                 FontSize = 15,
                 Foreground = Theme.SubtleBrush,
                 Margin = new Thickness(4, 30, 0, 30),
             });
             return;
         }
-        foreach (var n in notes.Take(12))
+        foreach (var n in notes.Take(20))
             _recents.Children.Add(NoteCard(n));
     }
 
     private UIElement NoteCard(Note note)
     {
-        var panel = new StackPanel();
         var lines = note.Body.Split('\n');
         var title = string.IsNullOrWhiteSpace(note.Title) ? (lines.FirstOrDefault(l => l.Trim().Length > 0) ?? "Untitled") : note.Title;
-        panel.Children.Add(new TextBlock
+        var panel = new Grid();
+        panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        panel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        var header = new DockPanel();
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        actions.Children.Add(PageChrome.IconButton("\uE70F", "Edit note", () => NoteWindow.OpenNote(note)));
+        actions.Children.Add(PageChrome.IconButton("\uE718", note.IsPinned ? "Unpin note" : "Pin note", () =>
+        {
+            note.IsPinned = !note.IsPinned;
+            NotesStore.Save(note);
+        }));
+        actions.Children.Add(PageChrome.IconButton("\uE74D", "Delete note", () => NotesStore.Delete(note.Id)));
+        DockPanel.SetDock(actions, Dock.Right);
+        header.Children.Add(actions);
+        header.Children.Add(new TextBlock
         {
             Text = title.Trim(),
             FontSize = 14.5,
@@ -197,34 +260,56 @@ public sealed class ScratchpadTab : StackPanel
             TextTrimming = TextTrimming.CharacterEllipsis,
             Margin = new Thickness(0, 0, 0, 8),
         });
-        var preview = string.Join("\n", lines.SkipWhile(l => l.Trim().Length == 0).Skip(1).Take(4));
-        panel.Children.Add(new TextBlock
+        Grid.SetRow(header, 0);
+        panel.Children.Add(header);
+
+        var contentLines = lines.SkipWhile(line => line.Trim().Length == 0);
+        if (!note.CustomTitle && contentLines.FirstOrDefault()?.Trim() == title.Trim())
+            contentLines = contentLines.Skip(1);
+        var preview = string.Join("\n", contentLines.Take(5));
+        var previewBlock = new TextBlock
         {
             Text = preview,
-            FontSize = 12.5,
-            Foreground = Theme.SubtleBrush,
+            FontSize = 13,
+            Foreground = Theme.TextBrush,
             TextWrapping = TextWrapping.Wrap,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxHeight = 72,
-            Margin = new Thickness(0, 0, 0, 12),
-        });
-        panel.Children.Add(new TextBlock
+            MaxHeight = 88,
+            Margin = new Thickness(0, 4, 0, 16),
+        };
+        Grid.SetRow(previewBlock, 1);
+        panel.Children.Add(previewBlock);
+
+        var footer = new Grid();
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        footer.Children.Add(new TextBlock
         {
             Text = note.UpdatedAt.ToString("MMM d"),
             FontSize = 11.5,
             Foreground = Theme.SubtleBrush,
         });
+        var time = new TextBlock
+        {
+            Text = note.UpdatedAt.ToString("h:mm tt"),
+            FontSize = 11.5,
+            Foreground = Theme.SubtleBrush,
+        };
+        Grid.SetColumn(time, 1);
+        footer.Children.Add(time);
+        Grid.SetRow(footer, 2);
+        panel.Children.Add(footer);
 
         var card = new Border
         {
-            Width = 320,
-            MinHeight = 168,
+            MinHeight = 150,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
             Background = new SolidColorBrush(Theme.CardInner),
             BorderBrush = Theme.HairlineBrush,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(18, 16, 18, 14),
-            Margin = new Thickness(0, 0, 16, 16),
+            Padding = new Thickness(20, 12, 14, 15),
+            Margin = new Thickness(0, 0, 0, 14),
             Cursor = Cursors.Hand,
             Child = panel,
         };

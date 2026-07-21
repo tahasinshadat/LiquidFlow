@@ -112,11 +112,25 @@ public static class UiCapture
                 {
                     contentNote.UpdateLayout();
                     Snap(contentNote, Path.Combine(outDir, "scratchpad-note-content.png"));
+                    contentNote.SetSidebarCollapsedForCapture(true);
+                    contentNote.UpdateLayout();
+                    Snap(contentNote, Path.Combine(outDir, "scratchpad-note-collapsed.png"));
+                    contentNote.SetSidebarCollapsedForCapture(false);
+                    contentNote.SetToolForCapture("formatting");
+                    contentNote.UpdateLayout();
+                    Snap(contentNote, Path.Combine(outDir, "scratchpad-note-formatting.png"));
+                    contentNote.SetToolForCapture("transforms");
+                    contentNote.UpdateLayout();
+                    Snap(contentNote, Path.Combine(outDir, "scratchpad-note-transforms.png"));
                     contentNote.Close();
                 }
+                win.CaptureNavigate("Scratchpad");
+                await Task.Delay(250);
+                win.UpdateLayout();
+                Snap(win, Path.Combine(outDir, "scratchpad-content.png"));
                 NotesStore.Delete(captureNote.Id);
 
-                Console.WriteLine($"captured {pages.Length + 8} screens -> {outDir}");
+                Console.WriteLine($"captured {pages.Length + 12} screens -> {outDir}");
             }
             catch (Exception ex)
             {

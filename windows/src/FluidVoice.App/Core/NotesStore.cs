@@ -10,6 +10,9 @@ public sealed class Note
     public string Title { get; set; } = "";
     public bool CustomTitle { get; set; }
     public string Body { get; set; } = "";
+    /// <summary>FlowDocument XAML for rich formatting; Body remains the searchable/plain-text copy.</summary>
+    public string RichTextXaml { get; set; } = "";
+    public bool IsPinned { get; set; }
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 }
 
@@ -50,7 +53,10 @@ public static class NotesStore
         get
         {
             EnsureLoaded();
-            lock (Sync) return _notes.OrderByDescending(n => n.UpdatedAt).ToList();
+            lock (Sync) return _notes
+                .OrderByDescending(n => n.IsPinned)
+                .ThenByDescending(n => n.UpdatedAt)
+                .ToList();
         }
     }
 
