@@ -211,12 +211,19 @@ public sealed class VoiceBoxHostView : Grid
             await VoiceBoxNative.InstallAsync(progress, _cts!.Token);
         }
 
-        VoiceBoxNative.StartServer();
         SetStatus("Starting VoiceBox (native)…", 0.02);
+        var started = await Task.Run(VoiceBoxNative.StartServer);
+        if (!started)
+        {
+            SetStatus("Couldn't start the native VoiceBox server (the port may be blocked). Try again — details in VoiceBoxNative\\server.log.", -1);
+            ShowRetry();
+            return;
+        }
         var boot = new Progress<double>(p => SetStatus("Starting VoiceBox (native)…", p));
         if (!await VoiceBoxNative.WaitForServerAsync(TimeSpan.FromSeconds(90), _cts!.Token, boot))
         {
-            SetStatus("The native VoiceBox server didn't come up. Try again, or enable the emulated app under Settings → General → VoiceBox.", -1);
+            SetStatus("The native VoiceBox server didn't come up — details in VoiceBoxNative\\server.log. Try again, or enable the emulated app under Settings → General → VoiceBox.", -1);
+            ShowRetry();
             return;
         }
 

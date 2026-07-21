@@ -137,21 +137,38 @@ public static class VoiceBoxNative
 
     // ── server lifecycle ───────────────────────────────────────────────────
 
-    /// <summary>Start the native server headless if not already listening. Returns fast.</summary>
+    /// <summary>Start the native server headless if not already listening. If a FOREIGN
+    /// VoiceBox server holds the fixed port (e.g. a stale x64 one from an old prewarm),
+    /// evict it — otherwise the tab attaches to a server that serves no UI and wedges.</summary>
     public static bool StartServer()
     {
         try
         {
             if (!IsInstalled) return false;
-            if (VoiceBoxManager.IsServerUp()) return true;
+            if (VoiceBoxManager.IsServerUp())
+            {
+                if (ServesOurUi()) return true;
+                Log.Warn("voicebox", "Port is held by a foreign VoiceBox server — evicting it");
+                KillForeignServers();
+                for (int i = 0; i < 10 && VoiceBoxManager.IsServerUp(); i++) Thread.Sleep(300);
+                if (VoiceBoxManager.IsServerUp())
+                {
+                    Log.Warn("voicebox", "Could not free the VoiceBox port");
+                    return false;
+                }
+            }
             Directory.CreateDirectory(DataDir);
             var psi = new ProcessStartInfo(PythonExe)
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
                 // server.py imports itself as the package `backend` — cwd must be its parent
                 WorkingDirectory = RootDir,
             };
+            // no console handles otherwise — force sane text IO and capture logs
+            psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
             psi.ArgumentList.Add(ServerPy);
             psi.ArgumentList.Add("--data-dir");
             psi.ArgumentList.Add(DataDir);
@@ -159,8 +176,12 @@ public static class VoiceBoxNative
             psi.ArgumentList.Add(Port.ToString());
             psi.ArgumentList.Add("--parent-pid");
             psi.ArgumentList.Add(Environment.ProcessId.ToString());
-            _server = Process.Start(psi);
-            Log.Info("voicebox", "Native ARM64 VoiceBox server starting");
+            _server = Process.Start(psi)!;
+            var logPath = Path.Combine(RootDir, "server.log");
+            try { File.WriteAllText(logPath, ""); } catch { }
+            _ = PumpToLogAsync(_server.StandardOutput, logPath);
+            _ = PumpToLogAsync(_server.StandardError, logPath);
+            Log.Info("voicebox", "Native ARM64 VoiceBox server starting (log: server.log)");
             return true;
         }
         catch (Exception ex)
@@ -168,6 +189,56 @@ public static class VoiceBoxNative
             Log.Warn("voicebox", $"Native server start failed: {ex.Message}");
             return false;
         }
+    }
+
+    /// <summary>Whether whatever answers on the port serves OUR web UI (the native server
+    /// mounts the SPA at /; the x64 desktop server returns a JSON 404 there).</summary>
+    private static bool ServesOurUi()
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+            var body = http.GetStringAsync($"http://127.0.0.1:{Port}/").GetAwaiter().GetResult();
+            return body.Contains("<div id=\"root\"", StringComparison.OrdinalIgnoreCase)
+                || body.Contains("<!doctype html", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Kill voicebox-server processes that are NOT our native runtime's python.</summary>
+    private static void KillForeignServers()
+    {
+        foreach (var p in Process.GetProcessesByName("voicebox-server"))
+        {
+            try
+            {
+                Log.Info("voicebox", $"Killing stale voicebox-server pid {p.Id}");
+                p.Kill(entireProcessTree: true);
+            }
+            catch (Exception ex) { Log.Warn("voicebox", $"Couldn't kill pid {p.Id}: {ex.Message}"); }
+        }
+    }
+
+    private static async Task PumpToLogAsync(StreamReader reader, string logPath)
+    {
+        try
+        {
+            string? line;
+            while ((line = await reader.ReadLineAsync()) is not null)
+            {
+                try
+                {
+                    using var fs = new FileStream(logPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                    using var w = new StreamWriter(fs);
+                    await w.WriteLineAsync(line);
+                }
+                catch { /* logging must never hurt the server */ }
+            }
+        }
+        catch { }
     }
 
     /// <summary>Wait until /health answers (the native server boots in seconds). Reports
