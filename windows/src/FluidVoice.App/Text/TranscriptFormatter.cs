@@ -25,8 +25,31 @@ public static class TranscriptFormatter
         if (text.Length == 0) return text;
         text = RemoveFillerWords(text);
         text = ApplyCustomDictionary(text);
+        text = ApplySnippets(text);
         if (Settings.Current.AutoConvertPunctuationEnabled)
             text = SpokenPunctuation.Apply(text, appName, windowTitle);
+        return text;
+    }
+
+    /// <summary>Voice snippets: a spoken trigger word/phrase expands to its saved text.</summary>
+    public static string ApplySnippets(string text)
+    {
+        var snippets = Settings.Current.Snippets;
+        if (snippets.Count == 0) return text;
+        foreach (var s in snippets)
+        {
+            var trigger = s.Trigger.Trim();
+            if (trigger.Length == 0 || string.IsNullOrEmpty(s.Text)) continue;
+            try
+            {
+                text = Regex.Replace(text, $@"\b{Regex.Escape(trigger)}\b",
+                    s.Text.Replace("$", "$$"), RegexOptions.IgnoreCase);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("formatter", $"Bad snippet trigger '{trigger}': {ex.Message}");
+            }
+        }
         return text;
     }
 

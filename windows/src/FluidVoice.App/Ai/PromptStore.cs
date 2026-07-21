@@ -207,7 +207,8 @@ Use the following selected context to improve your response:
     public static (string SystemPrompt, string Body) ResolveDictationPrompt(string? appId)
     {
         var (system, body) = Resolve(PromptMode.Dictate, appId);
-        return (system + DictionarySuffix(), body);
+        // per-context writing style (Style page): personal/work/email/other tone
+        return (system + DictionarySuffix() + Text.StyleRouter.ToneInstructionFor(appId), body);
     }
 
     /// <summary>

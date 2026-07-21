@@ -32,7 +32,7 @@ public sealed class MainWindow : Window
     private readonly List<TextBlock> _navLabels = new();
     private string _current = "";
     private string _feedFilter = "";
-    private bool _sidebarExpanded;  // collapsed icon-rail by default (more content room)
+    private bool _sidebarExpanded = true;  // expanded with labels by default (reference layout)
     private bool _didPromptForName;
     private ColumnDefinition? _railColumn;
     private Border? _brandMark;
@@ -57,15 +57,17 @@ public sealed class MainWindow : Window
 
         _entries = new List<NavEntry>
         {
-            new("", "Home", BuildHomePage),
-            new("", "Insights", () => new HomeTab()),
-            new("", "Dictionary", () => new DictionaryTab()),
-            new("", "History", () => new HistoryTab()),
-            new(((char)0xE716).ToString(), "Meetings", () => new MeetingsTab(_coordinator)),
-            new("", "Scratchpad", BuildScratchpadPage),
-            // rail pins these to the bottom (Wispr-style); Settings opens the modal, no page of its own
-            new("", "Settings", () => new TextBlock()),
-            new("", "Feedback", BuildFeedbackPage),
+            new("\uE720", "Dictation", BuildHomePage),
+            new("\uE9D2", "Insights", () => new HomeTab()),
+            new("\uE82D", "Dictionary", () => new DictionaryTab()),
+            new("\uE8C6", "Snippets", () => new SnippetsTab()),
+            new("\uE8D2", "Style", () => new StyleTab()),
+            new("\uE945", "Transforms", () => new TransformsTab(() => OpenCommandWindow?.Invoke(), () => OpenRewriteWindow?.Invoke(), _coordinator)),
+            new("\uE70B", "Scratchpad", () => new ScratchpadTab()),
+            new("\uE716", "Meetings", () => new MeetingsTab(_coordinator)),
+            // rail pins these to the bottom (reference layout); Settings opens the modal
+            new("\uE713", "Settings", () => new TextBlock()),
+            new("\uE897", "Help", BuildFeedbackPage),
         };
 
         var root = new Grid { Background = new SolidColorBrush(Theme.Bg) };
@@ -112,14 +114,14 @@ public sealed class MainWindow : Window
 
         Content = outer;
         SmoothScroll.Attach(_content);
-        Navigate("Home");
+        Navigate("Dictation");
         Loaded += (_, _) => PromptForNameIfNeeded();
         // dev seam: FLUIDVOICE_OPEN_SETTINGS=1 opens the settings modal on launch (screenshot tests)
         if (Environment.GetEnvironmentVariable("FLUIDVOICE_OPEN_SETTINGS") == "1")
             Loaded += (_, _) => Dispatcher.BeginInvoke(() => ShowSettingsDialog());
         HistoryStore.HistoryChanged += () => Dispatcher.BeginInvoke(() =>
         {
-            if (_current == "Home") Navigate("Home");
+            if (_current == "Dictation") Navigate("Dictation");
         });
         Settings.Changed += hint => Dispatcher.BeginInvoke(() =>
         {
@@ -134,9 +136,9 @@ public sealed class MainWindow : Window
                 RebuildRail();
                 Navigate(_current);
             }
-            else if (hint == "home" && _current == "Home")
+            else if (hint == "home" && _current == "Dictation")
             {
-                Navigate("Home"); // reflect the setup-checklist toggle immediately
+                Navigate("Dictation"); // reflect the setup-checklist toggle immediately
             }
         });
     }
@@ -219,15 +221,19 @@ public sealed class MainWindow : Window
         _updateBanner.Visibility = Visibility.Visible;
     }
 
+    /// <summary>Capture-harness seam: navigate directly to a page by nav title.</summary>
+    public void CaptureNavigate(string title) => Navigate(title);
+
     public void SelectTab(string title)
     {
         switch (title)
         {
             case "General" or "Preferences" or "Settings": ShowSettingsDialog("General"); break;
             case "AI Settings" or "Models" or "Speech Models": ShowSettingsDialog("Speech Models"); break;
-            case "Welcome": Navigate("Home"); break;
+            case "Welcome" or "Home" or "History": Navigate("Dictation"); break;
             case "Stats": Navigate("Insights"); break;
-            case "Command Mode" or "Write Mode" or "File Transcription": Navigate("Scratchpad"); break;
+            case "Feedback": Navigate("Help"); break;
+            case "Command Mode" or "Write Mode" or "File Transcription": Navigate("Transforms"); break;
             default: Navigate(title); break;
         }
     }
@@ -341,7 +347,7 @@ public sealed class MainWindow : Window
         topGroup.Children.Add(BrandMark());
         topGroup.Children.Add(new Border { Height = 18, Background = Brushes.Transparent });
         foreach (var e in _entries)
-            (e.Title is "Settings" or "Feedback" ? bottomGroup : topGroup).Children.Add(NavItem(e));
+            (e.Title is "Settings" or "Help" ? bottomGroup : topGroup).Children.Add(NavItem(e));
         DockPanel.SetDock(topGroup, Dock.Top);
         DockPanel.SetDock(bottomGroup, Dock.Bottom);
         _rail.Children.Add(topGroup);
@@ -378,7 +384,7 @@ public sealed class MainWindow : Window
         finally
         {
             Opacity = oldOpacity;
-            if (_current == "Home") Navigate("Home");
+            if (_current == "Dictation") Navigate("Dictation");
         }
     }
 
@@ -386,6 +392,7 @@ public sealed class MainWindow : Window
     {
         // First run gets the full OpenWhispr-style wizard (name, hotkey, model, AI);
         // the lone name dialog only remains for upgraders who somehow lack a name.
+        if (App.UiCapture.CaptureMode) return;
         if (_didPromptForName) return;
         _didPromptForName = true;
         if (!Settings.Current.OnboardingCompleted)
@@ -404,7 +411,7 @@ public sealed class MainWindow : Window
         finally
         {
             Opacity = oldOpacity;
-            if (_current == "Home") Navigate("Home");
+            if (_current == "Dictation") Navigate("Dictation");
         }
     }
 
@@ -420,7 +427,7 @@ public sealed class MainWindow : Window
         finally
         {
             Opacity = oldOpacity;
-            if (_current == "Home") Navigate("Home");
+            if (_current == "Dictation") Navigate("Dictation");
         }
     }
 
@@ -445,11 +452,12 @@ public sealed class MainWindow : Window
         var page = new StackPanel
         {
             Margin = new Thickness(44, 34, 44, 40),
-            MaxWidth = entry.Title == "Home" ? 1120 : 1080,
+            MaxWidth = entry.Title == "Dictation" ? 1120 : 1080,
             HorizontalAlignment = HorizontalAlignment.Center, // content stays centered in the sheet
             LayoutTransform = Theme.PageScale(),              // user text-size setting
         };
-        if (entry.Title != "Home") page.Children.Add(PageHeader(entry.Title));
+        if (entry.Title is not ("Dictation" or "Snippets" or "Scratchpad" or "Dictionary"))
+            page.Children.Add(PageHeader(entry.Title));
         page.Children.Add(entry.Page());
         _content.Content = page;
         _content.ScrollToTop();
@@ -575,17 +583,15 @@ public sealed class MainWindow : Window
         content.Children.Add(headline);
         content.Children.Add(new TextBlock
         {
-            Text = setupDone
-                ? $"Using {model.DisplayName}. Keep building your dictionary and style as you dictate."
-                : $"Finish setup for {model.DisplayName}, then dictate into any Windows app.",
+            Text = "Set up different writing styles for different apps.",
             FontSize = 15,
             FontWeight = FontWeights.SemiBold,
             Foreground = Brushes.White,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 18),
         });
-        var cta = Theme.SecondaryButton(setupDone ? "Open dictionary" : "Finish setup");
-        cta.Click += (_, _) => Navigate(setupDone ? "Dictionary" : "Models");
+        var cta = Theme.SecondaryButton("Start now");
+        cta.Click += (_, _) => Navigate("Style");
         content.Children.Add(cta);
         hero.Children.Add(content);
 
@@ -653,6 +659,10 @@ public sealed class MainWindow : Window
     private UIElement BuildVoiceProfilePanel(SpeechModelInfo model, bool setupDone)
     {
         var panel = new StackPanel();
+        panel.Children.Add(StatRow(FormatCompact(HistoryStore.TotalWords), "total words"));
+        panel.Children.Add(StatRow(Settings.Current.UserTypingWPM.ToString(), "wpm"));
+        panel.Children.Add(StatRow(HistoryStore.CurrentStreakDays.ToString(), "day streak"));
+        panel.Children.Add(Theme.Divider(14, 20));
         panel.Children.Add(new TextBlock
         {
             Text = "Your Voice Profile",
@@ -663,15 +673,15 @@ public sealed class MainWindow : Window
         });
         panel.Children.Add(new TextBlock
         {
-            Text = setupDone ? "Updates as LiquidFlow learns from your dictation." : "Complete setup to start building personal insights.",
+            Text = "Keep using LiquidFlow for new insights",
             FontSize = 12.5,
             Foreground = Theme.SubtleBrush,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 16),
         });
 
-        var progress = Math.Clamp((HistoryStore.TotalWords / 5000.0) + (setupDone ? 0.2 : 0.05), 0.1, 1.0);
-        var track = new Grid { Width = 150, Height = 7, HorizontalAlignment = HorizontalAlignment.Left };
+        var progress = Math.Clamp((HistoryStore.TotalWords % 1000) / 1000.0 + 0.05, 0.05, 1.0);
+        var track = new Grid { Width = 112, Height = 7, HorizontalAlignment = HorizontalAlignment.Left };
         track.Children.Add(new Border
         {
             Background = new SolidColorBrush(Theme.SidebarSelected),
@@ -679,7 +689,7 @@ public sealed class MainWindow : Window
         });
         track.Children.Add(new Border
         {
-            Width = 150 * progress,
+            Width = 112 * progress,
             HorizontalAlignment = HorizontalAlignment.Left,
             Background = Theme.PurpleBrush,
             CornerRadius = new CornerRadius(3.5),
@@ -689,7 +699,7 @@ public sealed class MainWindow : Window
         row.Children.Add(track);
         row.Children.Add(new TextBlock
         {
-            Text = setupDone ? "Active" : "Pending",
+            Text = $"Updates in {FormatCompact(Math.Max(1, 1000 - HistoryStore.TotalWords % 1000))} words",
             FontSize = 12,
             FontWeight = FontWeights.SemiBold,
             Foreground = Theme.TextBrush,
@@ -697,25 +707,23 @@ public sealed class MainWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
         });
         panel.Children.Add(row);
-        panel.Children.Add(Theme.Divider(20, 18));
-        panel.Children.Add(new TextBlock
-        {
-            Text = model.DisplayName,
-            FontSize = 13,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = Theme.TextBrush,
-            TextWrapping = TextWrapping.Wrap,
-        });
-        panel.Children.Add(new TextBlock
-        {
-            Text = model.LanguageSupport,
-            FontSize = 12,
-            Foreground = Theme.SubtleBrush,
-            Margin = new Thickness(0, 3, 0, 0),
-        });
 
         return Theme.Panel(panel, new Thickness(24), new Thickness(0, 0, 0, 18));
     }
+
+    private static UIElement StatRow(string number, string label)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12) };
+        row.Children.Add(new TextBlock { Text = number, FontFamily = Theme.StatSerif, FontSize = 33, Foreground = Theme.TextBrush, Margin = new Thickness(0, 0, 10, 0) });
+        row.Children.Add(new TextBlock { Text = label, FontSize = 14.5, Foreground = Theme.TextBrush, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 6) });
+        return row;
+    }
+
+    /// <summary>97.6K-style compact numbers for the stats rail.</summary>
+    private static string FormatCompact(int n) => n >= 100_000 ? $"{n / 1000.0:0}K" : n >= 1000 ? $"{n / 1000.0:0.#}K" : n.ToString();
+
+    private static string FeedDateHeader(DateTime t) =>
+        t.Date == DateTime.Today ? "TODAY" : t.ToString("MMMM d, yyyy").ToUpperInvariant();
 
     private UIElement BuildFeed()
     {
@@ -730,6 +738,7 @@ public sealed class MainWindow : Window
             Foreground = new SolidColorBrush(Theme.SubtleText),
             VerticalAlignment = VerticalAlignment.Center,
         };
+        _feedDateLabel = label;
         DockPanel.SetDock(label, Dock.Left);
         header.Children.Add(label);
 
@@ -779,6 +788,7 @@ public sealed class MainWindow : Window
     }
 
     private StackPanel? _feedRows;
+    private TextBlock? _feedDateLabel;
 
     /// <summary>Edit a past transcription (fix/delete words); optionally teach the change to the dictionary.</summary>
     private void EditEntry(TranscriptionHistoryEntry entry)
@@ -818,8 +828,19 @@ public sealed class MainWindow : Window
             });
             return;
         }
+        if (_feedDateLabel is not null)
+            _feedDateLabel.Text = FeedDateHeader(entries[0].Timestamp);
         for (int i = 0; i < entries.Count; i++)
         {
+            if (i > 0 && entries[i].Timestamp.Date != entries[i - 1].Timestamp.Date)
+                _feedRows.Children.Add(new TextBlock
+                {
+                    Text = FeedDateHeader(entries[i].Timestamp),
+                    FontSize = 11,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = new SolidColorBrush(Theme.SubtleText),
+                    Margin = new Thickness(18, 20, 0, 10),
+                });
             _feedRows.Children.Add(FeedRow(entries[i]));
             if (i < entries.Count - 1)
                 _feedRows.Children.Add(new Border { Height = 1, Background = Theme.HairlineBrush });
@@ -981,7 +1002,7 @@ public sealed class MainWindow : Window
             _tryoutStatus.Text = $"✓ You said: “{formatted}”";
             Settings.Current.SetupTested = true;
             Settings.Current.Save();
-            Navigate("Home");
+            Navigate("Dictation");
         }
         catch (Exception ex)
         {

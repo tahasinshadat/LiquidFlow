@@ -24,6 +24,14 @@ public sealed class CustomDictionaryEntry
     public bool Delete { get; set; }
 }
 
+/// <summary>A voice snippet: say the trigger word/phrase and the full text is inserted instead.</summary>
+public sealed class Snippet
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Trigger { get; set; } = "";
+    public string Text { get; set; } = "";
+}
+
 /// <summary>
 /// A candidate correction observed by the auto-learner: the transcriber keeps producing
 /// <see cref="From"/> where the intended word is <see cref="To"/>. Once <see cref="Count"/>
@@ -171,6 +179,17 @@ public sealed class Settings
     public bool EnableTranscriptionSounds { get; set; } = true;
     public float TranscriptionSoundVolume { get; set; } = 1.0f;
     public bool PauseMediaDuringTranscription { get; set; }
+
+    // ----- Snippets (say a word, insert saved text) -----
+    public List<Snippet> Snippets { get; set; } = new();
+
+    // ----- Writing styles (per message context; applied to AI cleanup) -----
+    /// <summary>"formal" | "casual" | "very-casual" | "excited" per context.</summary>
+    public string StylePersonal { get; set; } = "casual";
+    public string StyleWork { get; set; } = "formal";
+    public string StyleEmail { get; set; } = "formal";
+    public string StyleOther { get; set; } = "casual";
+    public bool StyleWizardCompleted { get; set; }
 
     // ----- Meeting notes -----
     /// <summary>Include the microphone (you) in meeting capture, mixed with system audio (everyone else).</summary>

@@ -21,7 +21,7 @@ public static class Program
 
         if (args.Contains("--version"))
         {
-            Console.WriteLine("LiquidFlow for Windows 1.6.2 (port of altic-dev/FluidVoice)");
+            Console.WriteLine($"LiquidFlow for Windows {App.Updater.ThisVersion} (port of altic-dev/FluidVoice)");
             return 0;
         }
         if (args.Contains("--selftest-stt"))
@@ -30,6 +30,8 @@ public static class Program
             return SelfTestLlm(args).GetAwaiter().GetResult();
         if (args.Contains("--selftest-type"))
             return SelfTestType(args);
+        if (args.Contains("--capture-ui"))
+            return App.UiCapture.Run(args);
 
         using var singleInstance = new SingleInstance();
         if (!singleInstance.IsFirstInstance)

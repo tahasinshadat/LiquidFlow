@@ -18,6 +18,8 @@ public sealed class DictionaryTab : StackPanel
     private void Build()
     {
         Children.Clear();
+        Children.Add(PageChrome.HeaderRow("Dictionary", "Add new", AddBlankEntry));
+        Children.Add(PageChrome.TabsRow(new[] { "All", "Personal" }, 0));
         Children.Add(BuildBanner());
         var learned = BuildLearned();
         if (learned is not null) Children.Add(learned);
@@ -71,9 +73,20 @@ public sealed class DictionaryTab : StackPanel
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 18),
         });
-        var add = Theme.SecondaryButton("Add a word");
-        add.Click += (_, _) => AddBlankEntry();
-        content.Children.Add(add);
+        var chips = new WrapPanel();
+        var addChip = PageChrome.HeroPill("Add new word");
+        addChip.Margin = new Thickness(0, 0, 10, 8);
+        addChip.MouseLeftButtonUp += (_, _) => AddBlankEntry();
+        chips.Children.Add(addChip);
+        foreach (var word in Settings.Current.CustomDictionaryEntries
+                     .Where(e => !e.Delete && e.Replacement.Length > 0)
+                     .Select(e => e.Replacement).Distinct().Take(5))
+        {
+            var c = PageChrome.HeroChip(word);
+            c.Margin = new Thickness(0, 0, 10, 8);
+            chips.Children.Add(c);
+        }
+        content.Children.Add(chips);
         grid.Children.Add(content);
 
         return new Border { CornerRadius = new CornerRadius(18), Margin = new Thickness(0, 0, 0, 22), Child = grid };

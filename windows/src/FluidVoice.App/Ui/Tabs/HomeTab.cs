@@ -10,6 +10,10 @@ namespace FluidVoice.Ui;
 /// <summary>Usage insights styled after Wispr Flow's analytics dashboard.</summary>
 public sealed class HomeTab : StackPanel
 {
+    /// <summary>Capture-harness seam: newly built HomeTabs start on the "Your voice" tab.</summary>
+    public static bool DefaultVoice;
+    private bool _voice = DefaultVoice;
+
     public HomeTab()
     {
         Build();
@@ -21,8 +25,15 @@ public sealed class HomeTab : StackPanel
         Children.Clear();
         Children.Add(BuildHistoryNotice());
         Children.Add(BuildTabs());
-        Children.Add(BuildMetricsRow());
-        Children.Add(BuildLowerDashboard());
+        if (_voice)
+        {
+            Children.Add(VoicePane.Build());
+        }
+        else
+        {
+            Children.Add(BuildMetricsRow());
+            Children.Add(BuildLowerDashboard());
+        }
     }
 
     private static UIElement BuildHistoryNotice()
@@ -74,34 +85,34 @@ public sealed class HomeTab : StackPanel
         };
     }
 
-    private static UIElement BuildTabs()
+    private UIElement BuildTabs()
     {
         var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 32) };
         var row = new StackPanel { Orientation = Orientation.Horizontal };
-        row.Children.Add(TabLabel("Your Usage", true));
-        row.Children.Add(TabLabel("Your Voice", false));
+        row.Children.Add(TabLabel("Your usage", !_voice, () => { _voice = false; Build(); }));
+        row.Children.Add(TabLabel("Your voice", _voice, () => { _voice = true; Build(); }));
         panel.Children.Add(row);
         panel.Children.Add(Theme.Divider(12, 0));
         return panel;
     }
 
-    private static UIElement TabLabel(string text, bool active)
+    private static UIElement TabLabel(string text, bool active, Action onClick)
     {
-        var wrap = new StackPanel { Margin = new Thickness(0, 0, 28, 0) };
+        var wrap = new StackPanel { Margin = new Thickness(0, 0, 28, 0), Cursor = System.Windows.Input.Cursors.Hand };
         wrap.Children.Add(new TextBlock
         {
             Text = text,
             FontSize = 16,
-            FontWeight = FontWeights.SemiBold,
+            FontWeight = active ? FontWeights.SemiBold : FontWeights.Normal,
             Foreground = active ? Theme.TextBrush : Theme.SubtleBrush,
         });
         wrap.Children.Add(new Border
         {
             Height = 2,
-            Width = active ? 86 : 0,
-            Background = Theme.TextBrush,
+            Background = active ? Theme.TextBrush : Brushes.Transparent,
             Margin = new Thickness(0, 20, 0, -13),
         });
+        wrap.MouseLeftButtonUp += (_, _) => onClick();
         return wrap;
     }
 
