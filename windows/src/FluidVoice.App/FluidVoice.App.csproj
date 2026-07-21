@@ -15,7 +15,7 @@
     <LangVersion>latest</LangVersion>
     <RuntimeIdentifiers>win-arm64;win-x64</RuntimeIdentifiers>
     <Platforms>AnyCPU;ARM64;x64</Platforms>
-    <Version>1.10.2</Version>
+    <Version>1.10.3</Version>
     <Product>LiquidFlow</Product>
     <Company>FluidVoice contributors</Company>
     <Copyright>GPLv3 — port of altic-dev/FluidVoice</Copyright>

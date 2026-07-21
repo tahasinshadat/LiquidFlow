@@ -68,9 +68,10 @@ public sealed class VoiceBoxHostView : Grid
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(0, 16, 0, 0),
         };
+        // No Cancel button: setup is fast and non-blocking, and a dead-feeling button is
+        // worse than none. Failures surface the Try again button below.
         _cancel = Theme.SecondaryButton("Cancel");
-        _cancel.Click += (_, _) => _cts?.Cancel();
-        buttons.Children.Add(_cancel);
+        _cancel.Visibility = Visibility.Collapsed;
         _retry = Theme.SecondaryButton("Try again");
         _retry.Margin = new Thickness(8, 0, 0, 0);
         _retry.Visibility = Visibility.Collapsed;
@@ -105,7 +106,6 @@ public sealed class VoiceBoxHostView : Grid
         if (_busy) return;
         _busy = true;
         _cts = new CancellationTokenSource();
-        _cancel.Visibility = Visibility.Visible;
         _retry.Visibility = Visibility.Collapsed;
         try
         {
@@ -196,7 +196,6 @@ public sealed class VoiceBoxHostView : Grid
     private void ShowRetry() => Dispatcher.BeginInvoke(() =>
     {
         _retry.Visibility = Visibility.Visible;
-        _cancel.Visibility = Visibility.Collapsed;
         _bar.SetFraction(0);
     });
 
@@ -239,16 +238,37 @@ public sealed class VoiceBoxHostView : Grid
 
         if (_web is null)
         {
+            _web = new Microsoft.Web.WebView2.Wpf.WebView2();
+            // CRITICAL ORDER: the WPF WebView2 only finishes initialization once it is IN
+            // the visual tree with a live HWND — awaiting EnsureCoreWebView2Async on an
+            // unparented control deadlocks forever (the "stuck at full bar" bug).
+            _hostBorder.Child = _web;
+            _hostBorder.Visibility = Visibility.Visible;
             var env = await Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(
                 userDataFolder: Path.Combine(FluidVoice.Core.AppPaths.DataDir, "WebView2-VoiceBoxNative"));
-            _web = new Microsoft.Web.WebView2.Wpf.WebView2();
             await _web.EnsureCoreWebView2Async(env);
             _web.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
             _web.CoreWebView2.Settings.IsStatusBarEnabled = false;
+            _web.CoreWebView2.NavigationCompleted += (_, e) => Dispatcher.BeginInvoke(() =>
+            {
+                if (e.IsSuccess)
+                {
+                    _progressPanel.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    _hostBorder.Visibility = Visibility.Collapsed;
+                    SetStatus("VoiceBox's interface failed to load — details in VoiceBoxNative\\server.log.", -1);
+                    ShowRetry();
+                }
+            });
+        }
+        else
+        {
+            _hostBorder.Child = _web;
+            _hostBorder.Visibility = Visibility.Visible;
         }
         _web.Source = new Uri($"http://127.0.0.1:{VoiceBoxNative.Port}/");
-        _hostBorder.Child = _web;
-        _hostBorder.Visibility = Visibility.Visible;
         _progressPanel.Visibility = Visibility.Collapsed;
         Log.Info("voicebox", "Native VoiceBox UI embedded (WebView2)");
     }
