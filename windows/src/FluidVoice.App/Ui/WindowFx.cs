@@ -15,7 +15,19 @@ public static class WindowFx
     private static BitmapFrame? _icon;
 
     public static BitmapFrame AppIcon =>
-        _icon ??= BitmapFrame.Create(new Uri("pack://application:,,,/Assets/fluidvoice.ico"));
+        _icon ??= LargestIconFrame();
+
+    /// <summary>The sharpest frame of the app icon (for in-app brand marks).</summary>
+    public static ImageSource AppIconLarge => AppIcon;
+
+    private static BitmapFrame LargestIconFrame()
+    {
+        // .ico files decode to their FIRST frame by default (often 16px → blurry when
+        // scaled). Pick the largest embedded frame so downscaling stays crisp.
+        var dec = BitmapDecoder.Create(new Uri("pack://application:,,,/Assets/fluidvoice.ico"),
+            BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+        return dec.Frames.OrderByDescending(f => f.PixelWidth).First();
+    }
 
     public const double TitlebarHeight = 44;
 
@@ -25,7 +37,7 @@ public static class WindowFx
     /// Returns the titlebar element; the caller docks it at the top of its layout.
     /// The whole strip is draggable (WindowChrome caption) and supports snap/double-click.
     /// </summary>
-    public static UIElement InstallChrome(Window window, string title)
+    public static UIElement InstallChrome(Window window, string title, UIElement? leading = null, bool showBrand = true)
     {
         WindowChrome.SetWindowChrome(window, new WindowChrome
         {
@@ -37,8 +49,17 @@ public static class WindowFx
         });
 
         var bar = new Grid { Height = TitlebarHeight, Background = Brushes.Transparent };
+        bar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        if (leading is not null)
+        {
+            WindowChrome.SetIsHitTestVisibleInChrome(leading, true);
+            if (leading is FrameworkElement lf) lf.Margin = new Thickness(10, 0, 0, 0);
+            Grid.SetColumn(leading, 0);
+            bar.Children.Add(leading);
+        }
 
         var brand = new StackPanel
         {
@@ -64,7 +85,8 @@ public static class WindowFx
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(9, 0, 0, 0),
         });
-        bar.Children.Add(brand);
+        Grid.SetColumn(brand, 1);
+        if (showBrand) bar.Children.Add(brand);
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top };
         buttons.Children.Add(CaptionButton(window, "", "Minimize",
@@ -79,7 +101,7 @@ public static class WindowFx
         buttons.Children.Add(maxBtn);
         buttons.Children.Add(CaptionButton(window, "", "Close",
             _ => window.Close(), danger: true));
-        Grid.SetColumn(buttons, 1);
+        Grid.SetColumn(buttons, 2);
         bar.Children.Add(buttons);
 
         window.StateChanged += (_, _) =>

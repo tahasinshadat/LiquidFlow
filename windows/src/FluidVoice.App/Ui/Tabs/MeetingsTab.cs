@@ -30,11 +30,8 @@ public sealed class MeetingsTab : StackPanel
         _coordinator = coordinator;
         var svc = MeetingService.Instance;
 
-        Children.Add(new TextBlock
-        {
-            Text = "Record a meeting and get an AI summary. Captures your PC's audio (everyone in the call) plus your mic — all on-device.",
-            FontSize = 14, Foreground = Theme.SubtleBrush, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, -8, 0, 20),
-        });
+        Children.Add(PageChrome.HeaderRow("Meetings", null, null));
+        Children.Add(BuildHero());
 
         // ---- recorder card ----
         var rec = new StackPanel();
@@ -102,6 +99,38 @@ public sealed class MeetingsTab : StackPanel
             _tick.Stop();
         };
     }
+
+    private static UIElement BuildHero()
+    {
+        var content = new System.Windows.Controls.StackPanel
+        {
+            Margin = new Thickness(44, 34, 44, 34),
+            VerticalAlignment = VerticalAlignment.Center,
+            MaxWidth = 780,
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        content.Children.Add(new TextBlock
+        {
+            Text = "Every meeting, remembered.",
+            FontFamily = Theme.DisplaySerif,
+            FontSize = 30,
+            Foreground = System.Windows.Media.Brushes.White,
+            Margin = new Thickness(0, 0, 0, 12),
+        });
+        content.Children.Add(new TextBlock
+        {
+            Text = "Capture your PC's audio and your mic — watch the transcript build live, get an AI summary when you stop. All on-device.",
+            FontSize = 14.5,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(228, 255, 255, 255)),
+            TextWrapping = TextWrapping.Wrap,
+        });
+        var hero = PageChrome.DarkHero(content);
+        ((System.Windows.Controls.Border)hero).MinHeight = 190;
+        ((System.Windows.Controls.Border)hero).Margin = new Thickness(0, 0, 0, 26);
+        return hero;
+    }
+
 
     private void OnStateChanged() => Dispatcher.BeginInvoke(SyncFromState);
     private void OnTranscriptUpdated(string t) => Dispatcher.BeginInvoke(() => { _liveBox.Text = t; _liveBox.CaretIndex = t.Length; _liveBox.ScrollToEnd(); });

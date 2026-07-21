@@ -48,6 +48,9 @@ public sealed class NoteWindow : Window
         Topmost = true;
         ShowInTaskbar = false;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        MinWidth = 520;
+        MinHeight = 340;
+        ResizeMode = ResizeMode.CanResizeWithGrip; // drag the corner (or use ⤢) to resize
         if (App.UiCapture.CaptureMode)
         {
             // render offscreen for the screenshot harness — never flash on the user's display
@@ -262,10 +265,46 @@ public sealed class NoteWindow : Window
             row.Children.Add(close);
             chip.Child = row;
             chip.MouseLeftButtonUp += (_, _) => ShowNote(note);
+            chip.MouseLeftButtonDown += (_, e) =>
+            {
+                if (e.ClickCount == 2) { e.Handled = true; BeginRename(note, chip); }
+            };
             _tabs.Children.Add(chip);
         }
         var plus = PageChrome.IconButton("", "New note", () => ShowNote(new Note()));
         _tabs.Children.Add(plus);
+    }
+
+    /// <summary>Double-click a tab: rename the note inline.</summary>
+    private void BeginRename(Note note, Border chip)
+    {
+        var box = new TextBox
+        {
+            Text = TitleOf(note),
+            FontSize = 12.5,
+            MinWidth = 110,
+            Padding = new Thickness(4, 1, 4, 1),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        void Commit()
+        {
+            var name = box.Text.Trim();
+            if (name.Length > 0)
+            {
+                note.Title = name;
+                NotesStore.Save(note);
+            }
+            RenderTabs();
+        }
+        box.KeyDown += (_, e) =>
+        {
+            if (e.Key == System.Windows.Input.Key.Enter) Commit();
+            else if (e.Key == System.Windows.Input.Key.Escape) RenderTabs();
+        };
+        box.LostFocus += (_, _) => Commit();
+        chip.Child = box;
+        box.Focus();
+        box.SelectAll();
     }
 
     private static string TitleOf(Note n)

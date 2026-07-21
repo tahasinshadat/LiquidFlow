@@ -43,13 +43,18 @@ public sealed class StyleTab : StackPanel
         }
 
         var context = Tabs[_tab].Key;
+        // Cards are ALWAYS shown and clickable; the wizard hero sits above them until
+        // personalization has run once (then the per-context banner takes its place).
         if (!Settings.Current.StyleWizardCompleted)
         {
-            Children.Add(BuildHero());
-            return;
+            var hero = BuildHero();
+            ((Border)hero).Margin = new Thickness(0, 0, 0, 26);
+            Children.Add(hero);
         }
-
-        Children.Add(BuildContextBanner(context));
+        else
+        {
+            Children.Add(BuildContextBanner(context));
+        }
         Children.Add(StyleCards.BuildRow(context, large: false, onPicked: Build));
     }
 

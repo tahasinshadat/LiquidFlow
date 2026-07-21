@@ -63,12 +63,13 @@ public sealed class SettingsModal : Window
         // scrollbar lives only in the body and never runs under the close button.
         var contentColumn = new Grid();
         contentColumn.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        contentColumn.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         contentColumn.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
         var header = new Grid { Margin = new Thickness(40, 30, 14, 6) };
-        _headerTitle.FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI");
-        _headerTitle.FontSize = 21;
-        _headerTitle.FontWeight = FontWeights.SemiBold;
+        _headerTitle.FontFamily = Theme.DisplaySerif;
+        _headerTitle.FontSize = 27;
+        _headerTitle.FontWeight = FontWeights.Normal;
         _headerTitle.Foreground = Theme.TextBrush;
         _headerTitle.VerticalAlignment = VerticalAlignment.Center;
         header.Children.Add(_headerTitle);
@@ -94,6 +95,9 @@ public sealed class SettingsModal : Window
         header.Children.Add(close);
         Grid.SetRow(header, 0);
         contentColumn.Children.Add(header);
+        var headerRule = new Border { Height = 1, Background = Theme.HairlineBrush, Margin = new Thickness(40, 10, 26, 0) };
+        Grid.SetRow(headerRule, 1);
+        contentColumn.Children.Add(headerRule);
 
         var scroller = new ScrollViewer
         {
@@ -103,8 +107,9 @@ public sealed class SettingsModal : Window
             Padding = new Thickness(40, 4, 26, 26),
             Margin = new Thickness(0, 0, 8, 10), // inset the scrollbar off the rounded corner
         };
-        Grid.SetRow(scroller, 1);
+        Grid.SetRow(scroller, 2);
         contentColumn.Children.Add(scroller);
+        SmoothScroll.Attach(scroller);
 
         Grid.SetColumn(contentColumn, 1);
         grid.Children.Add(contentColumn);

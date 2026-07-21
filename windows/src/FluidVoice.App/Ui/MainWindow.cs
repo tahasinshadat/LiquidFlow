@@ -25,7 +25,7 @@ public sealed class MainWindow : Window
 
     private readonly ScrollViewer _content = new()
     {
-        VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+        VerticalScrollBarVisibility = ScrollBarVisibility.Visible,
         HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
     };
     private readonly Dictionary<string, Border> _navItems = new();
@@ -101,7 +101,7 @@ public sealed class MainWindow : Window
         outer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // titlebar
         outer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // update banner
         outer.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // content
-        var titlebar = WindowFx.InstallChrome(this, "LiquidFlow");
+        var titlebar = WindowFx.InstallChrome(this, "LiquidFlow", BuildTitlebarLeading(), showBrand: false);
         Grid.SetRow((UIElement)titlebar, 0);
         outer.Children.Add((UIElement)titlebar);
         _updateBanner = BuildUpdateBanner();
@@ -238,31 +238,51 @@ public sealed class MainWindow : Window
         }
     }
 
+    /// <summary>Top-left chrome cluster (reference layout): sidebar collapse + account.</summary>
+    private UIElement BuildTitlebarLeading()
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        Border Btn(string glyph, string tip, Action onClick)
+        {
+            var b = PageChrome.IconButton(glyph, tip, onClick);
+            b.Width = 34;
+            b.Height = 34;
+            ((TextBlock)b.Child).FontSize = 15;
+            ((TextBlock)b.Child).Foreground = Theme.TextBrush;
+            return b;
+        }
+        row.Children.Add(Btn("\uE700", "Toggle sidebar", () => SetSidebarExpanded(!_sidebarExpanded)));
+        row.Children.Add(Btn("\uE77B", "Account & settings", () => ShowSettingsDialog("Account")));
+        return row;
+    }
+
     private UIElement BrandMark()
     {
-        // hamburger toggle — the app icon + name live in the titlebar now, so the rail
-        // doesn't repeat them (glyph box matches nav items so everything lines up)
-        _brandMark = new Border
+        // brand row at the top of the sidebar (reference layout: "Flow"-style wordmark);
+        // the collapse + account buttons live in the titlebar now.
+        var mark = new Image
         {
-            Width = 42,
-            Height = 42,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            CornerRadius = new CornerRadius(10),
-            Background = Brushes.Transparent,
-            ToolTip = _sidebarExpanded ? "Collapse sidebar" : "Expand sidebar",
-            Cursor = Cursors.Hand,
-            Child = new TextBlock
-            {
-                Text = ((char)0xE700).ToString(), // GlobalNavButton
-                FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                FontSize = 15,
-                Foreground = Theme.TextBrush,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-            },
+            Width = 24,
+            Height = 24,
+            Source = WindowFx.AppIconLarge,
+            VerticalAlignment = VerticalAlignment.Center,
         };
-        AttachHoverFx(_brandMark, () => false);
-        _brandMark.MouseLeftButtonUp += (_, _) => SetSidebarExpanded(!_sidebarExpanded);
+        RenderOptions.SetBitmapScalingMode(mark, BitmapScalingMode.HighQuality);
+        var label = new TextBlock
+        {
+            Text = "LiquidFlow",
+            FontSize = 15.5,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = Theme.TextBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(10, 0, 0, 0),
+            Visibility = _sidebarExpanded ? Visibility.Visible : Visibility.Collapsed,
+        };
+        _navLabels.Add(label);
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(9, 4, 0, 2) };
+        row.Children.Add(mark);
+        row.Children.Add(label);
+        _brandMark = new Border { Background = Brushes.Transparent, Child = row };
         return _brandMark;
     }
 
@@ -364,8 +384,6 @@ public sealed class MainWindow : Window
         _sidebarExpanded = expanded;
         if (_railColumn is not null)
             _railColumn.Width = new GridLength(SidebarWidth);
-        if (_brandMark is not null)
-            _brandMark.ToolTip = _sidebarExpanded ? "Collapse sidebar" : "Expand sidebar";
         foreach (var label in _navLabels)
             label.Visibility = _sidebarExpanded ? Visibility.Visible : Visibility.Collapsed;
         foreach (var border in _navItems.Values)
@@ -451,12 +469,12 @@ public sealed class MainWindow : Window
 
         var page = new StackPanel
         {
-            Margin = new Thickness(44, 34, 44, 40),
-            MaxWidth = entry.Title == "Dictation" ? 1120 : 1080,
+            Margin = new Thickness(30, 30, 30, 40),
+            MaxWidth = entry.Title == "Dictation" ? 1180 : 1150,
             HorizontalAlignment = HorizontalAlignment.Center, // content stays centered in the sheet
             LayoutTransform = Theme.PageScale(),              // user text-size setting
         };
-        if (entry.Title is not ("Dictation" or "Snippets" or "Scratchpad" or "Dictionary"))
+        if (entry.Title is not ("Dictation" or "Snippets" or "Scratchpad" or "Dictionary" or "Meetings"))
             page.Children.Add(PageHeader(entry.Title));
         page.Children.Add(entry.Page());
         _content.Content = page;
