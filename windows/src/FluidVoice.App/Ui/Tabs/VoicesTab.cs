@@ -23,7 +23,7 @@ public sealed class VoicesTab : StackPanel
         TextWrapping = TextWrapping.Wrap,
         Margin = new Thickness(2, 10, 0, 0),
     };
-    private readonly ProgressBar _bar = new() { Height = 8, Margin = new Thickness(0, 10, 0, 0), Visibility = Visibility.Collapsed };
+    private readonly ProgressStripe _bar = new(420, 8) { Margin = new Thickness(0, 10, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, Visibility = Visibility.Collapsed };
     private ComboBox _voice = null!;
     private TextBox _text = null!;
     private Button _generate = null!;
@@ -103,8 +103,8 @@ public sealed class VoicesTab : StackPanel
             var progress = new Progress<(string Phase, double Pct)>(x => Dispatcher.BeginInvoke(() =>
             {
                 _status.Text = x.Phase;
-                _bar.IsIndeterminate = x.Pct < 0;
-                if (x.Pct >= 0) _bar.Value = x.Pct * 100;
+                if (x.Pct < 0) _bar.SetIndeterminate();
+                else _bar.SetFraction(x.Pct);
             }));
             try
             {

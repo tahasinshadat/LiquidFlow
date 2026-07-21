@@ -170,8 +170,9 @@ public static class VoiceBoxNative
         }
     }
 
-    /// <summary>Wait until /health answers (the native server boots in seconds).</summary>
-    public static async Task<bool> WaitForServerAsync(TimeSpan timeout, CancellationToken ct)
+    /// <summary>Wait until /health answers (the native server boots in seconds). Reports
+    /// boot progress against a typical ~10s cold boot so the bar visibly moves.</summary>
+    public static async Task<bool> WaitForServerAsync(TimeSpan timeout, CancellationToken ct, IProgress<double>? progress = null)
     {
         var sw = Stopwatch.StartNew();
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
@@ -181,9 +182,14 @@ public static class VoiceBoxNative
             try
             {
                 var resp = await http.GetAsync($"http://127.0.0.1:{Port}/health", ct);
-                if (resp.IsSuccessStatusCode) return true;
+                if (resp.IsSuccessStatusCode)
+                {
+                    progress?.Report(1);
+                    return true;
+                }
             }
             catch { /* not up yet */ }
+            progress?.Report(Math.Min(0.95, sw.Elapsed.TotalSeconds / 10.0));
             await Task.Delay(400, ct);
         }
         return false;

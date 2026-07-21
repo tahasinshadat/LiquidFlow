@@ -30,7 +30,7 @@ public sealed class VoiceBoxHostView : Grid
         MaxWidth = 520,
         TextAlignment = TextAlignment.Center,
     };
-    private readonly ProgressBar _bar = new() { Width = 380, Height = 8, Margin = new Thickness(0, 14, 0, 0) };
+    private readonly ProgressStripe _bar = new(380, 8) { Margin = new Thickness(0, 14, 0, 0) };
     private readonly StackPanel _progressPanel;
     private readonly Border _hostBorder;
     private EmbedHost? _embed;
@@ -213,8 +213,9 @@ public sealed class VoiceBoxHostView : Grid
         }
 
         VoiceBoxNative.StartServer();
-        SetStatus("Starting VoiceBox (native)…", -1);
-        if (!await VoiceBoxNative.WaitForServerAsync(TimeSpan.FromSeconds(90), _cts!.Token))
+        SetStatus("Starting VoiceBox (native)…", 0.02);
+        var boot = new Progress<double>(p => SetStatus("Starting VoiceBox (native)…", p));
+        if (!await VoiceBoxNative.WaitForServerAsync(TimeSpan.FromSeconds(90), _cts!.Token, boot))
         {
             SetStatus("The native VoiceBox server didn't come up. Try again, or enable the emulated app under Settings → General → VoiceBox.", -1);
             return;
@@ -251,8 +252,8 @@ public sealed class VoiceBoxHostView : Grid
         Dispatcher.BeginInvoke(() =>
         {
             _status.Text = text;
-            _bar.IsIndeterminate = pct < 0;
-            if (pct >= 0) _bar.Value = pct * 100;
+            if (pct < 0) _bar.SetIndeterminate();
+            else _bar.SetFraction(pct);
         });
     }
 
