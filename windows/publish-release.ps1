@@ -5,12 +5,15 @@
   The in-app updater reads these releases, so publishing here ships the update to
   every install watching GitHub.
 
+  NOTE: keep this file ASCII-only. Windows PowerShell 5.1 reads BOM-less UTF-8 as ANSI,
+  and multi-byte punctuation (em dashes, curly quotes) then breaks the parser.
+
 .PREREQS
   - GitHub CLI (winget install GitHub.cli), then one-time: gh auth login
   - Installers built: powershell windows\installer\build.ps1 -Arches arm64 -Version <ver>
 
 .EXAMPLE
-  powershell windows\publish-release.ps1 -Version 1.9.0
+  powershell windows\publish-release.ps1 -Version 1.9.1
 #>
 param(
     [Parameter(Mandatory = $true)][string]$Version,
@@ -25,16 +28,16 @@ $gh = Get-Command gh -ErrorAction SilentlyContinue
 if (-not $gh) {
     $candidate = "$env:ProgramFiles\GitHub CLI\gh.exe"
     if (Test-Path $candidate) { $gh = @{ Source = $candidate } } else {
-        throw "GitHub CLI not found. Install with: winget install GitHub.cli  — then run: gh auth login"
+        throw "GitHub CLI not found. Install with: winget install GitHub.cli - then run: gh auth login"
     }
 }
 $ghExe = $gh.Source
 
-& $ghExe auth status 2>$null
+& $ghExe auth status | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "Not signed in. Run once: gh auth login  (choose GitHub.com, SSH, browser login)" }
 
 $assets = Get-ChildItem $dist -File | Where-Object { $_.Name -match [regex]::Escape($Version) }
-if (-not $assets) { throw "No installers matching $Version in $dist — build first: windows\installer\build.ps1 -Version $Version" }
+if (-not $assets) { throw "No installers matching $Version in $dist - build first: windows\installer\build.ps1 -Version $Version" }
 Write-Host "Assets:" ($assets.Name -join ", ")
 
 $tag = "v$Version"
