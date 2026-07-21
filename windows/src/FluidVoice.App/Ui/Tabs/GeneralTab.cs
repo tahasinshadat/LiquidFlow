@@ -113,6 +113,15 @@ public sealed class GeneralTab : StackPanel
             if (v) App.VoiceBoxManager.PrewarmServer();
         }));
         vbx.Children.Add(Theme.Caption("Starts VoiceBox's engine quietly when LiquidFlow launches, so the VoiceBox tab opens in seconds instead of a cold boot. Costs some idle memory — turn off to free it."));
+        if (App.VoiceBoxNative.IsArm64)
+        {
+            vbx.Children.Add(Theme.Toggle("Use the emulated x64 VoiceBox app (Chatterbox & LuxTTS engines)", s.VoiceBoxUseEmulated, v =>
+            {
+                s.VoiceBoxUseEmulated = v;
+                s.Save("voicebox");
+            }));
+            vbx.Children.Add(Theme.Caption("This machine runs the native ARM64 port by default — VoiceBox's real interface and engines with no emulation, booting in seconds. Turn this on only if you want the Chatterbox or LuxTTS engines, which still need the x64 desktop app (slower, downloads ~516 MB on first use). Nothing x64 loads until you enable it."));
+        }
         Children.Add(Theme.Card2(vbx));
 
         // --- Appearance ---

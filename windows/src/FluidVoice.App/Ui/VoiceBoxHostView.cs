@@ -34,6 +34,7 @@ public sealed class VoiceBoxHostView : Grid
     private readonly StackPanel _progressPanel;
     private readonly Border _hostBorder;
     private EmbedHost? _embed;
+    private Microsoft.Web.WebView2.Wpf.WebView2? _web;
     private CancellationTokenSource? _cts;
     private bool _busy;
     private readonly System.Windows.Controls.Button _cancel;
@@ -110,6 +111,15 @@ public sealed class VoiceBoxHostView : Grid
         {
             _progressPanel.Visibility = Visibility.Visible;
             _hostBorder.Visibility = Visibility.Collapsed;
+
+            // ARM64 machines get the NATIVE port (VoiceBox's own backend + web UI on native
+            // Python — boots in seconds). x64 machines, or the opt-in emulation toggle for
+            // the Chatterbox/LuxTTS engines, get the official desktop app SetParent-embedded.
+            if (VoiceBoxNative.IsArm64 && !Settings.Current.VoiceBoxUseEmulated)
+            {
+                await EnsureNativeAsync();
+                return;
+            }
 
             var exe = VoiceBoxManager.FindExecutable();
             if (exe is null)
@@ -190,6 +200,51 @@ public sealed class VoiceBoxHostView : Grid
         _bar.IsIndeterminate = false;
         _bar.Value = 0;
     });
+
+    /// <summary>Native ARM64 path: install runtime once, boot the server, show the real
+    /// VoiceBox web UI in an embedded WebView2 — pixel-identical, zero emulation.</summary>
+    private async Task EnsureNativeAsync()
+    {
+        if (!VoiceBoxNative.IsInstalled)
+        {
+            SetStatus("One-time setup: native ARM64 VoiceBox (about 350 MB)…", -1);
+            var progress = new Progress<(string Phase, double Pct)>(p => SetStatus(p.Phase, p.Pct));
+            await VoiceBoxNative.InstallAsync(progress, _cts!.Token);
+        }
+
+        VoiceBoxNative.StartServer();
+        SetStatus("Starting VoiceBox (native)…", -1);
+        if (!await VoiceBoxNative.WaitForServerAsync(TimeSpan.FromSeconds(90), _cts!.Token))
+        {
+            SetStatus("The native VoiceBox server didn't come up. Try again, or enable the emulated app under Settings → General → VoiceBox.", -1);
+            return;
+        }
+
+        // profiles db now exists (server migrations) — make sure the built-in voices are there
+        _ = Task.Run(async () =>
+        {
+            for (int i = 0; i < 12; i++)
+            {
+                if (await VoiceBoxManager.SeedPresetVoicesAsync() > 0) break;
+                await Task.Delay(2500);
+            }
+        });
+
+        if (_web is null)
+        {
+            var env = await Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(
+                userDataFolder: Path.Combine(FluidVoice.Core.AppPaths.DataDir, "WebView2-VoiceBoxNative"));
+            _web = new Microsoft.Web.WebView2.Wpf.WebView2();
+            await _web.EnsureCoreWebView2Async(env);
+            _web.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
+            _web.CoreWebView2.Settings.IsStatusBarEnabled = false;
+        }
+        _web.Source = new Uri($"http://127.0.0.1:{VoiceBoxNative.Port}/");
+        _hostBorder.Child = _web;
+        _hostBorder.Visibility = Visibility.Visible;
+        _progressPanel.Visibility = Visibility.Collapsed;
+        Log.Info("voicebox", "Native VoiceBox UI embedded (WebView2)");
+    }
 
     private void SetStatus(string text, double pct)
     {

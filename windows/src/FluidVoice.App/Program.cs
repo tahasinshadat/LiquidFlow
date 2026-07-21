@@ -189,12 +189,17 @@ public static class Program
             t.Start();
         }
 
-        // Pre-warm VoiceBox's AI backend (headless) shortly after startup so the VoiceBox
-        // tab opens in seconds. Delayed so it never competes with LiquidFlow's own boot.
+        // Pre-warm VoiceBox's backend (headless) shortly after startup so the VoiceBox tab
+        // opens in seconds. ARM64 warms the NATIVE server (only if already installed — the
+        // one-time setup happens on tab open); x64 / emulation-toggle warms the desktop app.
         _ = Task.Run(async () =>
         {
             await Task.Delay(TimeSpan.FromSeconds(20));
-            App.VoiceBoxManager.PrewarmServer();
+            if (!Settings.Current.VoiceBoxPrewarmEnabled) return;
+            if (App.VoiceBoxNative.IsArm64 && !Settings.Current.VoiceBoxUseEmulated)
+                App.VoiceBoxNative.StartServer();
+            else
+                App.VoiceBoxManager.PrewarmServer();
         });
 
         Log.Info("app", $"FluidVoice started (hotkey: {Settings.Current.PrimaryDictationShortcuts.FirstOrDefault()?.DisplayString})");

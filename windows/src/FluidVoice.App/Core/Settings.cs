@@ -142,6 +142,10 @@ public sealed class Settings
     /// <summary>Boot VoiceBox's AI backend quietly at LiquidFlow startup so the VoiceBox
     /// tab opens in seconds instead of a cold multi-minute boot (uses idle RAM).</summary>
     public bool VoiceBoxPrewarmEnabled { get; set; } = true;
+    /// <summary>ARM64 only: use the official x64 desktop VoiceBox under emulation instead of
+    /// the native port — needed for the Chatterbox/LuxTTS engines (no ARM64 torchaudio yet).
+    /// Off by default; nothing x64 is installed or loaded until this is turned on.</summary>
+    public bool VoiceBoxUseEmulated { get; set; }
     public List<CustomDictionaryEntry> CustomDictionaryEntries { get; set; } = new();
     public bool GaavRemoveTrailingPeriodEnabled { get; set; }
     public bool GaavLowercaseFirstLetterEnabled { get; set; }

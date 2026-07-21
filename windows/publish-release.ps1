@@ -38,6 +38,9 @@ if ($LASTEXITCODE -ne 0) { throw "Not signed in. Run once: gh auth login  (choos
 
 $assets = Get-ChildItem $dist -File | Where-Object { $_.Name -match [regex]::Escape($Version) }
 if (-not $assets) { throw "No installers matching $Version in $dist - build first: windows\installer\build.ps1 -Version $Version" }
+# Stable-name assets (no version in filename) that the app downloads via releases/latest:
+$frontend = Get-ChildItem $dist -File -Filter "VoiceBoxNative-frontend.zip" -ErrorAction SilentlyContinue
+if ($frontend) { $assets = @($assets) + @($frontend) }
 Write-Host "Assets:" ($assets.Name -join ", ")
 
 $tag = "v$Version"
