@@ -148,8 +148,8 @@ public sealed class VoiceBoxStudioView : StackPanel
     // ── studio shell ───────────────────────────────────────────────────────
 
     private string[] CurrentTabs => Settings.Current.VoiceBoxNativeOnly
-        ? new[] { "Generate", "Voices", "Stories", "History", "Models" }
-        : new[] { "Generate", "Voices", "Stories", "History", "Effects", "Captures", "Models" };
+        ? new[] { "Generate", "Clone", "Voices", "Stories", "History", "Models" }
+        : new[] { "Generate", "Clone", "Voices", "Stories", "History", "Effects", "Captures", "Models" };
 
     private void BuildStudio()
     {
@@ -164,6 +164,7 @@ public sealed class VoiceBoxStudioView : StackPanel
         switch (tabs[_tab])
         {
             case "Generate": _body.Children.Add(BuildGenerate()); break;
+            case "Clone": _body.Children.Add(BuildClone()); break;
             case "Voices": _ = BuildVoicesAsync(); break;
             case "Stories": _ = BuildStoriesAsync(); break;
             case "History": _ = BuildHistoryAsync(); break;
@@ -330,6 +331,232 @@ public sealed class VoiceBoxStudioView : StackPanel
         {
             File.Copy(_lastWav, dlg.FileName, overwrite: true);
             _status.Text = $"Saved to {dlg.FileName}";
+        }
+    }
+
+    // ── Clone (one-click voice cloning) ────────────────────────────────────
+
+    private WaveInEvent? _rec;
+    private MemoryStream? _recBytes;
+    private readonly List<float> _recSamples = new();
+    private DispatcherTimer? _recTimer;
+    private DateTime _recStart;
+    private bool _cloneBusy;
+
+    private UIElement BuildClone()
+    {
+        StopRecording(discard: true);
+        var p = new StackPanel();
+
+        p.Children.Add(Theme.Label("Voice name"));
+        var nameBox = new TextBox { Width = 280, HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(8, 6, 8, 6), FontSize = 14 };
+        nameBox.Text = UniqueVoiceName("My voice");
+        p.Children.Add(nameBox);
+
+        var micGlyph = new TextBlock
+        {
+            Text = "",
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+            FontSize = 34,
+            Foreground = Brushes.White,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var mic = new Border
+        {
+            Width = 92, Height = 92,
+            CornerRadius = new CornerRadius(46),
+            Background = Theme.InkBrush,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 26, 0, 12),
+            Cursor = Cursors.Hand,
+            Child = micGlyph,
+        };
+        p.Children.Add(mic);
+
+        var hint = new TextBlock
+        {
+            Text = "Click the mic and speak naturally — 15–30 seconds is ideal. Click again to finish.",
+            FontSize = 13,
+            Foreground = Theme.SubtleBrush,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            TextAlignment = TextAlignment.Center,
+            TextWrapping = TextWrapping.Wrap,
+            MaxWidth = 460,
+        };
+        p.Children.Add(hint);
+
+        var st = new TextBlock
+        {
+            FontSize = 12.5,
+            Foreground = Theme.SubtleBrush,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            TextAlignment = TextAlignment.Center,
+            TextWrapping = TextWrapping.Wrap,
+            MaxWidth = 520,
+            Margin = new Thickness(0, 10, 0, 6),
+        };
+        p.Children.Add(st);
+
+        mic.MouseLeftButtonUp += async (_, _) =>
+        {
+            if (_cloneBusy) return;
+            if (_rec is null)
+            {
+                // start
+                try
+                {
+                    _recSamples.Clear();
+                    _recBytes = new MemoryStream();
+                    _rec = new WaveInEvent { WaveFormat = new WaveFormat(16000, 1), BufferMilliseconds = 50 };
+                    _rec.DataAvailable += (_, e) =>
+                    {
+                        _recBytes?.Write(e.Buffer, 0, e.BytesRecorded);
+                        for (int i = 0; i + 1 < e.BytesRecorded; i += 2)
+                            _recSamples.Add(BitConverter.ToInt16(e.Buffer, i) / 32768f);
+                    };
+                    _rec.StartRecording();
+                    _recStart = DateTime.Now;
+                    mic.Background = new SolidColorBrush(Theme.Danger);
+                    micGlyph.Text = "";
+                    _recTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+                    _recTimer.Tick += (_, _) =>
+                    {
+                        var e = DateTime.Now - _recStart;
+                        hint.Text = $"Recording  {(int)e.TotalMinutes}:{e.Seconds:00} — click to finish (auto-stops at 1:00)";
+                        if (e.TotalSeconds >= 60) mic.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(
+                            System.Windows.Input.Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
+                        { RoutedEvent = MouseLeftButtonUpEvent });
+                    };
+                    _recTimer.Start();
+                    st.Text = "";
+                }
+                catch (Exception ex)
+                {
+                    StopRecording(discard: true);
+                    st.Text = $"Couldn't open the microphone: {ex.Message}";
+                }
+                return;
+            }
+
+            // stop + process
+            var seconds = (DateTime.Now - _recStart).TotalSeconds;
+            var samples = _recSamples.ToArray();
+            var raw = _recBytes?.ToArray() ?? Array.Empty<byte>();
+            StopRecording(discard: false);
+            mic.Background = Theme.InkBrush;
+            micGlyph.Text = "";
+            hint.Text = "Click the mic and speak naturally — 15–30 seconds is ideal. Click again to finish.";
+            if (seconds < 3)
+            {
+                st.Text = "That was under 3 seconds — give it a bit more speech and try again.";
+                return;
+            }
+
+            _cloneBusy = true;
+            try
+            {
+                // write the sample wav
+                var dir = Path.Combine(FluidVoice.Core.AppPaths.DataDir, "Voices", "CloneSamples");
+                Directory.CreateDirectory(dir);
+                var wavPath = Path.Combine(dir, $"clone-{DateTime.Now:yyyyMMdd-HHmmss}.wav");
+                await using (var writer = new WaveFileWriter(wavPath, new WaveFormat(16000, 1)))
+                    writer.Write(raw, 0, raw.Length);
+
+                st.Text = "Transcribing your recording locally…";
+                var transcript = await TryTranscribeAsync(samples);
+                var reference = string.IsNullOrWhiteSpace(transcript)
+                    ? "A natural reference recording of my voice."
+                    : transcript!;
+
+                var name = UniqueVoiceName(string.IsNullOrWhiteSpace(nameBox.Text) ? "My voice" : nameBox.Text.Trim());
+                st.Text = $"Creating “{name}”…";
+                var prof = await VoiceBoxApi.CreateClonedProfileAsync(name, "Cloned from a quick in-app recording");
+                st.Text = "Uploading your sample…";
+                await VoiceBoxApi.UploadSampleAsync(prof.Id, wavPath, reference);
+                _profiles = await VoiceBoxApi.GetProfilesAsync();
+                nameBox.Text = UniqueVoiceName("My voice");
+
+                var doneMsg = $"“{name}” is ready — pick it on the Generate tab.";
+                try
+                {
+                    var qwen = (await VoiceBoxApi.GetModelsAsync()).FirstOrDefault(m => m.ModelName == "qwen-tts-0.6B");
+                    if (qwen is { Downloaded: false })
+                        doneMsg += "  One more thing: download “Qwen TTS 0.6B” under Models — cloned voices speak through it.";
+                }
+                catch { }
+                st.Text = doneMsg;
+                if (!string.IsNullOrWhiteSpace(transcript))
+                    st.Text += $"\nHeard: “{(transcript!.Length > 90 ? transcript[..90] + "…" : transcript)}”";
+            }
+            catch (Exception ex)
+            {
+                Log.Error("voicebox", "One-click clone failed", ex);
+                st.Text = $"Couldn't clone: {ex.Message}";
+            }
+            finally
+            {
+                _cloneBusy = false;
+            }
+        };
+
+        p.Children.Add(Subtle("Have a recording already? Voices → Add voice → “Clone from my audio”.", 11.5));
+        ((TextBlock)p.Children[^1]).HorizontalAlignment = HorizontalAlignment.Center;
+        ((TextBlock)p.Children[^1]).Margin = new Thickness(0, 14, 0, 0);
+        return Theme.Card2(p);
+    }
+
+    private void StopRecording(bool discard)
+    {
+        try { _rec?.StopRecording(); _rec?.Dispose(); } catch { }
+        _rec = null;
+        _recTimer?.Stop();
+        _recTimer = null;
+        if (discard)
+        {
+            _recBytes?.Dispose();
+            _recBytes = null;
+            _recSamples.Clear();
+        }
+    }
+
+    private string UniqueVoiceName(string baseName)
+    {
+        if (_profiles.All(p => !string.Equals(p.Name, baseName, StringComparison.OrdinalIgnoreCase))) return baseName;
+        for (int i = 2; ; i++)
+        {
+            var candidate = $"{baseName} {i}";
+            if (_profiles.All(p => !string.Equals(p.Name, candidate, StringComparison.OrdinalIgnoreCase))) return candidate;
+        }
+    }
+
+    /// <summary>Transcribe the clip with LiquidFlow's own local STT (Parakeet by default) so
+    /// the clone gets an accurate reference text. Returns null when unavailable.</summary>
+    private static async Task<string?> TryTranscribeAsync(float[] samples16k)
+    {
+        try
+        {
+            var model = Stt.SpeechModels.Selected();
+            if (!model.IsDownloaded) return null;
+            using Stt.ISpeechEngine engine = model.Engine == Stt.SpeechEngineKind.Parakeet
+                ? new Stt.ParakeetEngine()
+                : new Stt.WhisperEngine();
+            await engine.PrepareAsync(model, new Progress<Stt.ModelPreparationProgress>(_ => { }), CancellationToken.None);
+            var pcm = samples16k;
+            if (pcm.Length < 16000)
+            {
+                var padded = new float[16000];
+                Array.Copy(pcm, padded, pcm.Length);
+                pcm = padded;
+            }
+            var raw = await engine.TranscribeAsync(Audio.Dsp.Normalize(pcm), CancellationToken.None);
+            var formatted = Text.TranscriptFormatter.Process(raw);
+            return string.IsNullOrWhiteSpace(formatted) ? null : formatted.Trim();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("voicebox", $"Clone transcription skipped: {ex.Message}");
+            return null;
         }
     }
 

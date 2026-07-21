@@ -127,18 +127,22 @@ public sealed class MeetingService
 
         var transcript = Transcript;
         string summary = "";
+        string title = "";
         if (!string.IsNullOrWhiteSpace(transcript) && MeetingSummarizer.IsAvailable)
         {
             StatusChanged?.Invoke("Summarizing…");
             try { summary = await MeetingSummarizer.SummarizeAsync(transcript, CancellationToken.None) ?? ""; }
             catch (Exception ex) { Log.Warn("meeting", $"Summary failed: {ex.Message}"); }
+            StatusChanged?.Invoke("Naming…");
+            try { title = await MeetingSummarizer.TitleAsync(transcript, CancellationToken.None) ?? ""; }
+            catch (Exception ex) { Log.Warn("meeting", $"Auto-title failed: {ex.Message}"); }
         }
 
         var meeting = new Meeting
         {
             StartedAt = _startedAt,
             DurationSeconds = duration.TotalSeconds,
-            Title = $"Meeting · {_startedAt:MMM d, h:mm tt}",
+            Title = string.IsNullOrWhiteSpace(title) ? $"Meeting · {_startedAt:MMM d, h:mm tt}" : title,
             Transcript = transcript,
             Summary = summary,
         };

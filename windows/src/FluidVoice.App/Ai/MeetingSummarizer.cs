@@ -58,4 +58,42 @@ public static class MeetingSummarizer
 
         return string.IsNullOrWhiteSpace(response.Content) ? null : response.Content.Trim();
     }
+
+    /// <summary>Short descriptive meeting title from the transcript, or null (no provider,
+    /// empty transcript, or an unusable response — callers keep their fallback title).</summary>
+    public static async Task<string?> TitleAsync(string transcript, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(transcript)) return null;
+        var providerId = Settings.Current.SelectedProviderID;
+        if (string.IsNullOrEmpty(providerId) || !ProviderCatalog.IsConfigured(providerId)) return null;
+        var model = ProviderCatalog.SelectedModelFor(providerId);
+        if (model is null) return null;
+
+        // The opening usually states the topic; the end covers what it became about.
+        var clipped = transcript.Length > 6000
+            ? transcript[..3000] + " … " + transcript[^3000..]
+            : transcript;
+
+        const string system =
+            "You name meetings. Reply with only a short descriptive title for the meeting " +
+            "transcript, 3 to 7 words, in plain text: no quotes, no trailing punctuation, and " +
+            "never a generic name like 'Meeting' or 'Discussion' alone.";
+
+        var response = await LlmClient.CallAsync(new LlmRequest
+        {
+            ProviderId = providerId,
+            Model = model,
+            Messages = new List<LlmMessage>
+            {
+                new("system", system),
+                new("user", $"Transcript:\n\n{clipped}"),
+            },
+            Temperature = providerId == ProviderCatalog.FluidLocalId ? 0.2 : 0.3,
+            TimeoutSeconds = 60,
+        }, ct);
+
+        var title = response.Content.Trim().Split('\n').FirstOrDefault()?.Trim().Trim('"', '\'', '“', '”', '.', ':') ?? "";
+        if (title.Length is 0 or > 80) return null; // over-long output = the model rambled, keep the fallback
+        return title;
+    }
 }

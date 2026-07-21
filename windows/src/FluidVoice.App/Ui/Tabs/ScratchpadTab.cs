@@ -243,12 +243,12 @@ public sealed class ScratchpadTab : StackPanel
         var header = new DockPanel();
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         actions.Children.Add(PageChrome.IconButton("\uE70F", "Edit note", () => NoteWindow.OpenNote(note)));
-        actions.Children.Add(PageChrome.IconButton("\uE718", note.IsPinned ? "Unpin note" : "Pin note", () =>
+        actions.Children.Add(PageChrome.DangerIconButton("\uE718", note.IsPinned ? "Unpin note" : "Pin note", () =>
         {
             note.IsPinned = !note.IsPinned;
             NotesStore.Save(note);
-        }));
-        actions.Children.Add(PageChrome.IconButton("\uE74D", "Delete note", () => NotesStore.Delete(note.Id)));
+        }, active: note.IsPinned));
+        actions.Children.Add(PageChrome.DangerIconButton("\uE74D", "Delete note", () => NotesStore.Delete(note.Id)));
         DockPanel.SetDock(actions, Dock.Right);
         header.Children.Add(actions);
         header.Children.Add(new TextBlock

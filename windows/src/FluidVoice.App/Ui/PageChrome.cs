@@ -275,6 +275,45 @@ public static class PageChrome
         return row;
     }
 
+    /// <summary>Icon button for destructive/pin actions: hovers red, and `active` (e.g. a pinned
+    /// note) keeps the red state persistently so the toggle is visible at a glance.</summary>
+    public static Border DangerIconButton(string glyph, string? tooltip, Action onClick, bool active = false)
+    {
+        var dangerSoft = new SolidColorBrush(Color.FromArgb(26, Theme.Danger.R, Theme.Danger.G, Theme.Danger.B));
+        var icon = new TextBlock
+        {
+            Text = glyph,
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+            FontSize = 14,
+            Foreground = active ? new SolidColorBrush(Theme.Danger) : Theme.SubtleBrush,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var button = new Border
+        {
+            Width = 30,
+            Height = 30,
+            CornerRadius = new CornerRadius(8),
+            Background = active ? dangerSoft : Brushes.Transparent,
+            Cursor = Cursors.Hand,
+            ToolTip = tooltip,
+            Margin = new Thickness(4, 0, 0, 0),
+            Child = icon,
+        };
+        button.MouseEnter += (_, _) =>
+        {
+            button.Background = dangerSoft;
+            icon.Foreground = new SolidColorBrush(Theme.Danger);
+        };
+        button.MouseLeave += (_, _) =>
+        {
+            button.Background = active ? dangerSoft : Brushes.Transparent;
+            icon.Foreground = active ? new SolidColorBrush(Theme.Danger) : Theme.SubtleBrush;
+        };
+        button.MouseLeftButtonUp += (_, e) => { e.Handled = true; onClick(); };
+        return button;
+    }
+
     /// <summary>Small hoverable MDL2 icon button.</summary>
     public static Border IconButton(string glyph, string? tooltip, Action? onClick)
     {

@@ -116,6 +116,8 @@ public sealed class NoteWindow : Window
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             IsUndoEnabled = true,
             SpellCheck = { IsEnabled = true },
+            SelectionBrush = new SolidColorBrush(Theme.Accent),
+            SelectionOpacity = 0.3,
         };
 
         var hotkey = Settings.Current.PrimaryDictationShortcuts.FirstOrDefault()?.DisplayString ?? "your hotkey";
@@ -250,7 +252,7 @@ public sealed class NoteWindow : Window
     {
         var document = new FlowDocument
         {
-            PagePadding = new Thickness(24, 18, 24, 82),
+            PagePadding = new Thickness(28, 22, 28, 90),
             FontFamily = Theme.UiFont,
             FontSize = 15,
             Foreground = Theme.TextBrush,
@@ -350,7 +352,7 @@ public sealed class NoteWindow : Window
         {
             if (_editor.CanUndo) _editor.Undo();
         }));
-        _editorActions.Children.Add(EditorAction("\uE74D", "Delete note", DeleteActive));
+        _editorActions.Children.Add(EditorAction("\uE74D", "Delete note", DeleteActive, danger: true));
         _editorActions.Children.Add(CopyButton());
         host.Children.Add(_editorActions);
         host.Children.Add(_toolPanel);
@@ -580,6 +582,11 @@ public sealed class NoteWindow : Window
                 Margin = new Thickness(0, 2, 0, 0),
             });
             button.Child = text;
+            button.MouseEnter += (_, _) =>
+            {
+                if (!selected) button.Background = new SolidColorBrush(Color.FromArgb(18, Theme.Text.R, Theme.Text.G, Theme.Text.B));
+            };
+            button.MouseLeave += (_, _) => button.Background = selected ? new SolidColorBrush(Theme.SidebarSelected) : Brushes.Transparent;
             button.MouseLeftButtonUp += (_, e) => { e.Handled = true; ShowNote(note); };
             _noteList.Children.Add(button);
         }
@@ -612,11 +619,18 @@ public sealed class NoteWindow : Window
     {
         _toolPanel.Child = null;
         _toolPanel.Visibility = _tool == BottomTool.None ? Visibility.Collapsed : Visibility.Visible;
-        _toolPanel.Height = _tool == BottomTool.Transforms ? 124 : 70;
+        _toolPanel.Height = _tool == BottomTool.Transforms ? 116 : 70;
         _editorActions.Margin = new Thickness(0, 0, 14, _tool == BottomTool.None ? 12 : _toolPanel.Height + 18);
-        _editor.Document.PagePadding = new Thickness(24, 18, 24, _tool == BottomTool.None ? 82 : _toolPanel.Height + 84);
+        ApplyEditorPadding();
         if (_tool == BottomTool.Formatting) _toolPanel.Child = BuildFormattingBar();
         if (_tool == BottomTool.Transforms) _toolPanel.Child = BuildTransformPanel();
+    }
+
+    /// <summary>Comfortable page padding; RichTextBox silently resets Document.PagePadding whenever
+    /// a document is attached, so this must be re-applied after every document swap/load.</summary>
+    private void ApplyEditorPadding()
+    {
+        _editor.Document.PagePadding = new Thickness(28, 22, 28, _tool == BottomTool.None ? 90 : _toolPanel.Height + 92);
     }
 
     private UIElement BuildFormattingBar()
@@ -650,15 +664,17 @@ public sealed class NoteWindow : Window
 
     private UIElement BuildTransformPanel()
     {
-        var grid = new Grid { Margin = new Thickness(16, 10, 16, 10) };
-        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(38) });
+        var grid = new Grid { Margin = new Thickness(16, 12, 16, 12) };
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1) });
         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-        var quick = new DockPanel();
+        var quick = new DockPanel { Margin = new Thickness(0, 0, 0, 11), LastChildFill = true };
+        _transformStatus.VerticalAlignment = VerticalAlignment.Center;
+        _transformStatus.Margin = new Thickness(10, 0, 2, 0);
         DockPanel.SetDock(_transformStatus, Dock.Right);
         quick.Children.Add(_transformStatus);
-        var chips = new StackPanel { Orientation = Orientation.Horizontal };
+        var chips = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         chips.Children.Add(TransformChip("Polish", "Polish this text: improve clarity and conciseness while preserving its meaning and tone."));
         chips.Children.Add(TransformChip("More professional", "Rewrite this text in a more professional, polished tone without making it stiff."));
         chips.Children.Add(TransformChip("More casual", "Rewrite this text in a natural, more casual tone while preserving the meaning."));
@@ -670,10 +686,22 @@ public sealed class NoteWindow : Window
         Grid.SetRow(divider, 1);
         grid.Children.Add(divider);
 
-        var composer = new Grid { Margin = new Thickness(0, 8, 0, 0) };
-        composer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        composer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(42) });
-        var promptHost = new Grid();
+        var composer = new Border
+        {
+            Tag = InteractiveTag,
+            Height = 38,
+            Margin = new Thickness(0, 10, 0, 0),
+            Background = new SolidColorBrush(Theme.Field),
+            BorderBrush = Theme.HairlineBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(11),
+            Padding = new Thickness(12, 0, 3, 0),
+            VerticalAlignment = VerticalAlignment.Top,
+        };
+        var composerGrid = new Grid();
+        composerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        composerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var promptHost = new Grid { VerticalAlignment = VerticalAlignment.Center };
         promptHost.Children.Add(_transformPrompt);
         _transformPromptPlaceholder = new TextBlock
         {
@@ -686,20 +714,22 @@ public sealed class NoteWindow : Window
         _transformPromptPlaceholder.Visibility = _transformPrompt.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         promptHost.Children.Add(_transformPromptPlaceholder);
         Grid.SetColumn(promptHost, 0);
-        composer.Children.Add(promptHost);
+        composerGrid.Children.Add(promptHost);
         var send = new Border
         {
             Tag = InteractiveTag,
-            Width = 34,
-            Height = 34,
-            CornerRadius = new CornerRadius(10),
+            Width = 30,
+            Height = 30,
+            CornerRadius = new CornerRadius(9),
             Background = Theme.InkBrush,
             Cursor = Cursors.Hand,
-            Child = Theme.Glyph("\uE72A", 13, new SolidColorBrush(Theme.InkText)),
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = Theme.Glyph("\uE72A", 12, new SolidColorBrush(Theme.InkText)),
         };
         send.MouseLeftButtonUp += (_, e) => { e.Handled = true; _ = RunTransformAsync(_transformPrompt.Text); };
         Grid.SetColumn(send, 1);
-        composer.Children.Add(send);
+        composerGrid.Children.Add(send);
+        composer.Child = composerGrid;
         Grid.SetRow(composer, 2);
         grid.Children.Add(composer);
         return grid;
@@ -711,12 +741,25 @@ public sealed class NoteWindow : Window
         {
             Tag = InteractiveTag,
             Background = new SolidColorBrush(Theme.SidebarSelected),
-            CornerRadius = new CornerRadius(14),
-            Padding = new Thickness(13, 6, 13, 6),
+            BorderBrush = Brushes.Transparent,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(15),
+            Padding = new Thickness(14, 6, 14, 6),
             Margin = new Thickness(0, 0, 8, 0),
+            VerticalAlignment = VerticalAlignment.Center,
             Cursor = Cursors.Hand,
-            Child = new TextBlock { Text = label, FontSize = 12.5, Foreground = Theme.TextBrush },
+            Child = new TextBlock
+            {
+                Text = label,
+                FontSize = 12.5,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Theme.TextBrush,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            },
         };
+        chip.MouseEnter += (_, _) => chip.BorderBrush = Theme.AccentBrush;
+        chip.MouseLeave += (_, _) => chip.BorderBrush = Brushes.Transparent;
         chip.MouseLeftButtonUp += (_, e) => { e.Handled = true; _ = RunTransformAsync(instruction); };
         return chip;
     }
@@ -874,7 +917,7 @@ public sealed class NoteWindow : Window
         return button;
     }
 
-    private Border EditorAction(string glyph, string tooltip, Action action)
+    private Border EditorAction(string glyph, string tooltip, Action action, bool danger = false)
     {
         var button = ChromeButton(glyph, tooltip, action);
         button.Width = 38;
@@ -885,6 +928,21 @@ public sealed class NoteWindow : Window
         button.Margin = new Thickness(7, 0, 0, 0);
         button.Effect = new DropShadowEffect { BlurRadius = 9, ShadowDepth = 2, Opacity = 0.12 };
         button.MouseLeave += (_, _) => button.Background = Theme.SurfaceBrush;
+        if (danger && button.Child is TextBlock glyphBlock)
+        {
+            // hovering destructive actions goes red so the intent is unmistakable
+            button.MouseEnter += (_, _) =>
+            {
+                button.Background = new SolidColorBrush(Color.FromArgb(26, Theme.Danger.R, Theme.Danger.G, Theme.Danger.B));
+                button.BorderBrush = new SolidColorBrush(Theme.Danger);
+                glyphBlock.Foreground = new SolidColorBrush(Theme.Danger);
+            };
+            button.MouseLeave += (_, _) =>
+            {
+                button.BorderBrush = Theme.HairlineBrush;
+                glyphBlock.Foreground = Theme.TextBrush;
+            };
+        }
         return button;
     }
 
@@ -974,6 +1032,7 @@ public sealed class NoteWindow : Window
         {
             SetPlainText(_active?.Body ?? "");
         }
+        ApplyEditorPadding();
         _loading = false;
         _hint.Visibility = PlainText().Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         _editor.CaretPosition = _editor.Document.ContentEnd;
