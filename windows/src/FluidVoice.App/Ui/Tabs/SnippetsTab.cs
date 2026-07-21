@@ -30,7 +30,7 @@ public sealed class SnippetsTab : StackPanel
 
     private UIElement BuildHero()
     {
-        var content = new StackPanel { Margin = new Thickness(40, 34, 40, 34) };
+        var content = new StackPanel { Margin = new Thickness(40, 30, 40, 30) };
         var title = new TextBlock { FontFamily = Theme.DisplaySerif, FontSize = 30, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 12) };
         title.Inlines.Add(new Run("The stuff "));
         title.Inlines.Add(new Run("you") { FontStyle = FontStyles.Italic });

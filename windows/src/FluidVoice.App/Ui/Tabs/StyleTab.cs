@@ -60,7 +60,7 @@ public sealed class StyleTab : StackPanel
 
     private UIElement BuildHero()
     {
-        var content = new StackPanel { Margin = new Thickness(44, 40, 44, 40), VerticalAlignment = VerticalAlignment.Center };
+        var content = new StackPanel { Margin = new Thickness(40, 28, 40, 28), VerticalAlignment = VerticalAlignment.Center };
         var title = new TextBlock { FontFamily = Theme.DisplaySerif, FontSize = 30, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 10) };
         title.Inlines.Add(new Run("Make LiquidFlow sound like "));
         title.Inlines.Add(new Run("you") { FontStyle = FontStyles.Italic });
@@ -82,13 +82,13 @@ public sealed class StyleTab : StackPanel
         };
         content.Children.Add(start);
         var hero = PageChrome.DarkHero(content);
-        ((Border)hero).MinHeight = 230;
+        ((Border)hero).MinHeight = 170;
         return hero;
     }
 
     private static UIElement BuildContextBanner(string context)
     {
-        var copy = new StackPanel { Margin = new Thickness(36, 26, 36, 26), VerticalAlignment = VerticalAlignment.Center };
+        var copy = new StackPanel { Margin = new Thickness(40, 28, 40, 28), VerticalAlignment = VerticalAlignment.Center };
         var title = new TextBlock { FontFamily = Theme.DisplaySerif, FontSize = 24, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 8) };
         title.Inlines.Add(new Run(context switch
         {
@@ -113,7 +113,7 @@ public sealed class StyleTab : StackPanel
         dock.Children.Add(cluster);
         dock.Children.Add(copy);
         var hero = PageChrome.DarkHero(dock);
-        ((Border)hero).MinHeight = 150;
+        ((Border)hero).MinHeight = 170;
         ((Border)hero).Margin = new Thickness(0, 0, 0, 26);
         return hero;
     }
@@ -417,7 +417,7 @@ public static class StyleCards
             BorderBrush = selected ? Theme.PurpleBrush : Theme.HairlineBrush,
             BorderThickness = new Thickness(selected ? 2 : 1),
             CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(18, 16, 18, 24),
+            Padding = new Thickness(20, 18, 20, 20),
             MinHeight = large ? 340 : 280,
             Cursor = Cursors.Hand,
             Child = panel,

@@ -104,7 +104,7 @@ public sealed class MeetingsTab : StackPanel
     {
         var content = new System.Windows.Controls.StackPanel
         {
-            Margin = new Thickness(44, 34, 44, 34),
+            Margin = new Thickness(40, 30, 40, 30),
             VerticalAlignment = VerticalAlignment.Center,
             MaxWidth = 780,
             HorizontalAlignment = HorizontalAlignment.Left,
@@ -126,7 +126,7 @@ public sealed class MeetingsTab : StackPanel
             TextWrapping = TextWrapping.Wrap,
         });
         var hero = PageChrome.DarkHero(content);
-        ((System.Windows.Controls.Border)hero).MinHeight = 190;
+        ((System.Windows.Controls.Border)hero).MinHeight = 200;
         ((System.Windows.Controls.Border)hero).Margin = new Thickness(0, 0, 0, 26);
         return hero;
     }

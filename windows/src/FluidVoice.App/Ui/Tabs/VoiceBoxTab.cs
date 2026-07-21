@@ -80,7 +80,7 @@ public sealed class VoiceBoxTab : StackPanel
         DockPanel.SetDock(cluster, Dock.Right);
         dock.Children.Add(cluster);
 
-        var content = new StackPanel { Margin = new Thickness(44, 32, 20, 32), VerticalAlignment = VerticalAlignment.Center };
+        var content = new StackPanel { Margin = new Thickness(40, 30, 20, 30), VerticalAlignment = VerticalAlignment.Center };
         var title = new TextBlock { FontFamily = Theme.DisplaySerif, FontSize = 28, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 10) };
         title.Inlines.Add(new Run("The open-source AI "));
         title.Inlines.Add(new Run("voice studio") { FontStyle = FontStyles.Italic });
@@ -137,7 +137,7 @@ public sealed class VoiceBoxTab : StackPanel
         dock.Children.Add(content);
 
         var hero = PageChrome.DarkHero(dock);
-        ((Border)hero).MinHeight = 210;
+        ((Border)hero).MinHeight = 200;
         ((Border)hero).Margin = new Thickness(0, 0, 0, 26);
         return hero;
     }

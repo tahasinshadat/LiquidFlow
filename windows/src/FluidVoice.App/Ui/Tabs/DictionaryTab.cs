@@ -59,7 +59,7 @@ public sealed class DictionaryTab : StackPanel
             },
         });
 
-        var content = new StackPanel { Margin = new Thickness(34, 28, 34, 28), VerticalAlignment = VerticalAlignment.Center };
+        var content = new StackPanel { Margin = new Thickness(40, 28, 40, 28), VerticalAlignment = VerticalAlignment.Center };
         var title = new TextBlock { FontFamily = Theme.DisplaySerif, FontSize = 28, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 12) };
         title.Inlines.Add(new Run("LiquidFlow spells the way "));
         title.Inlines.Add(new Run("you") { FontStyle = FontStyles.Italic });
@@ -115,7 +115,7 @@ public sealed class DictionaryTab : StackPanel
         close.MouseLeftButtonUp += (_, _) => { _bannerDismissed = true; Build(); };
         grid.Children.Add(close);
 
-        return new Border { CornerRadius = new CornerRadius(18), Margin = new Thickness(0, 0, 0, 22), Child = grid };
+        return new Border { CornerRadius = new CornerRadius(18), Margin = new Thickness(0, 0, 0, 26), Child = grid };
     }
 
     // ---- auto-learned corrections ----

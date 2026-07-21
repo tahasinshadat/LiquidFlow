@@ -1,0 +1,288 @@
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
+using FluidVoice.App;
+using FluidVoice.Core;
+
+namespace FluidVoice.Ui;
+
+/// <summary>
+/// The in-app VoiceBox surface: auto-downloads/installs VoiceBox on first open, launches it,
+/// and re-parents its window INSIDE LiquidFlow (SetParent embed) under a "← Back" bar — the
+/// sidebar entry routes here so VoiceBox feels like part of the app. Singleton so the embedded
+/// window survives tab switches; navigating away hides (not kills) VoiceBox.
+/// </summary>
+public sealed class VoiceBoxHostView : Grid
+{
+    public static VoiceBoxHostView Instance { get; } = new();
+
+    private readonly TextBlock _status = new()
+    {
+        FontSize = 13.5,
+        Foreground = Theme.SubtleBrush,
+        HorizontalAlignment = HorizontalAlignment.Center,
+        TextWrapping = TextWrapping.Wrap,
+        MaxWidth = 520,
+        TextAlignment = TextAlignment.Center,
+    };
+    private readonly ProgressBar _bar = new() { Width = 380, Height = 8, Margin = new Thickness(0, 14, 0, 0) };
+    private readonly StackPanel _progressPanel;
+    private readonly Border _hostBorder;
+    private EmbedHost? _embed;
+    private CancellationTokenSource? _cts;
+    private bool _busy;
+
+    private VoiceBoxHostView()
+    {
+        RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+        // ---- top bar: back + title ----
+        var bar = new DockPanel { Margin = new Thickness(16, 12, 16, 10) };
+        var back = new Border
+        {
+            Background = new SolidColorBrush(Theme.SidebarSelected),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(12, 6, 12, 6),
+            Cursor = Cursors.Hand,
+            Child = new TextBlock
+            {
+                Text = "←  Back to LiquidFlow",
+                FontSize = 12.5,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Theme.TextBrush,
+            },
+        };
+        back.MouseLeftButtonUp += (_, _) =>
+            (Window.GetWindow(this) as MainWindow)?.CaptureNavigate("Dictation");
+        DockPanel.SetDock(back, Dock.Left);
+        bar.Children.Add(back);
+        bar.Children.Add(new TextBlock
+        {
+            Text = "VoiceBox — open-source AI voice studio (MIT, by Jamie Pine)",
+            FontSize = 12.5,
+            Foreground = Theme.SubtleBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Right,
+        });
+        SetRow(bar, 0);
+        Children.Add(bar);
+
+        // ---- progress / status panel ----
+        _progressPanel = new StackPanel
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        _progressPanel.Children.Add(new TextBlock
+        {
+            Text = "VoiceBox",
+            FontFamily = Theme.DisplaySerif,
+            FontSize = 30,
+            Foreground = Theme.TextBrush,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 0, 0, 12),
+        });
+        _progressPanel.Children.Add(_status);
+        _progressPanel.Children.Add(_bar);
+        var cancel = Theme.SecondaryButton("Cancel");
+        cancel.HorizontalAlignment = HorizontalAlignment.Center;
+        cancel.Margin = new Thickness(0, 16, 0, 0);
+        cancel.Click += (_, _) => _cts?.Cancel();
+        _progressPanel.Children.Add(cancel);
+        SetRow(_progressPanel, 1);
+        Children.Add(_progressPanel);
+
+        // ---- embed host ----
+        _hostBorder = new Border
+        {
+            Background = new SolidColorBrush(Theme.CardInner),
+            CornerRadius = new CornerRadius(10),
+            Margin = new Thickness(12, 0, 12, 12),
+            Visibility = Visibility.Collapsed,
+        };
+        SetRow(_hostBorder, 1);
+        Children.Add(_hostBorder);
+
+        Loaded += (_, _) =>
+        {
+            if (App.UiCapture.CaptureMode)
+            {
+                SetStatus("VoiceBox embeds right here — it downloads and installs itself on first open.", -1);
+                return;
+            }
+            _ = EnsureAsync();
+        };
+        Unloaded += (_, _) => DetachEmbed(hideWindow: true);
+    }
+
+    /// <summary>Full auto flow: install if missing → launch → embed.</summary>
+    private async Task EnsureAsync()
+    {
+        if (_busy) return;
+        _busy = true;
+        _cts = new CancellationTokenSource();
+        try
+        {
+            _progressPanel.Visibility = Visibility.Visible;
+            _hostBorder.Visibility = Visibility.Collapsed;
+
+            var exe = VoiceBoxManager.FindExecutable();
+            if (exe is null)
+            {
+                SetStatus("VoiceBox isn't installed yet — downloading it now (~516 MB, one time).", -1);
+                var progress = new Progress<(string Phase, double Pct)>(p => SetStatus(p.Phase, p.Pct));
+                exe = await VoiceBoxManager.EnsureInstalledAsync(progress, _cts.Token);
+                if (exe is null)
+                {
+                    SetStatus("Install didn't complete. Get it manually from github.com/jamiepine/voicebox/releases, then reopen this tab.", -1);
+                    return;
+                }
+            }
+
+            SetStatus("Starting VoiceBox…", -1);
+            var hwnd = await LaunchAndFindWindowAsync(exe, _cts.Token);
+            if (hwnd == IntPtr.Zero)
+            {
+                SetStatus("VoiceBox started but its window wasn't found — it may be open as a separate window.", -1);
+                return;
+            }
+
+            _embed?.Dispose();
+            _embed = new EmbedHost(hwnd);
+            _hostBorder.Child = _embed;
+            _hostBorder.Visibility = Visibility.Visible;
+            _progressPanel.Visibility = Visibility.Collapsed;
+            Log.Info("voicebox", "VoiceBox embedded");
+        }
+        catch (OperationCanceledException)
+        {
+            SetStatus("Cancelled. Reopen this tab to try again.", -1);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("voicebox", "VoiceBox auto-embed failed", ex);
+            SetStatus($"Couldn't set up VoiceBox: {ex.Message}", -1);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void SetStatus(string text, double pct)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            _status.Text = text;
+            _bar.IsIndeterminate = pct < 0;
+            if (pct >= 0) _bar.Value = pct * 100;
+        });
+    }
+
+    private static async Task<IntPtr> LaunchAndFindWindowAsync(string exe, CancellationToken ct)
+    {
+        var processName = Path.GetFileNameWithoutExtension(exe);
+        var existing = Process.GetProcessesByName(processName).FirstOrDefault(p => p.MainWindowHandle != IntPtr.Zero);
+        if (existing is null)
+        {
+            Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true });
+        }
+        for (int i = 0; i < 60; i++) // up to ~30s: Tauri + Python backend take a moment on first run
+        {
+            ct.ThrowIfCancellationRequested();
+            var proc = Process.GetProcessesByName(processName).FirstOrDefault(p => p.MainWindowHandle != IntPtr.Zero);
+            if (proc is not null) return proc.MainWindowHandle;
+            await Task.Delay(500, ct);
+        }
+        return IntPtr.Zero;
+    }
+
+    private void DetachEmbed(bool hideWindow)
+    {
+        if (_embed is null) return;
+        _embed.Release(hideWindow);
+        _hostBorder.Child = null;
+        _embed.Dispose();
+        _embed = null;
+        _hostBorder.Visibility = Visibility.Collapsed;
+        _progressPanel.Visibility = Visibility.Visible;
+        SetStatus("VoiceBox keeps running in the background — reopen this tab to re-embed it.", -1);
+    }
+
+    /// <summary>Win32 SetParent embed: adopts VoiceBox's top-level window as a child of this host.</summary>
+    private sealed class EmbedHost : HwndHost
+    {
+        private readonly IntPtr _target;
+        private int _originalStyle;
+        private bool _released;
+
+        public EmbedHost(IntPtr target) => _target = target;
+
+        protected override HandleRef BuildWindowCore(HandleRef hwndParent)
+        {
+            var host = CreateWindowEx(0, "STATIC", "", WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
+                0, 0, 100, 100, hwndParent.Handle, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+            _originalStyle = GetWindowLong(_target, GWL_STYLE);
+            SetWindowLong(_target, GWL_STYLE, (_originalStyle & ~(WS_CAPTION | WS_THICKFRAME | WS_POPUP)) | WS_CHILD);
+            SetParent(_target, host);
+            ShowWindow(_target, SW_SHOW);
+            Resize();
+            SizeChanged += (_, _) => Resize();
+            return new HandleRef(this, host);
+        }
+
+        private void Resize()
+        {
+            if (_released) return;
+            var w = Math.Max(100, (int)ActualWidth);
+            var h = Math.Max(100, (int)ActualHeight);
+            MoveWindow(_target, 0, 0, w, h, true);
+        }
+
+        /// <summary>Give the window back to the desktop (keeps VoiceBox alive across tab switches).</summary>
+        public void Release(bool hide)
+        {
+            if (_released) return;
+            _released = true;
+            try
+            {
+                SetParent(_target, IntPtr.Zero);
+                SetWindowLong(_target, GWL_STYLE, _originalStyle);
+                ShowWindow(_target, hide ? SW_HIDE : SW_SHOW);
+            }
+            catch { /* window may already be gone */ }
+        }
+
+        protected override void DestroyWindowCore(HandleRef hwnd)
+        {
+            Release(hide: true);
+            DestroyWindow(hwnd.Handle);
+        }
+
+        private const int GWL_STYLE = -16;
+        private const int WS_CHILD = 0x40000000;
+        private const int WS_VISIBLE = 0x10000000;
+        private const int WS_CLIPCHILDREN = 0x02000000;
+        private const int WS_CAPTION = 0x00C00000;
+        private const int WS_THICKFRAME = 0x00040000;
+        private const int WS_POPUP = unchecked((int)0x80000000);
+        private const int SW_HIDE = 0;
+        private const int SW_SHOW = 5;
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr CreateWindowEx(int exStyle, string className, string windowName, int style,
+            int x, int y, int width, int height, IntPtr parent, IntPtr menu, IntPtr instance, IntPtr param);
+        [DllImport("user32.dll")] private static extern bool DestroyWindow(IntPtr hWnd);
+        [DllImport("user32.dll")] private static extern IntPtr SetParent(IntPtr child, IntPtr parent);
+        [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hWnd, int index);
+        [DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hWnd, int index, int value);
+        [DllImport("user32.dll")] private static extern bool MoveWindow(IntPtr hWnd, int x, int y, int w, int h, bool repaint);
+        [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int cmd);
+    }
+}

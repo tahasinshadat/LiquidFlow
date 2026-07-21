@@ -39,6 +39,7 @@ public sealed class MainWindow : Window
     private double SidebarWidth => _sidebarExpanded ? 252 : 66;
 
     private sealed record NavEntry(string Glyph, string Title, Func<UIElement> Page);
+    private SizeChangedEventHandler? _voiceBoxSizer;
     private readonly List<NavEntry> _entries;
 
     public MainWindow(CommandModeService? commandService = null, DictationCoordinator? coordinator = null)
@@ -468,6 +469,25 @@ public sealed class MainWindow : Window
         foreach (var (name, border) in _navItems)
             border.Background = name == entry.Title ? new SolidColorBrush(Theme.SidebarSelected) : Brushes.Transparent;
 
+        if (_voiceBoxSizer is not null)
+        {
+            _content.SizeChanged -= _voiceBoxSizer;
+            _voiceBoxSizer = null;
+        }
+        if (entry.Title == "VoiceBox")
+        {
+            // full-bleed embedded surface (no scrolling page wrapper)
+            var host = VoiceBoxHostView.Instance;
+            void SizeHost() =>
+                host.Height = Math.Max(420, _content.ViewportHeight > 1 ? _content.ViewportHeight : _content.ActualHeight - 4);
+            _voiceBoxSizer = (_, _) => SizeHost();
+            _content.SizeChanged += _voiceBoxSizer;
+            SizeHost();
+            _content.Content = host;
+            _content.ScrollToTop();
+            return;
+        }
+
         var page = new StackPanel
         {
             Margin = new Thickness(30, 30, 30, 40),
@@ -489,7 +509,7 @@ public sealed class MainWindow : Window
         FontWeight = FontWeights.SemiBold,
         FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI"),
         Foreground = new SolidColorBrush(Theme.Text),
-        Margin = new Thickness(0, 0, 0, 18),
+        Margin = new Thickness(0, 0, 0, 30),
     };
 
     private static StackPanel Stack(params UIElement[] children)

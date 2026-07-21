@@ -114,7 +114,7 @@ public sealed class ScratchpadTab : StackPanel
 
     private UIElement BuildHero()
     {
-        var content = new StackPanel { Margin = new Thickness(44, 36, 44, 36), VerticalAlignment = VerticalAlignment.Center, MaxWidth = 760, HorizontalAlignment = HorizontalAlignment.Left };
+        var content = new StackPanel { Margin = new Thickness(40, 30, 40, 30), VerticalAlignment = VerticalAlignment.Center, MaxWidth = 760, HorizontalAlignment = HorizontalAlignment.Left };
         content.Children.Add(new TextBlock
         {
             Text = "For quick thoughts you want to come back to",
@@ -137,8 +137,8 @@ public sealed class ScratchpadTab : StackPanel
         start.MouseLeftButtonUp += (_, _) => NoteWindow.OpenNote(null);
         content.Children.Add(start);
         var hero = PageChrome.DarkHero(content);
-        ((Border)hero).MinHeight = 230;
-        ((Border)hero).Margin = new Thickness(0, 0, 0, 30);
+        ((Border)hero).MinHeight = 200;
+        ((Border)hero).Margin = new Thickness(0, 0, 0, 26);
         return hero;
     }
 

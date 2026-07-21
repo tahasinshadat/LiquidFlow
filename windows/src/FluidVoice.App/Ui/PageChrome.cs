@@ -15,7 +15,7 @@ public static class PageChrome
     /// <summary>Title (+ optional Beta chip) with an optional black action pill on the right.</summary>
     public static UIElement HeaderRow(string title, string? action, Action? onAction, bool beta = false)
     {
-        var row = new DockPanel { Margin = new Thickness(0, 0, 0, 34) };
+        var row = new DockPanel { Margin = new Thickness(0, 0, 0, 30) };
         if (action is not null)
         {
             var pill = new Border
@@ -101,7 +101,7 @@ public static class PageChrome
     /// <summary>A tab strip entry that carries a small "Beta" chip (Style → Auto cleanup).</summary>
     public static UIElement TabsRowWithBeta(string[] tabs, int betaIndex, int active, Action<int> onSelect)
     {
-        var dock = new DockPanel { Margin = new Thickness(0, 16, 0, 24) };
+        var dock = new DockPanel { Margin = new Thickness(0, 0, 0, 24) };
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         for (int i = 0; i < tabs.Length; i++)
         {
