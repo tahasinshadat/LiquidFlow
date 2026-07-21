@@ -182,6 +182,10 @@ public sealed class VoiceBoxStudioView : StackPanel
 
     private UIElement BuildGenerate()
     {
+        // _status is a long-lived field (GenerateAsync writes it after awaits) — detach it
+        // from the previous build's card first, or WPF throws "already the logical child
+        // of another element" and the whole tab renders blank.
+        (_status.Parent as Panel)?.Children.Remove(_status);
         var p = new StackPanel();
         p.Children.Add(Theme.Label("Voice"));
         _voice = new ComboBox { Width = 360, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 12) };
@@ -631,7 +635,9 @@ public sealed class VoiceBoxStudioView : StackPanel
         host.Children.Add(Subtle("Loading stories…"));
         try
         {
-            var stories = await VoiceBoxApi.GetStoriesAsync();
+            List<VoiceBoxApi.Story> stories;
+            try { stories = await VoiceBoxApi.GetStoriesAsync(); }
+            catch { await Task.Delay(1200); stories = await VoiceBoxApi.GetStoriesAsync(); } // boot race: retry once
             var gens = (await VoiceBoxApi.GetHistoryAsync(200)).Where(g => g.Status == "completed").ToList();
             host.Children.Clear();
 
@@ -950,10 +956,17 @@ public sealed class VoiceBoxStudioView : StackPanel
             // Chatterbox/LuxTTS/TADA need torchaudio (no ARM64 wheels) — emulation only.
             static bool EmulatedOnly(string n) =>
                 n.StartsWith("chatterbox") || n.StartsWith("luxtts") || n.StartsWith("tada");
-            if (Settings.Current.VoiceBoxNativeOnly)
-                models = models.Where(m => !EmulatedOnly(m.ModelName)).ToList();
+            // Whisper/Qwen3 here exist only for VoiceBox's Captures/refine — LiquidFlow
+            // manages its own speech + AI models in Settings, so don't duplicate them.
+            // They stay visible in non-native mode, where the Captures tab can use them.
+            static bool CaptureStack(string n) => n.StartsWith("whisper") || n.StartsWith("qwen3-");
+            models = Settings.Current.VoiceBoxNativeOnly
+                ? models.Where(m => !EmulatedOnly(m.ModelName) && !CaptureStack(m.ModelName)).ToList()
+                : models;
             host.Children.Clear();
-            host.Children.Add(Subtle("Engines download once and run locally. Kokoro is the fast pick on this machine; the larger engines run on CPU and take noticeably longer per generation.", 12.5));
+            host.Children.Add(Subtle("Voice engines download once and run locally. Kokoro is the fast pick on this machine; the larger engines run on CPU and take noticeably longer per generation.", 12.5));
+            if (!Settings.Current.VoiceBoxNativeOnly)
+                host.Children.Add(Subtle("Whisper/Qwen3 entries below serve VoiceBox's Captures feature only — LiquidFlow's own speech models live in Settings.", 11.5));
 
             var list = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
             var anyDownloading = false;
@@ -1015,6 +1028,18 @@ public sealed class VoiceBoxStudioView : StackPanel
                         Rebuild();
                     };
                     act.Children.Add(un);
+                }
+                else if (m.Downloaded)
+                {
+                    var rm = Theme.SecondaryButton("Remove");
+                    rm.Padding = new Thickness(12, 4, 12, 4);
+                    rm.ToolTip = "Delete the downloaded engine from disk (you can re-download it anytime)";
+                    rm.Click += async (_, _) =>
+                    {
+                        try { await VoiceBoxApi.DeleteModelAsync(m.ModelName); } catch { }
+                        Rebuild();
+                    };
+                    act.Children.Add(rm);
                 }
                 Grid.SetColumn(act, 2);
                 grid.Children.Add(act);

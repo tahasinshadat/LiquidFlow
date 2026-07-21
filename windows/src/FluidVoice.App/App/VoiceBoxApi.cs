@@ -229,4 +229,8 @@ public static class VoiceBoxApi
 
     public static Task UnloadModelAsync(string modelName, CancellationToken ct = default)
         => Http.PostAsync($"/models/{modelName}/unload", null, ct);
+
+    /// <summary>Delete a downloaded engine from disk (unload it first if loaded).</summary>
+    public static Task DeleteModelAsync(string modelName, CancellationToken ct = default)
+        => Http.DeleteAsync($"/models/{modelName}", ct);
 }

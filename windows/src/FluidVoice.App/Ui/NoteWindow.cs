@@ -50,6 +50,9 @@ public sealed class NoteWindow : Window
     private TextBox? _searchBox;
     private BottomTool _tool;
     private CancellationTokenSource? _transformCts;
+    private bool _enlarged;
+    private Rect _restoreBounds;
+    private TextBlock? _maxGlyph;
 
     public static void OpenNote(Note? note)
     {
@@ -228,6 +231,15 @@ public sealed class NoteWindow : Window
             Child = shell,
         };
 
+        // The whole window drags from any non-interactive surface (header, sidebar, gaps) —
+        // buttons, the editor, and inputs are opted out via InteractiveTag.
+        MouseLeftButtonDown += (_, e) =>
+        {
+            if (e.ChangedButton != MouseButton.Left || IsInteractive(e.OriginalSource as DependencyObject)) return;
+            if (e.ClickCount == 2) ToggleMaximize();
+            else try { DragMove(); } catch { }
+        };
+
         RenderSidebar();
         RenderToolPanel();
         Loaded += (_, _) => NotesStore.Changed += OnNotesChanged;
@@ -282,10 +294,13 @@ public sealed class NoteWindow : Window
             Height = 62,
             Margin = new Thickness(12, 2, 10, 2),
             LastChildFill = true,
+            Background = Brushes.Transparent, // hit-testable so empty header space drags the window
         };
 
         var windowButtons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        windowButtons.Children.Add(ChromeButton("\uE740", "Maximize or restore", ToggleMaximize));
+        var maximize = ChromeButton("\uE922", "Enlarge or restore", ToggleMaximize);
+        _maxGlyph = maximize.Child as TextBlock;
+        windowButtons.Children.Add(maximize);
         windowButtons.Children.Add(ChromeButton("\uE711", "Close Scratchpad", Close));
         DockPanel.SetDock(windowButtons, Dock.Right);
         header.Children.Add(windowButtons);
@@ -873,8 +888,54 @@ public sealed class NoteWindow : Window
         return button;
     }
 
-    private void ToggleMaximize() =>
-        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    /// <summary>Grow to ~90% of the current monitor's work area (not OS-maximize) and back.</summary>
+    private void ToggleMaximize()
+    {
+        if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
+        if (_enlarged)
+        {
+            Left = _restoreBounds.Left;
+            Top = _restoreBounds.Top;
+            Width = _restoreBounds.Width;
+            Height = _restoreBounds.Height;
+            _enlarged = false;
+        }
+        else
+        {
+            _restoreBounds = new Rect(Left, Top, Width, Height);
+            var area = ScreenWorkAreaDip();
+            var width = Math.Max(MinWidth, area.Width * 0.9);
+            var height = Math.Max(MinHeight, area.Height * 0.9);
+            Left = area.Left + (area.Width - width) / 2;
+            Top = area.Top + (area.Height - height) / 2;
+            Width = width;
+            Height = height;
+            _enlarged = true;
+        }
+        if (_maxGlyph is not null) _maxGlyph.Text = _enlarged ? "" : "";
+    }
+
+    /// <summary>Work area of the monitor this window sits on, in WPF device-independent pixels.</summary>
+    private Rect ScreenWorkAreaDip()
+    {
+        try
+        {
+            var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            var area = System.Windows.Forms.Screen.FromHandle(handle).WorkingArea;
+            if (PresentationSource.FromVisual(this)?.CompositionTarget is { } target)
+            {
+                var fromDevice = target.TransformFromDevice;
+                var topLeft = fromDevice.Transform(new Point(area.Left, area.Top));
+                var bottomRight = fromDevice.Transform(new Point(area.Right, area.Bottom));
+                return new Rect(topLeft, bottomRight);
+            }
+            return new Rect(area.Left, area.Top, area.Width, area.Height);
+        }
+        catch
+        {
+            return SystemParameters.WorkArea;
+        }
+    }
 
     private void OnNotesChanged() => Dispatcher.BeginInvoke(() =>
     {
