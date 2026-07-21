@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
@@ -36,7 +37,8 @@ public static class VoiceBoxApi
         [property: JsonPropertyName("error")] string? Error,
         [property: JsonPropertyName("duration")] double? Duration,
         [property: JsonPropertyName("engine")] string? Engine,
-        [property: JsonPropertyName("created_at")] string? CreatedAt);
+        [property: JsonPropertyName("created_at")] string? CreatedAt,
+        [property: JsonPropertyName("is_favorited")] bool? IsFavorited);
 
     private sealed record HistoryPage([property: JsonPropertyName("items")] List<Generation> Items);
 
@@ -70,6 +72,36 @@ public static class VoiceBoxApi
 
     public static Task DeleteProfileAsync(string id, CancellationToken ct = default)
         => Http.DeleteAsync($"/profiles/{id}", ct);
+
+    /// <summary>Create a CLONED profile (qwen engine) — attach reference audio via UploadSampleAsync.</summary>
+    public static async Task<Profile> CreateClonedProfileAsync(string name, string? desc, CancellationToken ct = default)
+    {
+        var resp = await Http.PostAsJsonAsync("/profiles", new
+        {
+            name,
+            description = desc,
+            language = "en",
+            voice_type = "cloned",
+            default_engine = "qwen",
+        }, ct);
+        resp.EnsureSuccessStatusCode();
+        return (await resp.Content.ReadFromJsonAsync<Profile>(cancellationToken: ct))!;
+    }
+
+    /// <summary>Upload one reference audio sample (wav/mp3/m4a/flac…) with its transcript.</summary>
+    public static async Task UploadSampleAsync(string profileId, string filePath, string referenceText, CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent();
+        var bytes = await File.ReadAllBytesAsync(filePath, ct);
+        var fileContent = new ByteArrayContent(bytes);
+        form.Add(fileContent, "file", Path.GetFileName(filePath));
+        form.Add(new StringContent(referenceText), "reference_text");
+        var resp = await Http.PostAsync($"/profiles/{profileId}/samples", form, ct);
+        resp.EnsureSuccessStatusCode();
+    }
+
+    public static Task ToggleFavoriteAsync(string generationId, CancellationToken ct = default)
+        => Http.PostAsync($"/history/{generationId}/favorite", null, ct);
 
     public static async Task<Generation> GenerateAsync(string profileId, string text, string? engine, string? instruct, string? modelSize, CancellationToken ct = default)
     {

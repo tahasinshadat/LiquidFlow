@@ -42,8 +42,8 @@ public sealed class VoiceBoxStudioView : StackPanel
 
     public VoiceBoxStudioView()
     {
+        // No hero on this page — VoiceBox is a dense tool surface; every pixel goes to work.
         Children.Add(PageChrome.HeaderRow("VoiceBox", null, null));
-        Children.Add(BuildHero());
         Children.Add(_body);
         Loaded += async (_, _) =>
         {
@@ -56,28 +56,6 @@ public sealed class VoiceBoxStudioView : StackPanel
             await EnsureReadyAsync();
         };
         Unloaded += (_, _) => StopPlayback();
-    }
-
-    private UIElement BuildHero()
-    {
-        var content = new StackPanel { Margin = new Thickness(40, 28, 40, 28), VerticalAlignment = VerticalAlignment.Center, MaxWidth = 780, HorizontalAlignment = HorizontalAlignment.Left };
-        var title = new TextBlock { FontFamily = Theme.DisplaySerif, FontSize = 30, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 12) };
-        title.Inlines.Add(new Run("The voice "));
-        title.Inlines.Add(new Run("studio") { FontStyle = FontStyles.Italic });
-        title.Inlines.Add(new Run("."));
-        content.Children.Add(title);
-        content.Children.Add(new TextBlock
-        {
-            Text = "Generate speech in any of your voices, manage the library, and download engines — all running natively on this machine.",
-            FontSize = 14.5,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromArgb(228, 255, 255, 255)),
-            TextWrapping = TextWrapping.Wrap,
-        });
-        var hero = PageChrome.DarkHero(content);
-        ((Border)hero).MinHeight = 190;
-        ((Border)hero).Margin = new Thickness(0, 0, 0, 26);
-        return hero;
     }
 
     // ── setup / boot ───────────────────────────────────────────────────────
@@ -247,7 +225,7 @@ public sealed class VoiceBoxStudioView : StackPanel
         {
             _status.Text = $"Generating with {prof.Name}…";
             var engine = prof.PresetEngine ?? prof.DefaultEngine;
-            var modelSize = engine == "qwen_custom_voice" ? "0.6B" : null; // lighter default for this CPU
+            var modelSize = engine is "qwen_custom_voice" or "qwen" ? "0.6B" : null; // lighter default for this CPU
             var gen = await VoiceBoxApi.GenerateAsync(prof.Id, text, engine, _instruct?.Text, modelSize);
             for (int i = 0; i < 600; i++)
             {
@@ -405,7 +383,7 @@ public sealed class VoiceBoxStudioView : StackPanel
         var dlg = new Window
         {
             Title = "Add voice",
-            Width = 520, Height = 300,
+            Width = 560, Height = 430,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Owner = Window.GetWindow(this),
             WindowStyle = WindowStyle.ToolWindow,
@@ -413,30 +391,111 @@ public sealed class VoiceBoxStudioView : StackPanel
             Background = new SolidColorBrush(Theme.Bg),
         };
         var root = new StackPanel { Margin = new Thickness(22) };
-        root.Children.Add(Theme.Label("Preset voice"));
+
+        root.Children.Add(Theme.Label("Type"));
+        var mode = new ComboBox { Width = 260, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 14) };
+        mode.Items.Add("Preset voice (built-in)");
+        mode.Items.Add("Clone from my audio");
+        mode.SelectedIndex = 0;
+        root.Children.Add(mode);
+
+        // preset fields
+        var presetPanel = new StackPanel();
+        presetPanel.Children.Add(Theme.Label("Preset voice"));
         var catalog = VoiceBoxManager.PresetCatalog().ToList();
         var combo = new ComboBox { Margin = new Thickness(0, 0, 0, 14) };
         foreach (var v in catalog) combo.Items.Add($"{v.Name}  ·  {EngineLabel(v.Engine)}");
         combo.SelectedIndex = 0;
-        root.Children.Add(combo);
+        presetPanel.Children.Add(combo);
+        root.Children.Add(presetPanel);
+
+        // clone fields
+        var clonePanel = new StackPanel { Visibility = Visibility.Collapsed };
+        var files = new List<string>();
+        var filesLabel = Subtle("No audio picked yet — a clean 10–30s clip works best.", 12);
+        var pick = Theme.SecondaryButton("Choose audio…");
+        pick.HorizontalAlignment = HorizontalAlignment.Left;
+        pick.Click += (_, _) =>
+        {
+            var ofd = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "Audio|*.wav;*.mp3;*.m4a;*.flac;*.ogg;*.aac",
+                Multiselect = true,
+            };
+            if (ofd.ShowDialog() == true)
+            {
+                files.Clear();
+                files.AddRange(ofd.FileNames);
+                filesLabel.Text = string.Join(", ", files.Select(Path.GetFileName));
+            }
+        };
+        clonePanel.Children.Add(pick);
+        filesLabel.Margin = new Thickness(0, 6, 0, 10);
+        clonePanel.Children.Add(filesLabel);
+        clonePanel.Children.Add(Theme.Label("What is said in the clip (helps cloning accuracy)"));
+        var refText = new TextBox
+        {
+            AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 56, MaxHeight = 90,
+            Padding = new Thickness(8), FontSize = 13, Margin = new Thickness(0, 0, 0, 12),
+        };
+        clonePanel.Children.Add(refText);
+        clonePanel.Children.Add(Subtle("Cloning uses the Qwen TTS engine — download it once under Models. Generations are slower than presets on CPU.", 11.5));
+        root.Children.Add(clonePanel);
+
+        mode.SelectionChanged += (_, _) =>
+        {
+            presetPanel.Visibility = mode.SelectedIndex == 0 ? Visibility.Visible : Visibility.Collapsed;
+            clonePanel.Visibility = mode.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
+        };
+
         root.Children.Add(Theme.Label("Name"));
         var nameBox = new TextBox { Padding = new Thickness(8, 6, 8, 6), FontSize = 14 };
         nameBox.Text = catalog[0].Name;
         combo.SelectionChanged += (_, _) => { if (combo.SelectedIndex >= 0) nameBox.Text = catalog[combo.SelectedIndex].Name; };
         root.Children.Add(nameBox);
-        var btns = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 18, 0, 0) };
+
+        var status = Subtle("", 12);
+        status.Margin = new Thickness(0, 8, 0, 0);
+        root.Children.Add(status);
+
+        var btns = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
         var cancel = Theme.SecondaryButton("Cancel");
         cancel.Margin = new Thickness(0, 0, 8, 0);
         cancel.Click += (_, _) => dlg.Close();
         var addBtn = Theme.PrimaryButton("Add");
         addBtn.Click += async (_, _) =>
         {
-            if (combo.SelectedIndex < 0 || string.IsNullOrWhiteSpace(nameBox.Text)) return;
-            var v = catalog[combo.SelectedIndex];
-            try { await VoiceBoxApi.CreatePresetProfileAsync(nameBox.Text.Trim(), v.Engine, v.VoiceId, v.Lang, v.Desc); }
-            catch (Exception ex) { MessageBox.Show(dlg, ex.Message, "Couldn't add voice"); return; }
-            dlg.Close();
-            Rebuild();
+            var name = nameBox.Text.Trim();
+            if (name.Length == 0) { status.Text = "Give the voice a name."; return; }
+            addBtn.IsEnabled = false;
+            try
+            {
+                if (mode.SelectedIndex == 0)
+                {
+                    if (combo.SelectedIndex < 0) return;
+                    var v = catalog[combo.SelectedIndex];
+                    await VoiceBoxApi.CreatePresetProfileAsync(name, v.Engine, v.VoiceId, v.Lang, v.Desc);
+                }
+                else
+                {
+                    if (files.Count == 0) { status.Text = "Pick at least one audio clip."; addBtn.IsEnabled = true; return; }
+                    status.Text = "Creating profile…";
+                    var prof = await VoiceBoxApi.CreateClonedProfileAsync(name, "Cloned from my audio");
+                    var text = string.IsNullOrWhiteSpace(refText.Text) ? "A reference recording of my voice." : refText.Text.Trim();
+                    for (int i = 0; i < files.Count; i++)
+                    {
+                        status.Text = $"Uploading sample {i + 1}/{files.Count}…";
+                        await VoiceBoxApi.UploadSampleAsync(prof.Id, files[i], text);
+                    }
+                }
+                dlg.Close();
+                Rebuild();
+            }
+            catch (Exception ex)
+            {
+                status.Text = $"Couldn't add voice: {ex.Message}";
+                addBtn.IsEnabled = true;
+            }
         };
         btns.Children.Add(cancel);
         btns.Children.Add(addBtn);
@@ -482,6 +541,13 @@ public sealed class VoiceBoxStudioView : StackPanel
                 grid.Children.Add(info);
 
                 var actions = new StackPanel { Orientation = Orientation.Horizontal };
+                var fav = PageChrome.IconButton(g.IsFavorited == true ? "" : "",
+                    g.IsFavorited == true ? "Unfavorite" : "Favorite", async () =>
+                    {
+                        try { await VoiceBoxApi.ToggleFavoriteAsync(g.Id); } catch { }
+                        Rebuild();
+                    });
+                actions.Children.Add(fav);
                 if (g.Status == "completed")
                     actions.Children.Add(PageChrome.IconButton("", "Play", async () =>
                     {
@@ -605,6 +671,10 @@ public sealed class VoiceBoxStudioView : StackPanel
                 t.Tick += (_, _) => { t.Stop(); if (_tab == 3 && IsLoaded) Rebuild(); };
                 t.Start();
             }
+            host.Children.Add(Subtle(
+                $"Agent voices: an MCP server runs locally at http://127.0.0.1:{VoiceBoxNative.Port}/mcp — point Claude Code or any MCP client at it to give your agents these voices.",
+                12));
+            ((TextBlock)host.Children[^1]).Margin = new Thickness(2, 12, 0, 0);
         }
         catch (Exception ex)
         {
