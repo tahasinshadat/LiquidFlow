@@ -208,23 +208,24 @@ public static class StyleCards
         {
             case "work":
             {
+                // ref-09: large square avatar stacked ABOVE the name+time line, then plain text
                 var p = new StackPanel();
-                var head = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
-                head.Children.Add(new Border
+                p.Children.Add(new Border
                 {
-                    Width = 34, Height = 34, CornerRadius = new CornerRadius(8),
-                    Background = Theme.GreenSoftBrush, Margin = new Thickness(0, 0, 10, 0),
+                    Width = 62, Height = 62, CornerRadius = new CornerRadius(12),
+                    Background = Theme.GreenSoftBrush,
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    Margin = new Thickness(0, 0, 0, 12),
                     Child = new TextBlock
                     {
-                        Text = "J", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Theme.GreenBrush,
+                        Text = "J", FontSize = 22, FontWeight = FontWeights.SemiBold, Foreground = Theme.GreenBrush,
                         HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
                     },
                 });
-                var name = new TextBlock { VerticalAlignment = VerticalAlignment.Center };
+                var name = new TextBlock { Margin = new Thickness(0, 0, 0, 6) };
                 name.Inlines.Add(new Run("John Doe ") { FontWeight = FontWeights.SemiBold });
                 name.Inlines.Add(new Run("9:45 AM") { Foreground = Theme.SubtleBrush, FontSize = 11.5 });
-                head.Children.Add(name);
-                p.Children.Add(head);
+                p.Children.Add(name);
                 p.Children.Add(new TextBlock { Text = o.Sample, FontSize = 12.5, Foreground = Theme.TextBrush, TextWrapping = TextWrapping.Wrap });
                 return p;
             }
