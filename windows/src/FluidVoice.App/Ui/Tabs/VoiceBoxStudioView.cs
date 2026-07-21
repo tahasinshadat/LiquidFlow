@@ -353,6 +353,48 @@ public sealed class VoiceBoxStudioView : StackPanel
         nameBox.Text = UniqueVoiceName("My voice");
         p.Children.Add(nameBox);
 
+        // Read-along script: continuous speech is hard to improvise — give them something to read.
+        var scriptText = new TextBlock
+        {
+            FontSize = 14,
+            Foreground = Theme.TextBrush,
+            TextWrapping = TextWrapping.Wrap,
+            LineHeight = 22,
+        };
+        var scriptIdx = Environment.TickCount % CloneScripts.Length;
+        scriptText.Text = CloneScripts[scriptIdx];
+        var scriptHead = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
+        var shuffle = Theme.SecondaryButton("New script");
+        shuffle.Padding = new Thickness(10, 3, 10, 3);
+        shuffle.Click += (_, _) =>
+        {
+            scriptIdx = (scriptIdx + 1) % CloneScripts.Length;
+            scriptText.Text = CloneScripts[scriptIdx];
+        };
+        DockPanel.SetDock(shuffle, Dock.Right);
+        scriptHead.Children.Add(shuffle);
+        scriptHead.Children.Add(new TextBlock
+        {
+            Text = "Read this aloud (or say anything you like)",
+            FontSize = 12.5,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = Theme.SubtleBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+        var scriptBox = new StackPanel();
+        scriptBox.Children.Add(scriptHead);
+        scriptBox.Children.Add(scriptText);
+        p.Children.Add(new Border
+        {
+            Background = new SolidColorBrush(Theme.CardInner),
+            BorderBrush = Theme.HairlineBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(16, 12, 16, 14),
+            Margin = new Thickness(0, 14, 0, 0),
+            Child = scriptBox,
+        });
+
         var micGlyph = new TextBlock
         {
             Text = "",
@@ -373,6 +415,15 @@ public sealed class VoiceBoxStudioView : StackPanel
             Child = micGlyph,
         };
         p.Children.Add(mic);
+
+        // Live input level so you can SEE the mic picking you up while recording.
+        var level = new ProgressStripe(260, 6)
+        {
+            Margin = new Thickness(0, 0, 0, 10),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Visibility = Visibility.Collapsed,
+        };
+        p.Children.Add(level);
 
         var hint = new TextBlock
         {
@@ -409,13 +460,28 @@ public sealed class VoiceBoxStudioView : StackPanel
                     _recSamples.Clear();
                     _recBytes = new MemoryStream();
                     _rec = new WaveInEvent { WaveFormat = new WaveFormat(16000, 1), BufferMilliseconds = 50 };
+                    double disp = 0;
                     _rec.DataAvailable += (_, e) =>
                     {
                         _recBytes?.Write(e.Buffer, 0, e.BytesRecorded);
+                        double sumSq = 0;
+                        int n = 0;
                         for (int i = 0; i + 1 < e.BytesRecorded; i += 2)
-                            _recSamples.Add(BitConverter.ToInt16(e.Buffer, i) / 32768f);
+                        {
+                            var s = BitConverter.ToInt16(e.Buffer, i) / 32768f;
+                            _recSamples.Add(s);
+                            sumSq += s * s;
+                            n++;
+                        }
+                        // fast attack, slow decay — reads like a real VU meter
+                        var rms = n > 0 ? Math.Sqrt(sumSq / n) : 0;
+                        disp = Math.Max(Math.Min(1.0, rms * 9), disp * 0.82);
+                        var shown = disp;
+                        Dispatcher.BeginInvoke(() => level.SetFraction(shown));
                     };
                     _rec.StartRecording();
+                    level.Visibility = Visibility.Visible;
+                    level.SetFraction(0);
                     _recStart = DateTime.Now;
                     mic.Background = new SolidColorBrush(Theme.Danger);
                     micGlyph.Text = "";
@@ -454,10 +520,28 @@ public sealed class VoiceBoxStudioView : StackPanel
             mic.Background = Theme.InkBrush;
             micGlyph.Text = "";
             hint.Text = "Click the mic and speak naturally — 15–30 seconds is ideal. Click again to finish.";
+            level.Visibility = Visibility.Collapsed;
             if (seconds < 3)
             {
                 st.Text = "That was under 3 seconds — give it a bit more speech and try again.";
                 return;
+            }
+            // silence check locally, then the same auto-gain dictation uses — a quiet mic
+            // otherwise gets rejected server-side ("Audio is too quiet or silent")
+            double sq = 0;
+            foreach (var s in samples) sq += (double)s * s;
+            if (Math.Sqrt(sq / Math.Max(1, samples.Length)) < 0.0015)
+            {
+                st.Text = "The mic barely picked anything up — watch the level bar while you speak; check your Windows input device or move closer, then try again.";
+                return;
+            }
+            samples = Audio.Dsp.Normalize(samples);
+            raw = new byte[samples.Length * 2];
+            for (int i = 0; i < samples.Length; i++)
+            {
+                var s16 = (short)Math.Clamp((int)(samples[i] * 32767f), short.MinValue, short.MaxValue);
+                raw[2 * i] = (byte)(s16 & 0xFF);
+                raw[2 * i + 1] = (byte)((s16 >> 8) & 0xFF);
             }
 
             _cloneBusy = true;
@@ -529,6 +613,17 @@ public sealed class VoiceBoxStudioView : StackPanel
         ((TextBlock)p.Children[^1]).Margin = new Thickness(0, 14, 0, 0);
         return Theme.Card2(p);
     }
+
+    /// <summary>Original read-along passages (~20–30s aloud) so nobody has to improvise
+    /// continuous speech. Varied intonation on purpose: statements, questions, numbers.</summary>
+    private static readonly string[] CloneScripts =
+    {
+        "Here's a little test of my everyday voice. This morning I made coffee, checked the weather, and planned the rest of my week. Tuesday looks busy, but Friday should be quiet. Do I sound natural right now? I hope so! I'll keep talking at a relaxed pace, the way I'd chat with a friend across the table.",
+        "Let me describe the room around me. There's a desk, a couple of chairs, and a window with light coming through. Outside, someone is walking a very enthusiastic dog. If I count to five, it sounds like this: one, two, three, four, five. Reading aloud is strangely calming, isn't it? Anyway, that's the tour.",
+        "Picture a small kitchen on a Sunday afternoon. Butter melts in a warm pan, onions turn golden, and something smells faintly of garlic and thyme. I taste, adjust, and taste again. Cooking rewards patience more than talent. In about twenty minutes, dinner will be ready, and honestly? I can't wait.",
+        "Every city has a sound of its own. Buses sigh at their stops, markets hum with bargaining, and somewhere a street musician tunes an old guitar. I like walking with no destination, turning left simply because the light is better there. Travel isn't about distance; it's about paying attention. That's the whole secret.",
+        "Technology is funny. We carry tiny computers that talk to satellites, yet we still lose our keys every single day. My favorite feature is voice: I press a button, speak a thought, and watch it become text. Fifty years ago that was science fiction. Today, it's just a Tuesday. What a time to be alive!",
+    };
 
     private void StopRecording(bool discard)
     {
