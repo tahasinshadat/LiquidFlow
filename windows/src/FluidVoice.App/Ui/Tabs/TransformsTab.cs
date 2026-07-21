@@ -129,7 +129,7 @@ public sealed class TransformsTab : StackPanel
         DockPanel.SetDock(cluster, Dock.Right);
         dock.Children.Add(cluster);
 
-        var content = new StackPanel { Margin = new Thickness(40, 30, 20, 30), VerticalAlignment = VerticalAlignment.Center };
+        var content = new StackPanel { Margin = new Thickness(40, 28, 20, 28), VerticalAlignment = VerticalAlignment.Center };
         content.Children.Add(new TextBlock
         {
             Text = "Transform works anywhere you write",
@@ -169,7 +169,7 @@ public sealed class TransformsTab : StackPanel
         dock.Children.Add(content);
 
         var hero = PageChrome.DarkHero(dock);
-        ((Border)hero).MinHeight = 200;
+        ((Border)hero).MinHeight = 190;
         ((Border)hero).Margin = new Thickness(0, 0, 0, 26);
         return hero;
     }

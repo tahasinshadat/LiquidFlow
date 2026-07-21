@@ -80,7 +80,7 @@ public sealed class VoiceBoxTab : StackPanel
         DockPanel.SetDock(cluster, Dock.Right);
         dock.Children.Add(cluster);
 
-        var content = new StackPanel { Margin = new Thickness(40, 30, 20, 30), VerticalAlignment = VerticalAlignment.Center };
+        var content = new StackPanel { Margin = new Thickness(40, 28, 20, 28), VerticalAlignment = VerticalAlignment.Center };
         var title = new TextBlock { FontFamily = Theme.DisplaySerif, FontSize = 28, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 10) };
         title.Inlines.Add(new Run("The open-source AI "));
         title.Inlines.Add(new Run("voice studio") { FontStyle = FontStyles.Italic });
@@ -137,7 +137,7 @@ public sealed class VoiceBoxTab : StackPanel
         dock.Children.Add(content);
 
         var hero = PageChrome.DarkHero(dock);
-        ((Border)hero).MinHeight = 200;
+        ((Border)hero).MinHeight = 190;
         ((Border)hero).Margin = new Thickness(0, 0, 0, 26);
         return hero;
     }
@@ -257,9 +257,13 @@ public static class VoiceBoxLocator
                     using var k = root.OpenSubKey(sub);
                     var name = k?.GetValue("DisplayName") as string;
                     if (name is null || !name.Contains("voicebox", StringComparison.OrdinalIgnoreCase)) continue;
-                    var loc = k?.GetValue("InstallLocation") as string;
+                    // NB: Tauri's NSIS writes these values with literal surrounding quotes.
+                    var loc = (k?.GetValue("InstallLocation") as string)?.Trim().Trim('"');
                     var exe = FindExeUnder(loc);
                     if (exe is not null) return exe;
+                    var icon = (k?.GetValue("DisplayIcon") as string)?.Trim().Trim('"');
+                    if (icon is not null && icon.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && File.Exists(icon))
+                        return icon;
                 }
             }
             catch { /* registry view unavailable */ }
@@ -272,6 +276,10 @@ public static class VoiceBoxLocator
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "voicebox"),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "VoiceBox"),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "voicebox"),
+            // Tauri per-user NSIS default: %LOCALAPPDATA%\<ProductName> directly
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Voicebox"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoiceBox"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "voicebox"),
         };
         foreach (var dir in candidates)
         {
@@ -285,6 +293,7 @@ public static class VoiceBoxLocator
     {
         try
         {
+            dir = dir?.Trim().Trim('"');
             if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir)) return null;
             foreach (var name in new[] { "VoiceBox.exe", "voicebox.exe", "Voicebox.exe" })
             {

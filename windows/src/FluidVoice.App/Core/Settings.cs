@@ -136,6 +136,9 @@ public sealed class Settings
     public bool RemoveFillerWordsEnabled { get; set; } = true;
     public List<string> FillerWords { get; set; } = new() { "um", "uh", "uhm", "hmm", "mhm", "erm" };
     public bool AutoConvertPunctuationEnabled { get; set; } = true;
+    /// <summary>"Light + formatting" cleanup: collapse repeated words and turn spoken
+    /// enumerations ("first… then… finally…") into bullet lists. Local, no AI.</summary>
+    public bool AutoFormatStructureEnabled { get; set; }
     public List<CustomDictionaryEntry> CustomDictionaryEntries { get; set; } = new();
     public bool GaavRemoveTrailingPeriodEnabled { get; set; }
     public bool GaavLowercaseFirstLetterEnabled { get; set; }

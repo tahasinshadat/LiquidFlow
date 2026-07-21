@@ -36,6 +36,8 @@ public sealed class VoiceBoxHostView : Grid
     private EmbedHost? _embed;
     private CancellationTokenSource? _cts;
     private bool _busy;
+    private readonly System.Windows.Controls.Button _cancel;
+    private readonly System.Windows.Controls.Button _retry;
 
     private VoiceBoxHostView()
     {
@@ -81,11 +83,21 @@ public sealed class VoiceBoxHostView : Grid
         });
         _progressPanel.Children.Add(_status);
         _progressPanel.Children.Add(_bar);
-        var cancel = Theme.SecondaryButton("Cancel");
-        cancel.HorizontalAlignment = HorizontalAlignment.Center;
-        cancel.Margin = new Thickness(0, 16, 0, 0);
-        cancel.Click += (_, _) => _cts?.Cancel();
-        _progressPanel.Children.Add(cancel);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 16, 0, 0),
+        };
+        _cancel = Theme.SecondaryButton("Cancel");
+        _cancel.Click += (_, _) => _cts?.Cancel();
+        buttons.Children.Add(_cancel);
+        _retry = Theme.SecondaryButton("Try again");
+        _retry.Margin = new Thickness(8, 0, 0, 0);
+        _retry.Visibility = Visibility.Collapsed;
+        _retry.Click += (_, _) => _ = EnsureAsync();
+        buttons.Children.Add(_retry);
+        _progressPanel.Children.Add(buttons);
         SetRow(_progressPanel, 1);
         Children.Add(_progressPanel);
 
@@ -118,6 +130,8 @@ public sealed class VoiceBoxHostView : Grid
         if (_busy) return;
         _busy = true;
         _cts = new CancellationTokenSource();
+        _cancel.Visibility = Visibility.Visible;
+        _retry.Visibility = Visibility.Collapsed;
         try
         {
             _progressPanel.Visibility = Visibility.Visible;
@@ -131,7 +145,8 @@ public sealed class VoiceBoxHostView : Grid
                 exe = await VoiceBoxManager.EnsureInstalledAsync(progress, _cts.Token);
                 if (exe is null)
                 {
-                    SetStatus("Install didn't complete. Get it manually from github.com/jamiepine/voicebox/releases, then reopen this tab.", -1);
+                    SetStatus("Install didn't complete. Get it manually from github.com/jamiepine/voicebox/releases, then hit Try again.", -1);
+                    ShowRetry();
                     return;
                 }
             }
@@ -141,6 +156,7 @@ public sealed class VoiceBoxHostView : Grid
             if (hwnd == IntPtr.Zero)
             {
                 SetStatus("VoiceBox started but its window wasn't found — it may be open as a separate window.", -1);
+                ShowRetry();
                 return;
             }
 
@@ -153,18 +169,28 @@ public sealed class VoiceBoxHostView : Grid
         }
         catch (OperationCanceledException)
         {
-            SetStatus("Cancelled. Reopen this tab to try again.", -1);
+            SetStatus("Cancelled. Hit Try again whenever you're ready.", -1);
+            ShowRetry();
         }
         catch (Exception ex)
         {
             Log.Error("voicebox", "VoiceBox auto-embed failed", ex);
             SetStatus($"Couldn't set up VoiceBox: {ex.Message}", -1);
+            ShowRetry();
         }
         finally
         {
             _busy = false;
         }
     }
+
+    private void ShowRetry() => Dispatcher.BeginInvoke(() =>
+    {
+        _retry.Visibility = Visibility.Visible;
+        _cancel.Visibility = Visibility.Collapsed;
+        _bar.IsIndeterminate = false;
+        _bar.Value = 0;
+    });
 
     private void SetStatus(string text, double pct)
     {

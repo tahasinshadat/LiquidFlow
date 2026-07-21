@@ -22,7 +22,7 @@ public sealed class SnippetsTab : StackPanel
     private void Build()
     {
         Children.Clear();
-        Children.Add(PageChrome.HeaderRow("Snippets", "Add new", () => EditSnippet(null)));
+        Children.Add(PageChrome.HeaderRow("Snippets", "Add new", AddBlankSnippet));
         Children.Add(PageChrome.TabsRow(new[] { "All", "Personal" }, 0));
         Children.Add(BuildHero());
         Children.Add(BuildList());
@@ -30,7 +30,7 @@ public sealed class SnippetsTab : StackPanel
 
     private UIElement BuildHero()
     {
-        var content = new StackPanel { Margin = new Thickness(40, 30, 40, 30) };
+        var content = new StackPanel { Margin = new Thickness(40, 28, 40, 28), VerticalAlignment = VerticalAlignment.Center };
         var title = new TextBlock { FontFamily = Theme.DisplaySerif, FontSize = 30, Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 12) };
         title.Inlines.Add(new Run("The stuff "));
         title.Inlines.Add(new Run("you") { FontStyle = FontStyles.Italic });
@@ -53,10 +53,13 @@ public sealed class SnippetsTab : StackPanel
 
         var add = PageChrome.HeroPill("Add new snippet");
         add.Margin = new Thickness(0, 14, 0, 0);
-        add.MouseLeftButtonUp += (_, _) => EditSnippet(null);
+        add.MouseLeftButtonUp += (_, _) => AddBlankSnippet();
         content.Children.Add(add);
 
-        return PageChrome.DarkHero(content);
+        var hero = PageChrome.DarkHero(content);
+        ((Border)hero).MinHeight = 190;
+        ((Border)hero).Margin = new Thickness(0, 0, 0, 26);
+        return hero;
     }
 
     private static UIElement ExampleRow(string trigger, string text)
@@ -75,132 +78,100 @@ public sealed class SnippetsTab : StackPanel
         return row;
     }
 
-    private UIElement BuildList()
+    private void AddBlankSnippet()
     {
-        var host = new StackPanel { Margin = new Thickness(0, 22, 0, 0) };
-        var snippets = Settings.Current.Snippets;
-        if (snippets.Count == 0) return host; // hero carries the empty state
-        foreach (var s in snippets.ToList())
-            host.Children.Add(SnippetRow(s));
-        return host;
+        Settings.Current.Snippets.Insert(0, new Snippet { Trigger = "", Text = "" });
+        Settings.Current.Save("snippets");
+        Build();
     }
 
-    private UIElement SnippetRow(Snippet s)
+    /// <summary>Inline-editable rows in one bordered card — the same add/edit pattern
+    /// (and exact row geometry) as the Dictionary page.</summary>
+    private UIElement BuildList()
     {
-        var grid = new Grid { Margin = new Thickness(4, 0, 4, 0), Background = Brushes.Transparent };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });
+        var list = new StackPanel();
+        var snippets = Settings.Current.Snippets.ToList();
+        if (snippets.Count == 0)
+        {
+            list.Children.Add(new TextBlock
+            {
+                Text = "No snippets yet. Use Add new — say the trigger word while dictating and the saved text drops in.",
+                FontSize = 14,
+                Foreground = Theme.SubtleBrush,
+                Margin = new Thickness(20, 20, 20, 20),
+            });
+        }
+        else
+        {
+            for (int i = 0; i < snippets.Count; i++)
+            {
+                list.Children.Add(EntryRow(snippets[i]));
+                if (i < snippets.Count - 1) list.Children.Add(Theme.Divider());
+            }
+        }
+
+        return new Border
+        {
+            Background = Theme.SurfaceBrush,
+            BorderBrush = new SolidColorBrush(Theme.CardBorder),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Child = list,
+        };
+    }
+
+    private UIElement EntryRow(Snippet s)
+    {
+        var grid = new Grid { Margin = new Thickness(20, 14, 14, 14) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
 
-        var trig = new TextBlock
+        var trigger = new TextBox
         {
-            Text = $"“{s.Trigger}”",
-            FontSize = 14,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = Theme.TextBrush,
-            VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis,
+            Text = s.Trigger,
+            Padding = new Thickness(10, 8, 10, 8),
+            ToolTip = "Say this word or phrase while dictating",
+            VerticalContentAlignment = VerticalAlignment.Center,
         };
-        Grid.SetColumn(trig, 0);
-        grid.Children.Add(trig);
+        trigger.LostFocus += (_, _) => { s.Trigger = trigger.Text.Trim(); Settings.Current.Save("snippets"); };
+        Grid.SetColumn(trigger, 0);
+        grid.Children.Add(trigger);
 
-        var body = new TextBlock
+        var arrow = new TextBlock { Text = "\u2192", Foreground = Theme.SubtleBrush, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetColumn(arrow, 1);
+        grid.Children.Add(arrow);
+
+        var body = new TextBox
         {
-            Text = s.Text.Replace('\n', ' '),
-            FontSize = 13.5,
-            Foreground = Theme.SubtleBrush,
-            VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            Margin = new Thickness(8, 0, 8, 0),
+            Text = s.Text,
+            Padding = new Thickness(10, 8, 10, 8),
+            ToolTip = "\u2026and LiquidFlow types this instead",
+            VerticalContentAlignment = VerticalAlignment.Center,
         };
-        Grid.SetColumn(body, 1);
+        body.LostFocus += (_, _) => { s.Text = body.Text; Settings.Current.Save("snippets"); };
+        Grid.SetColumn(body, 2);
         grid.Children.Add(body);
 
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Opacity = 0 };
-        actions.Children.Add(PageChrome.IconButton("", "Edit", () => EditSnippet(s)));
-        actions.Children.Add(PageChrome.IconButton("", "Delete", () =>
+        var delete = new Button
+        {
+            Content = new TextBlock { Text = ((char)0xE74D).ToString(), FontFamily = new FontFamily("Segoe MDL2 Assets"), FontSize = 13 },
+            Width = 32,
+            Height = 32,
+            Padding = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            ToolTip = "Delete snippet",
+        };
+        delete.Click += (_, _) =>
         {
             Settings.Current.Snippets.RemoveAll(x => x.Id == s.Id);
             Settings.Current.Save("snippets");
             Build();
-        }));
-        Grid.SetColumn(actions, 2);
-        grid.Children.Add(actions);
-        grid.MouseEnter += (_, _) => actions.Opacity = 1;
-        grid.MouseLeave += (_, _) => actions.Opacity = 0;
-
-        return new Border
-        {
-            Background = new SolidColorBrush(Theme.CardInner),
-            BorderBrush = Theme.HairlineBrush,
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(18, 14, 12, 14),
-            Margin = new Thickness(0, 0, 0, 10),
-            Child = grid,
         };
-    }
-
-    private void EditSnippet(Snippet? existing)
-    {
-        var dlg = new SnippetDialog(existing) { Owner = Window.GetWindow(this) };
-        if (dlg.ShowDialog() != true) return;
-        if (existing is null) Settings.Current.Snippets.Add(dlg.Result);
-        Settings.Current.Save("snippets");
-        Build();
-    }
-}
-
-/// <summary>Add/edit one snippet (trigger word + inserted text).</summary>
-public sealed class SnippetDialog : Window
-{
-    private readonly TextBox _trigger;
-    private readonly TextBox _text;
-    private readonly Snippet _snippet;
-
-    public Snippet Result => _snippet;
-
-    public SnippetDialog(Snippet? existing)
-    {
-        _snippet = existing ?? new Snippet();
-        Title = existing is null ? "New snippet" : "Edit snippet";
-        Width = 520;
-        Height = 380;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        WindowStyle = WindowStyle.ToolWindow;
-        ResizeMode = ResizeMode.NoResize;
-        Background = new SolidColorBrush(Theme.Bg);
-
-        var root = new StackPanel { Margin = new Thickness(22) };
-        root.Children.Add(Theme.Label("Say this word or phrase…"));
-        _trigger = new TextBox { Text = _snippet.Trigger, Padding = new Thickness(8, 6, 8, 6), FontSize = 14, Margin = new Thickness(0, 0, 0, 14) };
-        root.Children.Add(_trigger);
-        root.Children.Add(Theme.Label("…and LiquidFlow types this instead"));
-        _text = new TextBox
-        {
-            Text = _snippet.Text, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
-            MinHeight = 120, MaxHeight = 150, Padding = new Thickness(8), FontSize = 14,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-        };
-        root.Children.Add(_text);
-
-        var btns = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0) };
-        var cancel = Theme.SecondaryButton("Cancel");
-        cancel.Margin = new Thickness(0, 0, 8, 0);
-        cancel.Click += (_, _) => { DialogResult = false; Close(); };
-        var save = Theme.PrimaryButton("Save");
-        save.Click += (_, _) =>
-        {
-            if (string.IsNullOrWhiteSpace(_trigger.Text) || string.IsNullOrWhiteSpace(_text.Text)) return;
-            _snippet.Trigger = _trigger.Text.Trim();
-            _snippet.Text = _text.Text;
-            DialogResult = true;
-            Close();
-        };
-        btns.Children.Add(cancel);
-        btns.Children.Add(save);
-        root.Children.Add(btns);
-        Content = root;
-        Loaded += (_, _) => _trigger.Focus();
+        Grid.SetColumn(delete, 3);
+        grid.Children.Add(delete);
+        return grid;
     }
 }

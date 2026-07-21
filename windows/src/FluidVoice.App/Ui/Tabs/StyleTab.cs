@@ -82,7 +82,7 @@ public sealed class StyleTab : StackPanel
         };
         content.Children.Add(start);
         var hero = PageChrome.DarkHero(content);
-        ((Border)hero).MinHeight = 170;
+        ((Border)hero).MinHeight = 190;
         return hero;
     }
 
@@ -113,7 +113,7 @@ public sealed class StyleTab : StackPanel
         dock.Children.Add(cluster);
         dock.Children.Add(copy);
         var hero = PageChrome.DarkHero(dock);
-        ((Border)hero).MinHeight = 170;
+        ((Border)hero).MinHeight = 190;
         ((Border)hero).Margin = new Thickness(0, 0, 0, 26);
         return hero;
     }
@@ -148,16 +148,10 @@ public sealed class StyleTab : StackPanel
             TextWrapping = TextWrapping.Wrap,
         });
         var hero = PageChrome.DarkHero(copy);
-        ((Border)hero).MinHeight = 170;
+        ((Border)hero).MinHeight = 190;
         ((Border)hero).Margin = new Thickness(0, 0, 0, 26);
         host.Children.Add(hero);
 
-        var grid = new Grid();
-        for (int i = 0; i < 3; i++)
-        {
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            if (i < 2) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
-        }
         var current = CurrentCleanupLevel();
         var levels = new (string Key, string Title, string Desc, string Sample)[]
         {
@@ -165,30 +159,47 @@ public sealed class StyleTab : StackPanel
                 "hey joey, we still on for coffee or? I think we maybe should leave earlier to make it there in time there might um be traffic. What are you thinking?"),
             ("light", "Light", "Cleans up filler words and grammar",
                 "Hey Joey, are we still on for coffee? I think we should leave earlier to make it there in time. There might be traffic. What are you thinking?"),
+            ("light-format", "Light + formatting", "Light cleanup, plus structure — removes repeated words and turns spoken lists into bullet points",
+                "Hey Joey, are we still on for coffee? Quick plan:\n• Leave earlier — there might be traffic\n• Grab the usual order\nWhat do you think?"),
             ("medium", "Medium", "Edits for clarity and conciseness (uses your AI provider)",
                 "Hey Joey, are we still on for coffee? We should leave earlier; there might be traffic. What do you think?"),
         };
+        var grid = new Grid();
+        for (int i = 0; i < levels.Length; i++)
+        {
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            if (i < levels.Length - 1) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
+        }
         for (int i = 0; i < levels.Length; i++)
         {
             var (key, title, desc, sample) = levels[i];
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock
+            // Grid so the sample bubble pins to the card bottom at every card height —
+            // identical geometry to the message-tab style cards (MinHeight 280).
+            var panel = new Grid();
+            panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            panel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            var titleBlock = new TextBlock
             {
                 Text = title,
                 FontFamily = Theme.DisplaySerif,
                 FontSize = 25,
                 Foreground = Theme.TextBrush,
                 Margin = new Thickness(0, 0, 0, 8),
-            });
-            panel.Children.Add(new TextBlock
+            };
+            Grid.SetRow(titleBlock, 0);
+            panel.Children.Add(titleBlock);
+            var descBlock = new TextBlock
             {
                 Text = desc,
                 FontSize = 13.5,
                 Foreground = Theme.SubtleBrush,
                 TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 60),
-            });
-            panel.Children.Add(new Border
+                Margin = new Thickness(0, 0, 0, 16),
+            };
+            Grid.SetRow(descBlock, 1);
+            panel.Children.Add(descBlock);
+            var bubble = new Border
             {
                 Background = Theme.GreenSoftBrush,
                 CornerRadius = new CornerRadius(10),
@@ -202,7 +213,9 @@ public sealed class StyleTab : StackPanel
                     Foreground = Theme.TextBrush,
                     TextWrapping = TextWrapping.Wrap,
                 },
-            });
+            };
+            Grid.SetRow(bubble, 2);
+            panel.Children.Add(bubble);
 
             bool selected = key == current;
             var card = new Border
@@ -212,7 +225,7 @@ public sealed class StyleTab : StackPanel
                 BorderThickness = new Thickness(selected ? 2 : 1),
                 CornerRadius = new CornerRadius(12),
                 Padding = new Thickness(20, 18, 20, 20),
-                MinHeight = 330,
+                MinHeight = 280,
                 Cursor = Cursors.Hand,
                 Child = panel,
             };
@@ -232,6 +245,7 @@ public sealed class StyleTab : StackPanel
     {
         var s = Settings.Current;
         if (!s.DictationPromptOff && !string.IsNullOrEmpty(s.SelectedProviderID)) return "medium";
+        if (s.AutoFormatStructureEnabled && (s.RemoveFillerWordsEnabled || s.AutoConvertPunctuationEnabled)) return "light-format";
         if (s.RemoveFillerWordsEnabled || s.AutoConvertPunctuationEnabled) return "light";
         return "none";
     }
@@ -244,16 +258,25 @@ public sealed class StyleTab : StackPanel
             case "none":
                 s.RemoveFillerWordsEnabled = false;
                 s.AutoConvertPunctuationEnabled = false;
+                s.AutoFormatStructureEnabled = false;
                 s.DictationPromptOff = true;
                 break;
             case "light":
                 s.RemoveFillerWordsEnabled = true;
                 s.AutoConvertPunctuationEnabled = true;
+                s.AutoFormatStructureEnabled = false;
+                s.DictationPromptOff = true;
+                break;
+            case "light-format":
+                s.RemoveFillerWordsEnabled = true;
+                s.AutoConvertPunctuationEnabled = true;
+                s.AutoFormatStructureEnabled = true;
                 s.DictationPromptOff = true;
                 break;
             default: // medium
                 s.RemoveFillerWordsEnabled = true;
                 s.AutoConvertPunctuationEnabled = true;
+                s.AutoFormatStructureEnabled = false;
                 s.DictationPromptOff = false;
                 break;
         }

@@ -28,7 +28,50 @@ public static class TranscriptFormatter
         text = ApplySnippets(text);
         if (Settings.Current.AutoConvertPunctuationEnabled)
             text = SpokenPunctuation.Apply(text, appName, windowTitle);
+        if (Settings.Current.AutoFormatStructureEnabled)
+            text = ApplyStructure(text);
         return text;
+    }
+
+    /// <summary>"Light + formatting" cleanup: collapse immediately-repeated words and turn
+    /// spoken enumerations ("first… then… finally…") into bullet lines. Local, deterministic,
+    /// deliberately conservative — lists only form when 3+ marker sentences are present.</summary>
+    public static string ApplyStructure(string text)
+    {
+        if (text.Length == 0) return text;
+
+        // 1. de-duplicate immediately-repeated words ("the the" → "the"), same line only
+        text = Regex.Replace(text, @"\b(\w+)([ \t]+\1\b)+", "$1", RegexOptions.IgnoreCase);
+
+        // 2. spoken enumerations → bullets
+        var sentences = Regex.Split(text, @"(?<=[.!?])\s+");
+        var marker = new Regex(
+            @"^(first(ly)?|second(ly)?|third(ly)?|fourth(ly)?|fifth(ly)?|then|next|after that|finally|lastly|number (one|two|three|four|five))\b[,.:]?\s*",
+            RegexOptions.IgnoreCase);
+        if (sentences.Count(s => marker.IsMatch(s.Trim())) < 3) return text;
+
+        var lines = new List<string>();
+        foreach (var s in sentences)
+        {
+            var t = s.Trim();
+            if (t.Length == 0) continue;
+            var m = marker.Match(t);
+            if (m.Success)
+            {
+                var item = t[m.Length..].TrimStart();
+                if (item.Length == 0) continue;
+                lines.Add("• " + char.ToUpperInvariant(item[0]) + item[1..]);
+            }
+            else if (lines.Count > 0 && !lines[^1].StartsWith("• ", StringComparison.Ordinal))
+            {
+                lines[^1] = lines[^1] + " " + t; // keep an ordinary paragraph flowing
+            }
+            else
+            {
+                lines.Add(t);
+            }
+        }
+        return string.Join("\n", lines);
     }
 
     /// <summary>Voice snippets: a spoken trigger word/phrase expands to its saved text.</summary>

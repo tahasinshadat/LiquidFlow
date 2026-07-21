@@ -61,14 +61,14 @@ public static class PageChrome
     /// <summary>Underlined tab strip with subtle search / sort / refresh icons on the right.</summary>
     public static UIElement TabsRow(string[] tabs, int active, Action<int>? onSelect = null)
     {
-        var dock = new DockPanel { Margin = new Thickness(0, 0, 0, 24) };
+        var dock = new DockPanel { Margin = new Thickness(0, 0, 0, 24), MinHeight = 30 };
         var icons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         foreach (var glyph in new[] { "", "", "" })
             icons.Children.Add(IconButton(glyph, null, null));
         DockPanel.SetDock(icons, Dock.Right);
         dock.Children.Add(icons);
 
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom };
         for (int i = 0; i < tabs.Length; i++)
         {
             int idx = i;
@@ -101,13 +101,13 @@ public static class PageChrome
     /// <summary>A tab strip entry that carries a small "Beta" chip (Style → Auto cleanup).</summary>
     public static UIElement TabsRowWithBeta(string[] tabs, int betaIndex, int active, Action<int> onSelect)
     {
-        var dock = new DockPanel { Margin = new Thickness(0, 0, 0, 24) };
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        var dock = new DockPanel { Margin = new Thickness(0, 0, 0, 24), MinHeight = 30 };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom };
         for (int i = 0; i < tabs.Length; i++)
         {
             int idx = i;
             bool on = i == active;
-            var wrap = new StackPanel { Margin = new Thickness(0, 0, 24, 0), Cursor = Cursors.Hand };
+            var wrap = new StackPanel { Margin = new Thickness(0, 0, 26, 0), Cursor = Cursors.Hand };
             var line = new StackPanel { Orientation = Orientation.Horizontal };
             line.Children.Add(new TextBlock
             {

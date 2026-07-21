@@ -60,17 +60,24 @@ public static class VoiceBoxManager
             File.Move(tmp, setupPath, overwrite: true);
         }
 
-        progress.Report(("Installing VoiceBox (silent)…", -1));
+        // strip mark-of-the-web so SmartScreen can't silently block the silent install
+        try { File.Delete(setupPath + ":Zone.Identifier"); } catch { /* not NTFS / no ADS */ }
+
+        progress.Report(("Installing VoiceBox silently — this one-time step can take a few minutes…", -1));
         var psi = name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase)
             ? new ProcessStartInfo("msiexec.exe", $"/i \"{setupPath}\" /qn /norestart") { UseShellExecute = true }
             : new ProcessStartInfo(setupPath, "/S") { UseShellExecute = true };
         using (var proc = Process.Start(psi))
         {
-            if (proc is not null) await proc.WaitForExitAsync(ct);
+            if (proc is not null)
+            {
+                await proc.WaitForExitAsync(ct);
+                Log.Info("voicebox", $"VoiceBox installer exited with code {proc.ExitCode}");
+            }
         }
 
-        // the installer registers + copies files; give the locator a few tries
-        for (int i = 0; i < 20; i++)
+        // the installer registers + copies files; give the locator a while (slow under emulation)
+        for (int i = 0; i < 60; i++)
         {
             var exe = FindExecutable();
             if (exe is not null) return exe;

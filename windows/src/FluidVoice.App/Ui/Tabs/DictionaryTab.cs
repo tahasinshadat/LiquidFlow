@@ -31,7 +31,7 @@ public sealed class DictionaryTab : StackPanel
     private UIElement BuildBanner()
     {
         // Warm, blurred-photo-inspired banner matching the rest of the hub.
-        var grid = new Grid { Height = 190, ClipToBounds = true };
+        var grid = new Grid { MinHeight = 190, ClipToBounds = true };
         grid.Children.Add(new Border
         {
             CornerRadius = new CornerRadius(18),

@@ -491,7 +491,7 @@ public sealed class MainWindow : Window
         var page = new StackPanel
         {
             Margin = new Thickness(30, 30, 30, 40),
-            MaxWidth = entry.Title == "Dictation" ? 1180 : 1150,
+            MaxWidth = 1150, // identical on every page so switching tabs never shifts content
             HorizontalAlignment = HorizontalAlignment.Center, // content stays centered in the sheet
             LayoutTransform = Theme.PageScale(),              // user text-size setting
         };
@@ -502,15 +502,8 @@ public sealed class MainWindow : Window
         _content.ScrollToTop();
     }
 
-    private static UIElement PageHeader(string title) => new TextBlock
-    {
-        Text = title,
-        FontSize = 21,
-        FontWeight = FontWeights.SemiBold,
-        FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI"),
-        Foreground = new SolidColorBrush(Theme.Text),
-        Margin = new Thickness(0, 0, 0, 30),
-    };
+    // Same builder the self-headed pages use, so every page title has identical size/spacing.
+    private static UIElement PageHeader(string title) => PageChrome.HeaderRow(title, null, null);
 
     private static StackPanel Stack(params UIElement[] children)
     {
