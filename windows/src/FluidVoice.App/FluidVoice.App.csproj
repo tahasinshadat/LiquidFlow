@@ -15,7 +15,7 @@
     <LangVersion>latest</LangVersion>
     <RuntimeIdentifiers>win-arm64;win-x64</RuntimeIdentifiers>
     <Platforms>AnyCPU;ARM64;x64</Platforms>
-    <Version>1.9.1</Version>
+    <Version>1.9.3</Version>
     <Product>LiquidFlow</Product>
     <Company>FluidVoice contributors</Company>
     <Copyright>GPLv3 — port of altic-dev/FluidVoice</Copyright>
@@ -44,6 +44,8 @@
     <!-- sherpa-onnx: Parakeet (NeMo transducer, ONNX) engine; ships win-arm64 + win-x64 native runtimes -->
     <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.13.3" />
     <PackageReference Include="NAudio" Version="2.2.1" />
+    <!-- seeds VoiceBox's preset-voice profiles into its SQLite db (voicebox.db) -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
     <!-- WebView2: hosts the React front-end (windows/web) as the app UI; Evergreen runtime, arm64 + x64 -->
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
   </ItemGroup>

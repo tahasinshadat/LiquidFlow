@@ -476,10 +476,11 @@ public sealed class MainWindow : Window
         }
         if (entry.Title == "VoiceBox")
         {
-            // full-bleed embedded surface (no scrolling page wrapper)
+            // full-bleed embedded surface: no scroll lane, no page wrapper — VoiceBox IS the sheet
             var host = VoiceBoxHostView.Instance;
+            _content.VerticalScrollBarVisibility = ScrollBarVisibility.Hidden;
             void SizeHost() =>
-                host.Height = Math.Max(420, _content.ViewportHeight > 1 ? _content.ViewportHeight : _content.ActualHeight - 4);
+                host.Height = Math.Max(420, _content.ViewportHeight > 1 ? _content.ViewportHeight : _content.ActualHeight);
             _voiceBoxSizer = (_, _) => SizeHost();
             _content.SizeChanged += _voiceBoxSizer;
             SizeHost();
@@ -487,6 +488,7 @@ public sealed class MainWindow : Window
             _content.ScrollToTop();
             return;
         }
+        _content.VerticalScrollBarVisibility = ScrollBarVisibility.Visible; // reserved lane on normal pages
 
         var page = new StackPanel
         {

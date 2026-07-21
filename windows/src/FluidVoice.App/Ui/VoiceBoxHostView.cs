@@ -41,30 +41,8 @@ public sealed class VoiceBoxHostView : Grid
 
     private VoiceBoxHostView()
     {
-        RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-
-        // ---- top bar: back ----
-        var back = new Border
-        {
-            Background = new SolidColorBrush(Theme.SidebarSelected),
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(12, 6, 12, 6),
-            Cursor = Cursors.Hand,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Margin = new Thickness(16, 12, 16, 10),
-            Child = new TextBlock
-            {
-                Text = "←  Back to LiquidFlow",
-                FontSize = 12.5,
-                FontWeight = FontWeights.SemiBold,
-                Foreground = Theme.TextBrush,
-            },
-        };
-        back.MouseLeftButtonUp += (_, _) =>
-            (Window.GetWindow(this) as MainWindow)?.CaptureNavigate("Dictation");
-        SetRow(back, 0);
-        Children.Add(back);
+        // Full-bleed single-cell layout: the embedded VoiceBox window IS the page
+        // (the sidebar handles navigation, so no back bar or chrome of our own).
 
         // ---- progress / status panel ----
         _progressPanel = new StackPanel
@@ -98,18 +76,14 @@ public sealed class VoiceBoxHostView : Grid
         _retry.Click += (_, _) => _ = EnsureAsync();
         buttons.Children.Add(_retry);
         _progressPanel.Children.Add(buttons);
-        SetRow(_progressPanel, 1);
         Children.Add(_progressPanel);
 
-        // ---- embed host ----
+        // ---- embed host (edge to edge) ----
         _hostBorder = new Border
         {
             Background = new SolidColorBrush(Theme.CardInner),
-            CornerRadius = new CornerRadius(10),
-            Margin = new Thickness(12, 0, 12, 12),
             Visibility = Visibility.Collapsed,
         };
-        SetRow(_hostBorder, 1);
         Children.Add(_hostBorder);
 
         Loaded += (_, _) =>
@@ -151,6 +125,10 @@ public sealed class VoiceBoxHostView : Grid
                 }
             }
 
+            // Seed the built-in voice library (Kokoro + Qwen presets, incl. the Jarvis persona)
+            // before VoiceBox starts so the profiles are there on its very first paint.
+            await VoiceBoxManager.SeedPresetVoicesAsync();
+
             SetStatus("Starting VoiceBox…", -1);
             var hwnd = await LaunchAndFindWindowAsync(exe, _cts.Token);
             if (hwnd == IntPtr.Zero)
@@ -166,6 +144,17 @@ public sealed class VoiceBoxHostView : Grid
             _hostBorder.Visibility = Visibility.Visible;
             _progressPanel.Visibility = Visibility.Collapsed;
             Log.Info("voicebox", "VoiceBox embedded");
+
+            // Very first run: voicebox.db only exists after VoiceBox boots — retry the seed
+            // in the background so the library still lands without user action.
+            _ = Task.Run(async () =>
+            {
+                for (int i = 0; i < 24; i++)
+                {
+                    await Task.Delay(5000);
+                    if (await VoiceBoxManager.SeedPresetVoicesAsync() > 0) break;
+                }
+            });
         }
         catch (OperationCanceledException)
         {
@@ -257,9 +246,18 @@ public sealed class VoiceBoxHostView : Grid
         private void Resize()
         {
             if (_released) return;
-            var w = Math.Max(100, (int)ActualWidth);
-            var h = Math.Max(100, (int)ActualHeight);
+            // MoveWindow takes PHYSICAL pixels; ActualWidth/Height are DIPs — on a scaled
+            // display (e.g. 150%) forgetting this leaves the child at ~2/3 size.
+            var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(this);
+            var w = Math.Max(100, (int)Math.Ceiling(ActualWidth * dpi.DpiScaleX));
+            var h = Math.Max(100, (int)Math.Ceiling(ActualHeight * dpi.DpiScaleY));
             MoveWindow(_target, 0, 0, w, h, true);
+        }
+
+        protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+        {
+            base.OnDpiChanged(oldDpi, newDpi);
+            Resize();
         }
 
         /// <summary>Give the window back to the desktop (keeps VoiceBox alive across tab switches).</summary>
