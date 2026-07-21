@@ -67,6 +67,7 @@ public sealed class MainWindow : Window
             new("\uE945", "Transforms", () => new TransformsTab(() => OpenCommandWindow?.Invoke(), () => OpenRewriteWindow?.Invoke(), _coordinator)),
             new("\uE70B", "Scratchpad", () => new ScratchpadTab()),
             new("\uE716", "Meetings", () => new MeetingsTab(_coordinator)),
+            new("\uE995", "Voices", () => new VoicesTab()),
             new("\uE767", "VoiceBox", () => new VoiceBoxTab()),
             // rail pins these to the bottom (reference layout); Settings opens the modal
             new("\uE713", "Settings", () => new TextBlock()),

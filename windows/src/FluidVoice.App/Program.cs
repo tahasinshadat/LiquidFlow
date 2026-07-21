@@ -30,6 +30,8 @@ public static class Program
             return SelfTestLlm(args).GetAwaiter().GetResult();
         if (args.Contains("--selftest-type"))
             return SelfTestType(args);
+        if (args.Contains("--selftest-tts"))
+            return SelfTestTts(args).GetAwaiter().GetResult();
         if (args.Contains("--capture-ui"))
             return App.UiCapture.Run(args);
 
@@ -238,6 +240,39 @@ public static class Program
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
     [System.Runtime.InteropServices.DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
+
+    /// <summary>
+    /// Headless native-TTS check: --selftest-tts [voiceName] ["text"]
+    /// Downloads the Kokoro bundle if needed, generates a WAV, prints timing.
+    /// </summary>
+    private static async Task<int> SelfTestTts(string[] args)
+    {
+        var idx = Array.IndexOf(args, "--selftest-tts");
+        var voiceName = args.Length > idx + 1 && !args[idx + 1].StartsWith("--") ? args[idx + 1] : "Jarvis";
+        var text = args.Length > idx + 2 && !args[idx + 2].StartsWith("--")
+            ? args[idx + 2]
+            : "At your service. All systems are online and running well.";
+        try
+        {
+            if (!Ai.VoiceStudio.IsInstalled)
+            {
+                Console.WriteLine("Downloading Kokoro voice bundle (~126 MB)...");
+                var progress = new Progress<(string Phase, double Pct)>(p => Console.WriteLine($"  {p.Phase}"));
+                await Ai.VoiceStudio.DownloadAsync(progress, CancellationToken.None);
+            }
+            var voice = Ai.VoiceStudio.Voices.FirstOrDefault(v => v.Name.StartsWith(voiceName, StringComparison.OrdinalIgnoreCase));
+            if (voice.Name is null) { Console.WriteLine($"Unknown voice '{voiceName}'"); return 1; }
+            Console.WriteLine($"Generating with {voice.Name} (id {voice.Id}): \"{text}\"");
+            var (path, seconds, ms) = await Ai.VoiceStudio.GenerateAsync(text, voice.Id, 1.0f, CancellationToken.None);
+            Console.WriteLine($"OK: {seconds:0.00}s of audio in {ms}ms -> {path}");
+            return seconds > 0.2 && File.Exists(path) ? 0 : 1;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"TTS selftest FAILED: {ex}");
+            return 1;
+        }
+    }
 
     /// <summary>
     /// Headless pipeline check: --selftest-stt &lt;wav&gt; [modelId]

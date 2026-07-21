@@ -15,7 +15,7 @@
     <LangVersion>latest</LangVersion>
     <RuntimeIdentifiers>win-arm64;win-x64</RuntimeIdentifiers>
     <Platforms>AnyCPU;ARM64;x64</Platforms>
-    <Version>1.9.4</Version>
+    <Version>1.9.5</Version>
     <Product>LiquidFlow</Product>
     <Company>FluidVoice contributors</Company>
     <Copyright>GPLv3 — port of altic-dev/FluidVoice</Copyright>
@@ -46,6 +46,10 @@
     <PackageReference Include="NAudio" Version="2.2.1" />
     <!-- seeds VoiceBox's preset-voice profiles into its SQLite db (voicebox.db) -->
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+    <!-- extracts the Kokoro TTS voice bundle (.tar.bz2) for the native Voices page.
+         NU1902 (zip-slip in WriteEntryToDirectory, no patched release) is suppressed:
+         we extract manually with our own path-traversal guard and a pinned trusted URL. -->
+    <PackageReference Include="SharpCompress" Version="0.39.0" NoWarn="NU1902" />
     <!-- WebView2: hosts the React front-end (windows/web) as the app UI; Evergreen runtime, arm64 + x64 -->
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
   </ItemGroup>
