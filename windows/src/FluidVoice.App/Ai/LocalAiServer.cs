@@ -42,6 +42,13 @@ public static class LocalAiServer
             "Best local quality; slower. ~2 GB.",
             "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf",
             "qwen2.5-3b-instruct-q4_k_m.gguf", 0),
+        // Custom fine-tune (windows/ai-training): Gemma 3 270M trained on the dictation-reformat
+        // dataset. No download URL — train it on Colab per ai-training/README.md and drop the
+        // exported GGUF into the LocalAI\Models folder; it then appears as installed.
+        new("gemma3-270m-liquidflow", "Gemma 3 270M · LiquidFlow fine-tune (instant)",
+            "Your custom-trained reformatter — near-instant on this CPU. Build it with windows/ai-training (Colab, <1h), then drop the GGUF in the models folder. ~0.3 GB.",
+            "",
+            "gemma3-270m-liquidflow-q8_0.gguf", 0),
     };
 
     private static readonly object Sync = new();
