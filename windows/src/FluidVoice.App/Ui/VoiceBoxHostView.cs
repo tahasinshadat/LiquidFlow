@@ -42,14 +42,15 @@ public sealed class VoiceBoxHostView : Grid
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-        // ---- top bar: back + title ----
-        var bar = new DockPanel { Margin = new Thickness(16, 12, 16, 10) };
+        // ---- top bar: back ----
         var back = new Border
         {
             Background = new SolidColorBrush(Theme.SidebarSelected),
             CornerRadius = new CornerRadius(8),
             Padding = new Thickness(12, 6, 12, 6),
             Cursor = Cursors.Hand,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(16, 12, 16, 10),
             Child = new TextBlock
             {
                 Text = "←  Back to LiquidFlow",
@@ -60,18 +61,8 @@ public sealed class VoiceBoxHostView : Grid
         };
         back.MouseLeftButtonUp += (_, _) =>
             (Window.GetWindow(this) as MainWindow)?.CaptureNavigate("Dictation");
-        DockPanel.SetDock(back, Dock.Left);
-        bar.Children.Add(back);
-        bar.Children.Add(new TextBlock
-        {
-            Text = "VoiceBox — open-source AI voice studio (MIT, by Jamie Pine)",
-            FontSize = 12.5,
-            Foreground = Theme.SubtleBrush,
-            VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Right,
-        });
-        SetRow(bar, 0);
-        Children.Add(bar);
+        SetRow(back, 0);
+        Children.Add(back);
 
         // ---- progress / status panel ----
         _progressPanel = new StackPanel
