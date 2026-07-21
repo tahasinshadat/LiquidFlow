@@ -8,6 +8,7 @@ public sealed class Note
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Title { get; set; } = "";
+    public bool CustomTitle { get; set; }
     public string Body { get; set; } = "";
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 }

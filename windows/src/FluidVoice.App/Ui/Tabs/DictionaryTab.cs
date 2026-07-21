@@ -30,7 +30,7 @@ public sealed class DictionaryTab : StackPanel
 
     private UIElement BuildBanner()
     {
-        // brand-teal banner (was a clashing brown gradient) with a soft glow
+        // Warm, blurred-photo-inspired banner matching the rest of the hub.
         var grid = new Grid { Height = 190, ClipToBounds = true };
         grid.Children.Add(new Border
         {
@@ -38,9 +38,9 @@ public sealed class DictionaryTab : StackPanel
             Background = new LinearGradientBrush(
                 new GradientStopCollection
                 {
-                    new(Color.FromRgb(14, 18, 19), 0),
-                    new(Color.FromRgb(16, 42, 43), 0.55),
-                    new(Color.FromRgb(24, 94, 91), 1),
+                    new(Color.FromRgb(14, 14, 15), 0),
+                    new(Color.FromRgb(27, 23, 21), 0.55),
+                    new(Color.FromRgb(54, 39, 26), 1),
                 },
                 new Point(0, 0.3), new Point(1, 0.9)),
         });
@@ -49,8 +49,8 @@ public sealed class DictionaryTab : StackPanel
             Width = 320,
             HorizontalAlignment = HorizontalAlignment.Right,
             CornerRadius = new CornerRadius(18),
-            Opacity = 0.5,
-            Background = new RadialGradientBrush(Color.FromArgb(150, 74, 214, 196), Color.FromArgb(0, 74, 214, 196))
+            Opacity = 0.82,
+            Background = new RadialGradientBrush(Color.FromArgb(190, 196, 128, 58), Color.FromArgb(0, 196, 128, 58))
             {
                 Center = new Point(0.75, 0.35),
                 GradientOrigin = new Point(0.75, 0.35),

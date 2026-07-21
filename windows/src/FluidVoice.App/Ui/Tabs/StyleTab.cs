@@ -208,7 +208,7 @@ public sealed class StyleTab : StackPanel
             var card = new Border
             {
                 Background = new SolidColorBrush(Theme.CardInner),
-                BorderBrush = selected ? Theme.AccentBrush : Theme.HairlineBrush,
+                BorderBrush = selected ? Theme.PurpleBrush : Theme.HairlineBrush,
                 BorderThickness = new Thickness(selected ? 2 : 1),
                 CornerRadius = new CornerRadius(12),
                 Padding = new Thickness(20, 18, 20, 20),
@@ -414,7 +414,7 @@ public static class StyleCards
         var card = new Border
         {
             Background = new SolidColorBrush(Theme.CardInner),
-            BorderBrush = selected ? Theme.AccentBrush : Theme.HairlineBrush,
+            BorderBrush = selected ? Theme.PurpleBrush : Theme.HairlineBrush,
             BorderThickness = new Thickness(selected ? 2 : 1),
             CornerRadius = new CornerRadius(12),
             Padding = new Thickness(18, 16, 18, 24),

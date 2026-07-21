@@ -20,7 +20,7 @@ public sealed record UpdateInfo(string Version, string Notes, string DownloadUrl
 public static class Updater
 {
     // Point this at your fork's releases. Assets should be named LiquidFlow-Setup-<version>-<arch>.exe
-    public const string Repo = "altic-dev/FluidVoice-Windows";
+    public const string Repo = "tahasinshadat/LiquidFlow";
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30) };
 
     static Updater()

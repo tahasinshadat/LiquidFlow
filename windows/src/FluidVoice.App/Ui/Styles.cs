@@ -292,14 +292,16 @@ public static class Styles
     <Setter Property="CaretBrush" Value="{FG}"/>
     <Setter Property="Padding" Value="10,7"/>
     <Setter Property="FontSize" Value="13"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
     <Setter Property="SelectionBrush" Value="{ACCENT}"/>
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="TextBox">
           <Border x:Name="Bg" Background="{TemplateBinding Background}"
-                  BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="8">
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
             <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
-                          VerticalAlignment="Center"/>
+                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsKeyboardFocusWithin" Value="True">
@@ -318,14 +320,16 @@ public static class Styles
     <Setter Property="CaretBrush" Value="{FG}"/>
     <Setter Property="Padding" Value="10,7"/>
     <Setter Property="FontSize" Value="13"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
     <Setter Property="SelectionBrush" Value="{ACCENT}"/>
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="PasswordBox">
           <Border x:Name="Bg" Background="{TemplateBinding Background}"
-                  BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="8">
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
             <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
-                          VerticalAlignment="Center"/>
+                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsKeyboardFocusWithin" Value="True">

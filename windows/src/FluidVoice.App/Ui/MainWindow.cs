@@ -65,6 +65,7 @@ public sealed class MainWindow : Window
             new("\uE945", "Transforms", () => new TransformsTab(() => OpenCommandWindow?.Invoke(), () => OpenRewriteWindow?.Invoke(), _coordinator)),
             new("\uE70B", "Scratchpad", () => new ScratchpadTab()),
             new("\uE716", "Meetings", () => new MeetingsTab(_coordinator)),
+            new("\uE767", "VoiceBox", () => new VoiceBoxTab()),
             // rail pins these to the bottom (reference layout); Settings opens the modal
             new("\uE713", "Settings", () => new TextBlock()),
             new("\uE897", "Help", BuildFeedbackPage),
@@ -474,7 +475,7 @@ public sealed class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Center, // content stays centered in the sheet
             LayoutTransform = Theme.PageScale(),              // user text-size setting
         };
-        if (entry.Title is not ("Dictation" or "Snippets" or "Scratchpad" or "Dictionary" or "Meetings" or "Transforms"))
+        if (entry.Title is not ("Dictation" or "Snippets" or "Scratchpad" or "Dictionary" or "Meetings" or "Transforms" or "VoiceBox"))
             page.Children.Add(PageHeader(entry.Title));
         page.Children.Add(entry.Page());
         _content.Content = page;
@@ -541,8 +542,7 @@ public sealed class MainWindow : Window
 
     private UIElement BuildHomeHero(SpeechModelInfo model, bool setupDone)
     {
-        // brand-teal hero: deep charcoal sweeping into the app's teal, with a soft glow —
-        // reads on-brand in both themes (the old gold/brown gradient clashed with everything)
+        // Warm, blurred-photo-inspired hero treatment used throughout the reference UI.
         var hero = new Grid { Height = 190, ClipToBounds = true };
         hero.Children.Add(new Border
         {
@@ -550,9 +550,9 @@ public sealed class MainWindow : Window
             Background = new LinearGradientBrush(
                 new GradientStopCollection
                 {
-                    new(Color.FromRgb(14, 18, 19), 0),
-                    new(Color.FromRgb(16, 42, 43), 0.55),
-                    new(Color.FromRgb(24, 94, 91), 1),
+                    new(Color.FromRgb(14, 14, 15), 0),
+                    new(Color.FromRgb(27, 23, 21), 0.55),
+                    new(Color.FromRgb(54, 39, 26), 1),
                 },
                 new Point(0, 0.3),
                 new Point(1, 0.9)),
@@ -563,9 +563,9 @@ public sealed class MainWindow : Window
             Height = 190,
             HorizontalAlignment = HorizontalAlignment.Right,
             CornerRadius = new CornerRadius(18),
-            Opacity = 0.5,
+            Opacity = 0.82,
             Background = new RadialGradientBrush(
-                Color.FromArgb(150, 74, 214, 196), Color.FromArgb(0, 74, 214, 196))
+                Color.FromArgb(190, 196, 128, 58), Color.FromArgb(0, 196, 128, 58))
             {
                 Center = new Point(0.75, 0.35),
                 GradientOrigin = new Point(0.75, 0.35),

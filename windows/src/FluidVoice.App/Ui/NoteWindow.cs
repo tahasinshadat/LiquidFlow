@@ -2,109 +2,208 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shell;
 using System.Windows.Threading;
 using FluidVoice.Core;
 using FluidVoice.Typing;
 
 namespace FluidVoice.Ui;
 
-/// <summary>
-/// Floating scratchpad note: chromeless rounded always-on-top window with note tabs, a
-/// left mini-rail, an autosaving editor (dictate straight into it with your hotkey), and
-/// a Copy pill. One shared window; notes open as tabs.
-/// </summary>
+/// <summary>A shared, floating scratchpad editor with persistent note tabs.</summary>
 public sealed class NoteWindow : Window
 {
+    private const string InteractiveTag = "scratchpad-interactive";
     private static NoteWindow? _current;
 
     private readonly List<Note> _open = new();
-    private Note? _active;
     private readonly StackPanel _tabs = new() { Orientation = Orientation.Horizontal };
     private readonly TextBox _editor;
     private readonly TextBlock _hint;
+    private readonly Border _lineHighlight;
     private readonly DispatcherTimer _saveDebounce = new() { Interval = TimeSpan.FromMilliseconds(450) };
-    private bool _expanded;
+    private Note? _active;
+    private bool _loading;
 
-    /// <summary>Open (or focus) the shared note window, showing <paramref name="note"/> (null = new note).</summary>
     public static void OpenNote(Note? note)
     {
         if (_current is null)
         {
             _current = new NoteWindow();
             _current.Closed += (_, _) => _current = null;
+            if (!App.UiCapture.CaptureMode)
+            {
+                var owner = Application.Current?.Windows.OfType<MainWindow>().FirstOrDefault(window => window.IsVisible);
+                if (owner is not null) _current.Owner = owner;
+            }
         }
+
         _current.ShowNote(note ?? new Note());
-        _current.Show();
+        if (!_current.IsVisible) _current.Show();
+        if (_current.WindowState == WindowState.Minimized) _current.WindowState = WindowState.Normal;
         _current.Activate();
     }
 
     private NoteWindow()
     {
-        Width = 740;
-        Height = 470;
+        Title = "LiquidFlow Scratchpad";
+        Width = 760;
+        Height = 500;
+        MinWidth = 560;
+        MinHeight = 380;
         WindowStyle = WindowStyle.None;
-        AllowsTransparency = true;
-        Background = Brushes.Transparent;
-        Topmost = true;
+        ResizeMode = ResizeMode.CanResize;
+        AllowsTransparency = false;
+        Background = Theme.BgBrush;
         ShowInTaskbar = false;
-        WindowStartupLocation = WindowStartupLocation.CenterScreen;
-        MinWidth = 520;
-        MinHeight = 340;
-        ResizeMode = ResizeMode.CanResizeWithGrip; // drag the corner (or use ⤢) to resize
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        WindowChrome.SetWindowChrome(this, new WindowChrome
+        {
+            CaptionHeight = 0,
+            ResizeBorderThickness = new Thickness(8),
+            GlassFrameThickness = new Thickness(0, 1, 0, 0),
+            UseAeroCaptionButtons = false,
+            CornerRadius = new CornerRadius(0),
+        });
+        WindowFx.Apply(this);
+
         if (App.UiCapture.CaptureMode)
         {
-            // render offscreen for the screenshot harness — never flash on the user's display
             WindowStartupLocation = WindowStartupLocation.Manual;
             Left = -4000;
             Top = 120;
-            Topmost = false;
             ShowActivated = false;
         }
+
+        _lineHighlight = new Border
+        {
+            Height = 28,
+            Margin = new Thickness(16, 18, 16, 0),
+            VerticalAlignment = VerticalAlignment.Top,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Background = new SolidColorBrush(Theme.IsDark
+                ? Color.FromRgb(45, 44, 39)
+                : Color.FromRgb(248, 245, 237)),
+            CornerRadius = new CornerRadius(6),
+            IsHitTestVisible = false,
+            Visibility = Visibility.Collapsed,
+        };
 
         _editor = new TextBox
         {
             AcceptsReturn = true,
+            AcceptsTab = true,
             TextWrapping = TextWrapping.Wrap,
             BorderThickness = new Thickness(0),
             Background = Brushes.Transparent,
             Foreground = Theme.TextBrush,
-            FontSize = 14.5,
-            Padding = new Thickness(18, 14, 18, 14),
+            FontSize = 15,
+            Padding = new Thickness(24, 18, 24, 72),
+            VerticalContentAlignment = VerticalAlignment.Top,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            SpellCheck = { IsEnabled = true },
         };
+        TextBlock.SetLineHeight(_editor, 27);
+        TextBlock.SetLineStackingStrategy(_editor, LineStackingStrategy.BlockLineHeight);
+
         var hotkey = Settings.Current.PrimaryDictationShortcuts.FirstOrDefault()?.DisplayString ?? "your hotkey";
         _hint = new TextBlock
         {
-            Text = $"{hotkey}  to dictate",
+            Text = $"{hotkey} to dictate",
             FontSize = 14,
             Foreground = Theme.SubtleBrush,
-            Margin = new Thickness(20, 16, 0, 0),
+            Margin = new Thickness(26, 21, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
             IsHitTestVisible = false,
         };
+
         _editor.TextChanged += (_, _) =>
         {
             _hint.Visibility = _editor.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+            UpdateLineHighlight();
+            if (_loading) return;
             _saveDebounce.Stop();
             _saveDebounce.Start();
         };
-        _saveDebounce.Tick += (_, _) => { _saveDebounce.Stop(); SaveActive(); };
-
-        // ---- header: tabs + expand/close ----
-        var header = new DockPanel { Margin = new Thickness(12, 10, 10, 6), LastChildFill = true };
-        var winBtns = new StackPanel { Orientation = Orientation.Horizontal };
-        winBtns.Children.Add(PageChrome.IconButton("", "Expand", ToggleExpand));
-        winBtns.Children.Add(PageChrome.IconButton("", "Close", Close));
-        DockPanel.SetDock(winBtns, Dock.Right);
-        header.Children.Add(winBtns);
-
-        var brand = new TextBlock
+        _editor.SelectionChanged += (_, _) => UpdateLineHighlight();
+        _editor.SizeChanged += (_, _) => UpdateLineHighlight();
+        _editor.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler((_, _) => UpdateLineHighlight()));
+        _editor.PreviewKeyDown += (_, e) =>
         {
-            Text = "",
-            FontFamily = new FontFamily("Segoe MDL2 Assets"),
-            FontSize = 15,
-            Foreground = Theme.AccentBrush,
+            if (e.Key == Key.S && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            {
+                SaveActive();
+                e.Handled = true;
+            }
+        };
+        _saveDebounce.Tick += (_, _) =>
+        {
+            _saveDebounce.Stop();
+            SaveActive();
+        };
+
+        var header = BuildHeader();
+        var rail = BuildRail();
+        var editorHost = BuildEditorHost();
+
+        var body = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(header, Dock.Top);
+        body.Children.Add(header);
+        DockPanel.SetDock(rail, Dock.Left);
+        body.Children.Add(rail);
+        body.Children.Add(new Border
+        {
+            Margin = new Thickness(0, 0, 10, 10),
+            Background = Theme.SurfaceBrush,
+            CornerRadius = new CornerRadius(10),
+            Child = editorHost,
+        });
+
+        Content = new Border
+        {
+            Background = Theme.BgBrush,
+            BorderBrush = Theme.HairlineBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(14),
+            Child = body,
+        };
+    }
+
+    private UIElement BuildHeader()
+    {
+        var header = new DockPanel
+        {
+            Height = 50,
+            Margin = new Thickness(11, 2, 8, 2),
+            LastChildFill = true,
+        };
+
+        var windowButtons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(4, 0, 12, 0),
+        };
+        windowButtons.Children.Add(ChromeButton("", "Maximize or restore", ToggleMaximize));
+        windowButtons.Children.Add(ChromeButton("", "Close scratchpad", Close));
+        DockPanel.SetDock(windowButtons, Dock.Right);
+        header.Children.Add(windowButtons);
+
+        var brand = new Border
+        {
+            Width = 36,
+            Height = 36,
+            Margin = new Thickness(0, 0, 9, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = new Image
+            {
+                Source = WindowFx.AppIconLarge,
+                Width = 23,
+                Height = 23,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+            },
         };
         DockPanel.SetDock(brand, Dock.Left);
         header.Children.Add(brand);
@@ -114,45 +213,67 @@ public sealed class NoteWindow : Window
             Content = _tabs,
             VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
+            VerticalAlignment = VerticalAlignment.Stretch,
         };
         header.Children.Add(tabsScroll);
 
-        // ---- left mini-rail (top: nav trio; bottom: polish + text size, per reference) ----
-        var rail = new DockPanel { Margin = new Thickness(8, 6, 4, 10), LastChildFill = false };
-        var railTop = new StackPanel();
-        railTop.Children.Add(PageChrome.IconButton("\uE700", "All notes (open the Scratchpad tab)", () =>
+        header.MouseLeftButtonDown += (_, e) =>
         {
-            foreach (var n in NotesStore.All.Take(8).Reverse())
-                if (_open.All(o => o.Id != n.Id)) _open.Insert(0, n);
-            RenderTabs();
-        }));
-        railTop.Children.Add(PageChrome.IconButton("\uE70F", "New note", () => ShowNote(new Note())));
-        railTop.Children.Add(PageChrome.IconButton("\uE721", "Search (use the Scratchpad tab)", null));
-        DockPanel.SetDock(railTop, Dock.Top);
-        rail.Children.Add(railTop);
-        var railBottom = new StackPanel();
-        railBottom.Children.Add(PageChrome.IconButton("\uE734", "Polish with Write Mode (select text + hotkey)", null));
-        railBottom.Children.Add(new Border
+            if (e.ChangedButton != MouseButton.Left || IsInteractive(e.OriginalSource as DependencyObject)) return;
+            if (e.ClickCount == 2) ToggleMaximize();
+            else
+            {
+                try { DragMove(); }
+                catch { }
+            }
+        };
+        return header;
+    }
+
+    private UIElement BuildRail()
+    {
+        var rail = new DockPanel
         {
-            Width = 30, Height = 30, Margin = new Thickness(4, 0, 0, 0),
+            Width = 52,
+            Margin = new Thickness(5, 4, 5, 10),
+            LastChildFill = false,
+        };
+        var top = new StackPanel();
+        top.Children.Add(RailButton("", "Open recent notes", OpenRecentNotes));
+        top.Children.Add(RailButton("", "New note", () => ShowNote(new Note())));
+        top.Children.Add(RailButton("", "Load all notes", OpenRecentNotes));
+        DockPanel.SetDock(top, Dock.Top);
+        rail.Children.Add(top);
+
+        var bottom = new StackPanel();
+        bottom.Children.Add(RailButton("", "Polish selected text", null));
+        bottom.Children.Add(new Border
+        {
+            Width = 36,
+            Height = 36,
+            Margin = new Thickness(8, 4, 8, 0),
             Child = new TextBlock
             {
-                Text = "Aa", FontSize = 12.5, FontWeight = FontWeights.SemiBold, Foreground = Theme.SubtleBrush,
-                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                Text = "Aa",
+                FontSize = 12.5,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Theme.SubtleBrush,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
             },
         });
-        DockPanel.SetDock(railBottom, Dock.Bottom);
-        rail.Children.Add(railBottom);
+        DockPanel.SetDock(bottom, Dock.Bottom);
+        rail.Children.Add(bottom);
+        return rail;
+    }
 
-        // ---- editor host with hint + bottom-right actions ----
-        var editorHost = new Grid();
-        editorHost.Children.Add(new Border
-        {
-            Background = Theme.SurfaceBrush,
-            CornerRadius = new CornerRadius(10),
-            Child = _editor,
-        });
-        editorHost.Children.Add(_hint);
+    private UIElement BuildEditorHost()
+    {
+        var host = new Grid { ClipToBounds = true };
+        host.Children.Add(_lineHighlight);
+        host.Children.Add(_editor);
+        host.Children.Add(_hint);
+
         var actions = new StackPanel
         {
             Orientation = Orientation.Horizontal,
@@ -160,64 +281,135 @@ public sealed class NoteWindow : Window
             VerticalAlignment = VerticalAlignment.Bottom,
             Margin = new Thickness(0, 0, 14, 12),
         };
-        actions.Children.Add(PageChrome.IconButton("", "Delete note", DeleteActive));
+        actions.Children.Add(EditorAction("", "Undo", () =>
+        {
+            if (_editor.CanUndo) _editor.Undo();
+        }));
+        actions.Children.Add(EditorAction("", "Delete note", DeleteActive));
+
         var copy = new Border
         {
+            Tag = InteractiveTag,
             Background = Theme.InkBrush,
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(16, 8, 16, 8),
+            CornerRadius = new CornerRadius(11),
+            Padding = new Thickness(17, 9, 17, 9),
             Cursor = Cursors.Hand,
-            Margin = new Thickness(8, 0, 0, 0),
+            Margin = new Thickness(7, 0, 0, 0),
             Child = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 Children =
                 {
-                    new TextBlock { Text = "", FontFamily = new FontFamily("Segoe MDL2 Assets"), FontSize = 13, Foreground = new SolidColorBrush(Theme.InkText), Margin = new Thickness(0, 1, 8, 0) },
-                    new TextBlock { Text = "Copy", FontSize = 13.5, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Theme.InkText) },
+                    new TextBlock
+                    {
+                        Text = "",
+                        FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                        FontSize = 13,
+                        Foreground = new SolidColorBrush(Theme.InkText),
+                        Margin = new Thickness(0, 1, 8, 0),
+                    },
+                    new TextBlock
+                    {
+                        Text = "Copy",
+                        FontSize = 13.5,
+                        FontWeight = FontWeights.SemiBold,
+                        Foreground = new SolidColorBrush(Theme.InkText),
+                    },
                 },
             },
         };
-        copy.MouseLeftButtonUp += (_, _) => { SaveActive(); ClipboardService.SetText(_editor.Text); };
-        actions.Children.Add(copy);
-        editorHost.Children.Add(actions);
-
-        var body = new DockPanel();
-        DockPanel.SetDock(header, Dock.Top);
-        body.Children.Add(header);
-        DockPanel.SetDock(rail, Dock.Left);
-        body.Children.Add(rail);
-        body.Children.Add(new Border { Child = editorHost, Margin = new Thickness(0, 0, 12, 12) });
-
-        Content = new Border
+        copy.MouseLeftButtonUp += (_, e) =>
         {
-            Background = new SolidColorBrush(Theme.Surface),
-            CornerRadius = new CornerRadius(14),
-            BorderBrush = Theme.HairlineBrush,
-            BorderThickness = new Thickness(1),
-            Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 26, ShadowDepth = 5, Opacity = 0.3, Color = Colors.Black },
-            Child = body,
+            e.Handled = true;
+            SaveActive();
+            ClipboardService.SetText(_editor.Text);
         };
-        header.MouseLeftButtonDown += (_, _) => { try { DragMove(); } catch { } };
+        actions.Children.Add(copy);
+        host.Children.Add(actions);
+        return host;
     }
 
-    private void ToggleExpand()
+    private Border ChromeButton(string glyph, string tooltip, Action action)
     {
-        _expanded = !_expanded;
-        Width = _expanded ? 1060 : 740;
-        Height = _expanded ? 660 : 470;
+        var button = new Border
+        {
+            Tag = InteractiveTag,
+            Width = 34,
+            Height = 34,
+            CornerRadius = new CornerRadius(8),
+            Background = Brushes.Transparent,
+            Cursor = Cursors.Hand,
+            ToolTip = tooltip,
+            Child = Theme.Glyph(glyph, 13, Theme.TextBrush),
+        };
+        button.MouseEnter += (_, _) => button.Background = new SolidColorBrush(Theme.SidebarSelected);
+        button.MouseLeave += (_, _) => button.Background = Brushes.Transparent;
+        button.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            action();
+        };
+        return button;
+    }
+
+    private Border RailButton(string glyph, string tooltip, Action? action)
+    {
+        var button = ChromeButton(glyph, tooltip, action ?? (() => { }));
+        button.Width = 36;
+        button.Height = 36;
+        button.Margin = new Thickness(8, 0, 8, 3);
+        button.Cursor = action is null ? Cursors.Arrow : Cursors.Hand;
+        return button;
+    }
+
+    private Border EditorAction(string glyph, string tooltip, Action action)
+    {
+        var button = ChromeButton(glyph, tooltip, action);
+        button.Background = new SolidColorBrush(Theme.SidebarSelected);
+        button.Margin = new Thickness(7, 0, 0, 0);
+        button.MouseLeave += (_, _) => button.Background = new SolidColorBrush(Theme.SidebarSelected);
+        return button;
+    }
+
+    private void ToggleMaximize()
+    {
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    }
+
+    private void OpenRecentNotes()
+    {
+        SaveActive(false);
+        foreach (var note in NotesStore.All.Take(10).Reverse())
+            if (_open.All(openNote => openNote.Id != note.Id)) _open.Insert(0, note);
+        if (_active is null && _open.Count > 0)
+        {
+            _active = _open[0];
+            LoadActive();
+        }
+        RenderTabs();
     }
 
     private void ShowNote(Note note)
     {
-        SaveActive();
-        if (_open.All(n => n.Id != note.Id)) _open.Add(note);
-        _active = _open.First(n => n.Id == note.Id);
-        _editor.Text = _active.Body;
-        _hint.Visibility = _editor.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        SaveActive(false);
+        if (_open.All(openNote => openNote.Id != note.Id)) _open.Add(note);
+        _active = _open.First(openNote => openNote.Id == note.Id);
+        LoadActive();
         RenderTabs();
-        _editor.Focus();
+    }
+
+    private void LoadActive()
+    {
+        _loading = true;
+        _editor.Text = _active?.Body ?? "";
+        _loading = false;
+        _hint.Visibility = _editor.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         _editor.CaretIndex = _editor.Text.Length;
+        Dispatcher.BeginInvoke(() =>
+        {
+            _editor.Focus();
+            UpdateLineHighlight();
+        }, DispatcherPriority.Input);
     }
 
     private void RenderTabs()
@@ -225,121 +417,225 @@ public sealed class NoteWindow : Window
         _tabs.Children.Clear();
         foreach (var note in _open.ToList())
         {
-            bool on = note.Id == _active?.Id;
-            var chip = new Border
+            var active = note.Id == _active?.Id;
+            var tab = new Grid { Height = 46, Margin = new Thickness(0, 0, 2, 0) };
+            tab.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            tab.RowDefinitions.Add(new RowDefinition { Height = new GridLength(2) });
+
+            var hit = new Border
             {
-                Background = on ? new SolidColorBrush(Theme.SidebarSelected) : Brushes.Transparent,
-                CornerRadius = new CornerRadius(8),
-                Padding = new Thickness(12, 5, 8, 5),
-                Margin = new Thickness(0, 0, 4, 0),
+                Tag = InteractiveTag,
+                Background = Brushes.Transparent,
+                Padding = new Thickness(11, 3, 8, 2),
                 Cursor = Cursors.Hand,
+                ToolTip = active ? "Click to rename" : "Open note",
             };
-            var row = new StackPanel { Orientation = Orientation.Horizontal };
+            var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             row.Children.Add(new TextBlock
             {
                 Text = TitleOf(note),
                 FontSize = 12.5,
-                FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal,
-                Foreground = Theme.TextBrush,
-                MaxWidth = 140,
+                FontWeight = active ? FontWeights.SemiBold : FontWeights.Normal,
+                Foreground = active ? Theme.TextBrush : Theme.SubtleBrush,
+                MaxWidth = 145,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 VerticalAlignment = VerticalAlignment.Center,
             });
             var close = new TextBlock
             {
-                Text = "✕",
-                FontSize = 10,
+                Text = "×",
+                FontSize = 15,
                 Foreground = Theme.SubtleBrush,
-                Margin = new Thickness(8, 1, 0, 0),
+                Margin = new Thickness(8, -1, 0, 0),
+                Cursor = Cursors.Hand,
                 VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = "Close tab",
             };
             close.MouseLeftButtonUp += (_, e) =>
             {
                 e.Handled = true;
-                if (note.Id == _active?.Id) SaveActive();
-                _open.RemoveAll(n => n.Id == note.Id);
-                if (_active?.Id == note.Id) { _active = _open.FirstOrDefault(); _editor.Text = _active?.Body ?? ""; }
-                if (_open.Count == 0) { Close(); return; }
-                RenderTabs();
+                CloseTab(note);
             };
             row.Children.Add(close);
-            chip.Child = row;
-            chip.MouseLeftButtonUp += (_, _) => ShowNote(note);
-            chip.MouseLeftButtonDown += (_, e) =>
+            hit.Child = row;
+            hit.MouseEnter += (_, _) => hit.Background = new SolidColorBrush(Color.FromArgb(18, Theme.Text.R, Theme.Text.G, Theme.Text.B));
+            hit.MouseLeave += (_, _) => hit.Background = Brushes.Transparent;
+            hit.MouseLeftButtonUp += (_, e) =>
             {
-                if (e.ClickCount == 2) { e.Handled = true; BeginRename(note, chip); }
+                e.Handled = true;
+                if (note.Id == _active?.Id) BeginRename(note, hit);
+                else ShowNote(note);
             };
-            _tabs.Children.Add(chip);
+            Grid.SetRow(hit, 0);
+            tab.Children.Add(hit);
+
+            var underline = new Border
+            {
+                Height = 2,
+                Margin = new Thickness(9, 0, 9, 0),
+                Background = active ? Theme.TextBrush : Brushes.Transparent,
+            };
+            Grid.SetRow(underline, 1);
+            tab.Children.Add(underline);
+            _tabs.Children.Add(tab);
         }
-        var plus = PageChrome.IconButton("", "New note", () => ShowNote(new Note()));
+
+        var plus = ChromeButton("", "New note", () => ShowNote(new Note()));
+        plus.Width = 36;
+        plus.Height = 36;
+        plus.Margin = new Thickness(3, 5, 0, 0);
         _tabs.Children.Add(plus);
     }
 
-    /// <summary>Double-click a tab: rename the note inline.</summary>
-    private void BeginRename(Note note, Border chip)
+    private void BeginRename(Note note, Border tab)
     {
         var box = new TextBox
         {
+            Tag = InteractiveTag,
             Text = TitleOf(note),
             FontSize = 12.5,
-            MinWidth = 110,
-            Padding = new Thickness(4, 1, 4, 1),
+            MinWidth = 105,
+            MaxWidth = 180,
+            Padding = new Thickness(7, 3, 7, 3),
             VerticalAlignment = VerticalAlignment.Center,
         };
-        void Commit()
+        var finished = false;
+        void Finish(bool save)
         {
-            var name = box.Text.Trim();
-            if (name.Length > 0)
+            if (finished) return;
+            finished = true;
+            var title = box.Text.Trim();
+            if (save && title.Length > 0)
             {
-                note.Title = name;
+                note.Title = title;
+                note.CustomTitle = true;
                 NotesStore.Save(note);
             }
             RenderTabs();
+            _editor.Focus();
         }
-        box.KeyDown += (_, e) =>
+        box.PreviewKeyDown += (_, e) =>
         {
-            if (e.Key == System.Windows.Input.Key.Enter) Commit();
-            else if (e.Key == System.Windows.Input.Key.Escape) RenderTabs();
+            if (e.Key == Key.Enter)
+            {
+                e.Handled = true;
+                Finish(true);
+            }
+            else if (e.Key == Key.Escape)
+            {
+                e.Handled = true;
+                Finish(false);
+            }
         };
-        box.LostFocus += (_, _) => Commit();
-        chip.Child = box;
+        box.LostFocus += (_, _) => Finish(true);
+        tab.Child = box;
         box.Focus();
         box.SelectAll();
     }
 
-    private static string TitleOf(Note n)
+    private void CloseTab(Note note)
     {
-        if (!string.IsNullOrWhiteSpace(n.Title)) return n.Title;
-        var first = n.Body.Split('\n').FirstOrDefault(l => l.Trim().Length > 0);
-        return string.IsNullOrWhiteSpace(first) ? "Untitled" : first.Trim();
+        if (note.Id == _active?.Id) SaveActive(false);
+        var index = _open.IndexOf(note);
+        _open.RemoveAll(openNote => openNote.Id == note.Id);
+        if (_open.Count == 0)
+        {
+            Close();
+            return;
+        }
+        if (_active?.Id == note.Id)
+        {
+            _active = _open[Math.Clamp(index - 1, 0, _open.Count - 1)];
+            LoadActive();
+        }
+        RenderTabs();
     }
 
-    private void SaveActive()
+    private static string SuggestedTitle(string body)
+    {
+        var first = body.Replace("\r", "").Split('\n').FirstOrDefault(line => line.Trim().Length > 0)?.Trim();
+        if (string.IsNullOrWhiteSpace(first)) return "Untitled";
+        return first.Length <= 48 ? first : first[..45] + "…";
+    }
+
+    private static string TitleOf(Note note) =>
+        string.IsNullOrWhiteSpace(note.Title) ? SuggestedTitle(note.Body) : note.Title;
+
+    private void SaveActive(bool refreshTabs = true)
     {
         if (_active is null) return;
         var body = _editor.Text;
-        if (body == _active.Body && !string.IsNullOrWhiteSpace(_active.Title)) return;
-        if (string.IsNullOrWhiteSpace(body) && string.IsNullOrWhiteSpace(_active.Title)) return; // don't persist empty new notes
+        var title = _active.CustomTitle ? _active.Title : SuggestedTitle(body);
+        if (string.IsNullOrWhiteSpace(body) && !_active.CustomTitle) return;
+        if (body == _active.Body && title == _active.Title) return;
+
         _active.Body = body;
-        _active.Title = TitleOf(_active);
+        _active.Title = title;
         NotesStore.Save(_active);
-        RenderTabs();
+        if (refreshTabs) RenderTabs();
     }
 
     private void DeleteActive()
     {
         if (_active is null) return;
-        NotesStore.Delete(_active.Id);
-        _open.RemoveAll(n => n.Id == _active.Id);
-        _active = _open.FirstOrDefault();
-        _editor.Text = _active?.Body ?? "";
-        if (_open.Count == 0) { Close(); return; }
+        var deleting = _active;
+        NotesStore.Delete(deleting.Id);
+        _open.RemoveAll(note => note.Id == deleting.Id);
+        if (_open.Count == 0)
+        {
+            Close();
+            return;
+        }
+        _active = _open[^1];
+        LoadActive();
         RenderTabs();
+    }
+
+    private void UpdateLineHighlight()
+    {
+        if (_editor.Text.Length == 0 || !_editor.IsLoaded)
+        {
+            _lineHighlight.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            try
+            {
+                var caret = Math.Clamp(_editor.CaretIndex, 0, _editor.Text.Length);
+                var rect = _editor.GetRectFromCharacterIndex(caret, true);
+                if (rect.IsEmpty || rect.Top < 0 || rect.Top > _editor.ActualHeight)
+                {
+                    _lineHighlight.Visibility = Visibility.Collapsed;
+                    return;
+                }
+                _lineHighlight.Height = Math.Max(27, rect.Height + 7);
+                _lineHighlight.Margin = new Thickness(14, Math.Max(8, rect.Top - 3), 14, 0);
+                _lineHighlight.Visibility = Visibility.Visible;
+            }
+            catch
+            {
+                _lineHighlight.Visibility = Visibility.Collapsed;
+            }
+        }, DispatcherPriority.Background);
+    }
+
+    private static bool IsInteractive(DependencyObject? source)
+    {
+        var current = source;
+        while (current is not null)
+        {
+            if (current is FrameworkElement element && Equals(element.Tag, InteractiveTag)) return true;
+            current = VisualTreeHelper.GetParent(current);
+        }
+        return false;
     }
 
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
-        SaveActive();
+        _saveDebounce.Stop();
+        SaveActive(false);
         base.OnClosing(e);
     }
 }

@@ -139,7 +139,7 @@ public static class PageChrome
         return host;
     }
 
-    /// <summary>Near-black rounded hero with a soft teal glow (our stand-in for their photo heroes).</summary>
+    /// <summary>Near-black rounded hero with soft, blurred warm/cool color fields.</summary>
     public static UIElement DarkHero(UIElement content, double corner = 16)
     {
         var grid = new Grid { ClipToBounds = true };
@@ -149,22 +149,42 @@ public static class PageChrome
             Background = new LinearGradientBrush(
                 new GradientStopCollection
                 {
-                    new(Color.FromRgb(15, 16, 18), 0),
-                    new(Color.FromRgb(24, 27, 30), 0.6),
-                    new(Color.FromRgb(18, 46, 46), 1),
+                    new(Color.FromRgb(15, 15, 16), 0),
+                    new(Color.FromRgb(26, 22, 21), 0.55),
+                    new(Color.FromRgb(47, 37, 28), 1),
                 },
                 new Point(0, 0.2), new Point(1, 1)),
         });
         grid.Children.Add(new Border
         {
-            Width = 360,
+            Width = 520,
             HorizontalAlignment = HorizontalAlignment.Right,
             CornerRadius = new CornerRadius(corner),
-            Opacity = 0.45,
-            Background = new RadialGradientBrush(Color.FromArgb(130, 74, 214, 196), Color.FromArgb(0, 74, 214, 196))
+            Opacity = 0.86,
+            Background = new RadialGradientBrush(Color.FromArgb(210, 190, 123, 57), Color.FromArgb(0, 190, 123, 57))
             {
-                Center = new Point(0.7, 0.4), GradientOrigin = new Point(0.7, 0.4), RadiusX = 0.8, RadiusY = 1.0,
+                Center = new Point(0.72, 0.44), GradientOrigin = new Point(0.72, 0.44), RadiusX = 0.65, RadiusY = 0.92,
             },
+        });
+        grid.Children.Add(new Border
+        {
+            Width = 330,
+            Height = 240,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(250, -70, 0, 0),
+            Opacity = 0.7,
+            Background = new RadialGradientBrush(Color.FromArgb(165, 42, 83, 116), Color.FromArgb(0, 42, 83, 116)),
+        });
+        grid.Children.Add(new Border
+        {
+            Width = 420,
+            Height = 210,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(0, 0, -70, -85),
+            Opacity = 0.72,
+            Background = new RadialGradientBrush(Color.FromArgb(150, 103, 55, 37), Color.FromArgb(0, 103, 55, 37)),
         });
         grid.Children.Add(content);
         return new Border { CornerRadius = new CornerRadius(corner), Child = grid };

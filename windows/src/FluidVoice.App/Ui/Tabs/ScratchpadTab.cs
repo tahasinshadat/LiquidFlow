@@ -28,20 +28,76 @@ public sealed class ScratchpadTab : StackPanel
 
     private UIElement BuildHeader()
     {
-        var row = new DockPanel { Margin = new Thickness(0, 0, 0, 34) };
-        var open = PageChrome.HeroPill("Open floating note");
-        open.Background = new System.Windows.Media.SolidColorBrush(Theme.SidebarSelected);
-        ((System.Windows.Controls.TextBlock)open.Child).Foreground = Theme.TextBrush;
-        open.VerticalAlignment = VerticalAlignment.Center;
-        open.MouseLeftButtonUp += (_, _) => NoteWindow.OpenNote(null);
-        DockPanel.SetDock(open, Dock.Right);
-        row.Children.Add(open);
+        var row = new DockPanel { Margin = new Thickness(0, 0, 0, 42) };
+        var controls = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        controls.Children.Add(new TextBlock
+        {
+            Text = "Add to Flow Bar",
+            FontSize = 14,
+            Foreground = Theme.TextBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+        controls.Children.Add(new TextBlock
+        {
+            Text = "",
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+            FontSize = 13,
+            Foreground = Theme.SubtleBrush,
+            Margin = new Thickness(8, 0, 10, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            ToolTip = "Keep Scratchpad within reach while you work",
+        });
+        var pinned = new CheckBox
+        {
+            IsChecked = Settings.Current.ScratchpadPinned,
+            Content = null,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 10, 0),
+        };
+        pinned.Checked += (_, _) =>
+        {
+            Settings.Current.ScratchpadPinned = true;
+            Settings.Current.Save("scratchpad");
+        };
+        pinned.Unchecked += (_, _) =>
+        {
+            Settings.Current.ScratchpadPinned = false;
+            Settings.Current.Save("scratchpad");
+        };
+        controls.Children.Add(pinned);
+
+        var hotkey = Settings.Current.PrimaryDictationShortcuts.FirstOrDefault()?.DisplayString ?? "your hotkey";
+        var shortcut = new Border
+        {
+            Background = new SolidColorBrush(Theme.SidebarSelected),
+            BorderBrush = Theme.HairlineBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(14, 8, 14, 8),
+            Cursor = Cursors.Hand,
+            ToolTip = "Open a floating note",
+            Child = new TextBlock
+            {
+                Text = $"{hotkey} to dictate",
+                FontSize = 12.5,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Theme.SubtleBrush,
+            },
+        };
+        shortcut.MouseLeftButtonUp += (_, _) => NoteWindow.OpenNote(null);
+        controls.Children.Add(shortcut);
+        DockPanel.SetDock(controls, Dock.Right);
+        row.Children.Add(controls);
 
         var left = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         left.Children.Add(new TextBlock
         {
             Text = "Scratchpad",
-            FontSize = 26,
+            FontSize = 25,
             FontWeight = FontWeights.SemiBold,
             FontFamily = new System.Windows.Media.FontFamily("Segoe UI Variable Display, Segoe UI"),
             Foreground = Theme.TextBrush,
@@ -92,6 +148,7 @@ public sealed class ScratchpadTab : StackPanel
         var icons = new StackPanel { Orientation = Orientation.Horizontal };
         icons.Children.Add(PageChrome.IconButton("", "Search notes", null));
         icons.Children.Add(PageChrome.IconButton("", "New note", () => NoteWindow.OpenNote(null)));
+        icons.Children.Add(PageChrome.IconButton("", "Notes are stored locally", null));
         DockPanel.SetDock(icons, Dock.Right);
         dock.Children.Add(icons);
         dock.Children.Add(new TextBlock
@@ -161,8 +218,8 @@ public sealed class ScratchpadTab : StackPanel
 
         var card = new Border
         {
-            Width = 300,
-            MinHeight = 150,
+            Width = 320,
+            MinHeight = 168,
             Background = new SolidColorBrush(Theme.CardInner),
             BorderBrush = Theme.HairlineBrush,
             BorderThickness = new Thickness(1),

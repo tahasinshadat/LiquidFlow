@@ -247,6 +247,7 @@ public sealed class Settings
     /// they're first-run aids and clutter once you're going; the hero still links to setup.</summary>
     public bool ShowHomeSetup { get; set; }
     public string DisplayName { get; set; } = "";
+    public bool ScratchpadPinned { get; set; } = true;
     /// <summary>Welcome-page "Setup Tested Successfully" checkmark.</summary>
     public bool SetupTested { get; set; }
 

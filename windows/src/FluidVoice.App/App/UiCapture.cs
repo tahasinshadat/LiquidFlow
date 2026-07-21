@@ -42,7 +42,7 @@ public static class UiCapture
         var pages = new[]
         {
             "Dictation", "Insights", "Insights:voice", "Dictionary",
-            "Snippets", "Style", "Transforms", "Scratchpad", "Meetings",
+            "Snippets", "Style", "Transforms", "Scratchpad", "Meetings", "VoiceBox",
         };
 
         var exit = 0;
@@ -99,7 +99,24 @@ public static class UiCapture
                     nw.Close();
                 }
 
-                Console.WriteLine($"captured {pages.Length + 7} screens -> {outDir}");
+                var captureNote = new Note
+                {
+                    Id = "ui-capture-scratchpad-note",
+                    Title = "yeooo",
+                    CustomTitle = true,
+                    Body = "1. Go to the gym\n2. Complete UI review\n3. Test the scratchpad editor\n4. Ship the update",
+                };
+                NoteWindow.OpenNote(captureNote);
+                await Task.Delay(300);
+                if (Application.Current.Windows.OfType<NoteWindow>().FirstOrDefault() is { } contentNote)
+                {
+                    contentNote.UpdateLayout();
+                    Snap(contentNote, Path.Combine(outDir, "scratchpad-note-content.png"));
+                    contentNote.Close();
+                }
+                NotesStore.Delete(captureNote.Id);
+
+                Console.WriteLine($"captured {pages.Length + 8} screens -> {outDir}");
             }
             catch (Exception ex)
             {
