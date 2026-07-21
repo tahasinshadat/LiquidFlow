@@ -208,7 +208,7 @@ public static class VoiceBoxManager
         }
     });
 
-    private static IEnumerable<(string Engine, string VoiceId, string Name, string Lang, string Desc)> PresetCatalog()
+    public static IEnumerable<(string Engine, string VoiceId, string Name, string Lang, string Desc)> PresetCatalog()
     {
         const string K = "kokoro";
         const string Q = "qwen_custom_voice";

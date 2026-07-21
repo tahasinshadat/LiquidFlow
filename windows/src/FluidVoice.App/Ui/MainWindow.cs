@@ -68,7 +68,7 @@ public sealed class MainWindow : Window
             new("\uE70B", "Scratchpad", () => new ScratchpadTab()),
             new("\uE716", "Meetings", () => new MeetingsTab(_coordinator)),
             new("\uE995", "Voices", () => new VoicesTab()),
-            new("\uE767", "VoiceBox", () => new VoiceBoxTab()),
+            new("\uE767", "VoiceBox", () => App.VoiceBoxNative.IsArm64 && !Settings.Current.VoiceBoxUseEmulated ? new VoiceBoxStudioView() : (UIElement)new VoiceBoxTab()),
             // rail pins these to the bottom (reference layout); Settings opens the modal
             new("\uE713", "Settings", () => new TextBlock()),
             new("\uE897", "Help", BuildFeedbackPage),
@@ -476,9 +476,10 @@ public sealed class MainWindow : Window
             _content.SizeChanged -= _voiceBoxSizer;
             _voiceBoxSizer = null;
         }
-        if (entry.Title == "VoiceBox")
+        // The full-bleed embed host is only for the EMULATED x64 desktop app. On ARM64 the
+        // VoiceBox tab is a normal native LiquidFlow page (VoiceBoxStudioView) below.
+        if (entry.Title == "VoiceBox" && (!App.VoiceBoxNative.IsArm64 || Settings.Current.VoiceBoxUseEmulated))
         {
-            // full-bleed embedded surface: no scroll lane, no page wrapper — VoiceBox IS the sheet
             var host = VoiceBoxHostView.Instance;
             _content.VerticalScrollBarVisibility = ScrollBarVisibility.Hidden;
             void SizeHost() =>
