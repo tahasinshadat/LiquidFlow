@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using FluidVoice.App;
@@ -20,6 +21,7 @@ public sealed class VoiceBoxStudioView : StackPanel
 {
     private int _tab;
     private bool _ready;
+    private string? _storyId;
     private readonly StackPanel _body = new();
 
     // generate state
@@ -43,7 +45,30 @@ public sealed class VoiceBoxStudioView : StackPanel
     public VoiceBoxStudioView()
     {
         // No hero on this page — VoiceBox is a dense tool surface; every pixel goes to work.
-        Children.Add(PageChrome.HeaderRow("VoiceBox", null, null));
+        // Header carries the Native toggle: on (default) = only fully-native features;
+        // off = also Effects, Captures, and the x64-emulation-only engines.
+        var header = new DockPanel { Margin = new Thickness(0, 0, 0, 30) };
+        var toggle = Theme.Toggle("Native", Settings.Current.VoiceBoxNativeOnly, v =>
+        {
+            Settings.Current.VoiceBoxNativeOnly = v;
+            Settings.Current.Save("voicebox");
+            _tab = 0;
+            if (_ready) BuildStudio();
+        });
+        toggle.VerticalAlignment = VerticalAlignment.Center;
+        toggle.ToolTip = "On: only features that run fully natively on this chip. Off: also show Effects, Captures, and the engines that need the emulated x64 app.";
+        DockPanel.SetDock(toggle, Dock.Right);
+        header.Children.Add(toggle);
+        header.Children.Add(new TextBlock
+        {
+            Text = "VoiceBox",
+            FontSize = 26,
+            FontWeight = FontWeights.SemiBold,
+            FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI"),
+            Foreground = Theme.TextBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+        Children.Add(header);
         Children.Add(_body);
         Loaded += async (_, _) =>
         {
@@ -122,20 +147,29 @@ public sealed class VoiceBoxStudioView : StackPanel
 
     // ── studio shell ───────────────────────────────────────────────────────
 
+    private string[] CurrentTabs => Settings.Current.VoiceBoxNativeOnly
+        ? new[] { "Generate", "Voices", "Stories", "History", "Models" }
+        : new[] { "Generate", "Voices", "Stories", "History", "Effects", "Captures", "Models" };
+
     private void BuildStudio()
     {
+        var tabs = CurrentTabs;
+        if (_tab >= tabs.Length) _tab = 0;
         _body.Children.Clear();
-        _body.Children.Add(PageChrome.TabsRow(new[] { "Generate", "Voices", "History", "Models" }, _tab, i =>
+        _body.Children.Add(PageChrome.TabsRow(tabs, _tab, i =>
         {
             _tab = i;
             if (_ready) BuildStudio();
         }));
-        switch (_tab)
+        switch (tabs[_tab])
         {
-            case 0: _body.Children.Add(BuildGenerate()); break;
-            case 1: _ = BuildVoicesAsync(); break;
-            case 2: _ = BuildHistoryAsync(); break;
-            case 3: _ = BuildModelsAsync(); break;
+            case "Generate": _body.Children.Add(BuildGenerate()); break;
+            case "Voices": _ = BuildVoicesAsync(); break;
+            case "Stories": _ = BuildStoriesAsync(); break;
+            case "History": _ = BuildHistoryAsync(); break;
+            case "Effects": _ = BuildEffectsAsync(); break;
+            case "Captures": _ = BuildCapturesAsync(); break;
+            case "Models": _ = BuildModelsAsync(); break;
         }
     }
 
@@ -588,6 +622,321 @@ public sealed class VoiceBoxStudioView : StackPanel
         }
     }
 
+    // ── Stories (native) ───────────────────────────────────────────────────
+
+    private async Task BuildStoriesAsync()
+    {
+        var host = new StackPanel();
+        _body.Children.Add(host);
+        host.Children.Add(Subtle("Loading stories…"));
+        try
+        {
+            var stories = await VoiceBoxApi.GetStoriesAsync();
+            var gens = (await VoiceBoxApi.GetHistoryAsync(200)).Where(g => g.Status == "completed").ToList();
+            host.Children.Clear();
+
+            var bar = new DockPanel { Margin = new Thickness(0, 0, 0, 12) };
+            var newBtn = Theme.PrimaryButton("New story");
+            newBtn.Click += (_, _) => NewStoryDialog();
+            DockPanel.SetDock(newBtn, Dock.Right);
+            bar.Children.Add(newBtn);
+            bar.Children.Add(new TextBlock
+            {
+                Text = stories.Count == 0 ? "Stories" : $"{stories.Count} stories",
+                FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = Theme.TextBrush,
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+            host.Children.Add(bar);
+
+            if (stories.Count == 0)
+            {
+                host.Children.Add(Subtle("Compose multi-voice narratives: generate lines on the Generate tab, then arrange them here and export one mixed track."));
+                return;
+            }
+            if (_storyId is null || stories.All(s => s.Id != _storyId)) _storyId = stories[0].Id;
+
+            var pick = new WrapPanel { Margin = new Thickness(0, 0, 0, 12) };
+            foreach (var s in stories)
+            {
+                bool on = s.Id == _storyId;
+                var chip = Theme.Pill($"{s.Name}  ({s.ItemCount ?? 0})",
+                    on ? Theme.InkBrush : new SolidColorBrush(Theme.SidebarSelected),
+                    on ? new SolidColorBrush(Theme.InkText) : Theme.TextBrush, 12);
+                chip.Margin = new Thickness(0, 0, 8, 8);
+                chip.Cursor = Cursors.Hand;
+                var sid = s.Id;
+                chip.MouseLeftButtonUp += (_, _) => { _storyId = sid; Rebuild(); };
+                pick.Children.Add(chip);
+            }
+            host.Children.Add(pick);
+
+            var detail = await VoiceBoxApi.GetStoryAsync(_storyId!);
+            if (detail is null) { host.Children.Add(Subtle("Couldn't open that story.")); return; }
+
+            string GenLabel(string genId)
+            {
+                var g = gens.FirstOrDefault(x => x.Id == genId);
+                if (g is null) return genId.Length > 8 ? genId[..8] : genId;
+                var t = g.Text ?? "";
+                return $"{g.ProfileName}:  {(t.Length > 70 ? t[..70] + "…" : t)}";
+            }
+
+            var card = new StackPanel();
+            var head = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
+            var del = Theme.SecondaryButton("Delete story");
+            del.Padding = new Thickness(12, 4, 12, 4);
+            del.Click += async (_, _) =>
+            {
+                try { await VoiceBoxApi.DeleteStoryAsync(detail.Id); } catch { }
+                _storyId = null;
+                Rebuild();
+            };
+            DockPanel.SetDock(del, Dock.Right);
+            head.Children.Add(del);
+            head.Children.Add(new TextBlock
+            {
+                Text = detail.Name, FontSize = 16, FontWeight = FontWeights.SemiBold,
+                Foreground = Theme.TextBrush, VerticalAlignment = VerticalAlignment.Center,
+            });
+            card.Children.Add(head);
+
+            if (detail.Items.Count == 0)
+                card.Children.Add(Subtle("No lines yet — add generated clips below; each lands right after the previous one."));
+            foreach (var it in detail.Items.OrderBy(i => i.StartTimeMs))
+            {
+                var row = new DockPanel { Margin = new Thickness(0, 3, 0, 3) };
+                var itemId = it.Id;
+                var rm = PageChrome.IconButton("", "Remove from story", async () =>
+                {
+                    try { await VoiceBoxApi.DeleteStoryItemAsync(detail.Id, itemId); } catch { }
+                    Rebuild();
+                });
+                DockPanel.SetDock(rm, Dock.Right);
+                row.Children.Add(rm);
+                var line = new TextBlock { FontSize = 13, Foreground = Theme.TextBrush, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
+                line.Inlines.Add(new Run($"{TimeSpan.FromMilliseconds(it.StartTimeMs):m\\:ss\\.f}   ")
+                {
+                    Foreground = Theme.SubtleBrush,
+                    FontFamily = new FontFamily("Consolas"),
+                    FontSize = 12,
+                });
+                line.Inlines.Add(new Run(GenLabel(it.GenerationId)));
+                row.Children.Add(line);
+                card.Children.Add(row);
+            }
+
+            var addRow = new DockPanel { Margin = new Thickness(0, 12, 0, 0) };
+            var addBtn = Theme.SecondaryButton("Add line");
+            addBtn.Padding = new Thickness(14, 5, 14, 5);
+            DockPanel.SetDock(addBtn, Dock.Right);
+            var genCombo = new ComboBox { Margin = new Thickness(0, 0, 8, 0) };
+            foreach (var g in gens) genCombo.Items.Add(GenLabel(g.Id));
+            if (genCombo.Items.Count > 0) genCombo.SelectedIndex = 0;
+            addBtn.Click += async (_, _) =>
+            {
+                if (genCombo.SelectedIndex < 0) { return; }
+                try { await VoiceBoxApi.AddStoryItemAsync(detail.Id, gens[genCombo.SelectedIndex].Id); } catch { }
+                Rebuild();
+            };
+            addRow.Children.Add(addBtn);
+            addRow.Children.Add(genCombo);
+            card.Children.Add(addRow);
+            if (gens.Count == 0)
+                card.Children.Add(Subtle("Generate some clips first — completed generations become the lines you arrange here.", 11.5));
+
+            var st = Subtle("", 12);
+            st.Margin = new Thickness(2, 8, 0, 0);
+            var actRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 14, 0, 0) };
+            var play = Theme.PrimaryButton("Play story");
+            play.Click += async (_, _) =>
+            {
+                try
+                {
+                    st.Text = "Mixing the story…";
+                    StopPlayback();
+                    var bytes = await VoiceBoxApi.ExportStoryAudioAsync(detail.Id);
+                    var tmp = Path.Combine(Path.GetTempPath(), $"story-{detail.Id[..8]}.wav");
+                    await File.WriteAllBytesAsync(tmp, bytes);
+                    _lastWav = tmp;
+                    st.Text = "Playing the mixed story.";
+                    Play(tmp);
+                }
+                catch (Exception ex) { st.Text = $"Couldn't mix the story: {ex.Message}"; }
+            };
+            actRow.Children.Add(play);
+            var stop = Theme.SecondaryButton("Stop");
+            stop.Margin = new Thickness(8, 0, 0, 0);
+            stop.Click += (_, _) => StopPlayback();
+            actRow.Children.Add(stop);
+            var export = Theme.SecondaryButton("Export WAV…");
+            export.Margin = new Thickness(8, 0, 0, 0);
+            export.Click += async (_, _) =>
+            {
+                var dlg = new Microsoft.Win32.SaveFileDialog { Filter = "WAV audio|*.wav", FileName = $"{detail.Name}.wav" };
+                if (dlg.ShowDialog() != true) return;
+                try
+                {
+                    st.Text = "Mixing and exporting…";
+                    var bytes = await VoiceBoxApi.ExportStoryAudioAsync(detail.Id);
+                    await File.WriteAllBytesAsync(dlg.FileName, bytes);
+                    st.Text = $"Exported to {dlg.FileName}";
+                }
+                catch (Exception ex) { st.Text = $"Export failed: {ex.Message}"; }
+            };
+            actRow.Children.Add(export);
+            card.Children.Add(actRow);
+            card.Children.Add(st);
+
+            host.Children.Add(Theme.Card2(card));
+        }
+        catch (Exception ex)
+        {
+            host.Children.Clear();
+            host.Children.Add(Subtle($"Couldn't load stories: {ex.Message}"));
+        }
+    }
+
+    private void NewStoryDialog()
+    {
+        var dlg = new Window
+        {
+            Title = "New story",
+            Width = 460, Height = 210,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = Window.GetWindow(this),
+            WindowStyle = WindowStyle.ToolWindow,
+            ResizeMode = ResizeMode.NoResize,
+            Background = new SolidColorBrush(Theme.Bg),
+        };
+        var root = new StackPanel { Margin = new Thickness(22) };
+        root.Children.Add(Theme.Label("Name"));
+        var nameBox = new TextBox { Padding = new Thickness(8, 6, 8, 6), FontSize = 14 };
+        root.Children.Add(nameBox);
+        var btns = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 18, 0, 0) };
+        var cancel = Theme.SecondaryButton("Cancel");
+        cancel.Margin = new Thickness(0, 0, 8, 0);
+        cancel.Click += (_, _) => dlg.Close();
+        var create = Theme.PrimaryButton("Create");
+        create.Click += async (_, _) =>
+        {
+            if (string.IsNullOrWhiteSpace(nameBox.Text)) return;
+            try
+            {
+                var s = await VoiceBoxApi.CreateStoryAsync(nameBox.Text.Trim(), null);
+                _storyId = s.Id;
+            }
+            catch (Exception ex) { MessageBox.Show(dlg, ex.Message, "Couldn't create story"); return; }
+            dlg.Close();
+            Rebuild();
+        };
+        btns.Children.Add(cancel);
+        btns.Children.Add(create);
+        root.Children.Add(btns);
+        dlg.Content = root;
+        dlg.Loaded += (_, _) => nameBox.Focus();
+        dlg.ShowDialog();
+    }
+
+    // ── Effects (shown when Native is off) ─────────────────────────────────
+
+    private async Task BuildEffectsAsync()
+    {
+        var host = new StackPanel();
+        _body.Children.Add(host);
+        host.Children.Add(Subtle("Loading effects…"));
+        try
+        {
+            var presets = await VoiceBoxApi.GetEffectPresetsAsync();
+            host.Children.Clear();
+            host.Children.Add(Subtle("Effect processing needs an audio library with no ARM64 build yet, so effects are pass-through in native mode. For real effect rendering, use the emulated app below.", 12.5));
+            var list = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
+            foreach (var p in presets)
+            {
+                var row = new StackPanel { Margin = new Thickness(20, 10, 12, 10) };
+                row.Children.Add(new TextBlock { Text = p.Name, FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Theme.TextBrush });
+                if (!string.IsNullOrWhiteSpace(p.Description)) row.Children.Add(Subtle(p.Description!, 12));
+                list.Children.Add(row);
+                if (p != presets[^1]) list.Children.Add(Theme.Divider());
+            }
+            host.Children.Add(new Border
+            {
+                Background = Theme.SurfaceBrush,
+                BorderBrush = new SolidColorBrush(Theme.CardBorder),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(12),
+                Child = list,
+            });
+            var open = Theme.SecondaryButton("Open the emulated VoiceBox app (full effects)");
+            open.Margin = new Thickness(0, 14, 0, 0);
+            open.HorizontalAlignment = HorizontalAlignment.Left;
+            open.Click += (_, _) => SwitchToEmulated();
+            host.Children.Add(open);
+        }
+        catch (Exception ex)
+        {
+            host.Children.Clear();
+            host.Children.Add(Subtle($"Couldn't load effects: {ex.Message}"));
+        }
+    }
+
+    private void SwitchToEmulated()
+    {
+        Settings.Current.VoiceBoxUseEmulated = true;
+        Settings.Current.Save("voicebox");
+        (Window.GetWindow(this) as MainWindow)?.CaptureNavigate("VoiceBox");
+    }
+
+    // ── Captures (shown when Native is off) ────────────────────────────────
+
+    private async Task BuildCapturesAsync()
+    {
+        var host = new StackPanel();
+        _body.Children.Add(host);
+        host.Children.Add(Subtle("Loading captures…"));
+        try
+        {
+            var caps = await VoiceBoxApi.GetCapturesAsync();
+            host.Children.Clear();
+            host.Children.Add(Subtle("VoiceBox's own capture/dictation feature. Heads-up: LiquidFlow's Dictation and Meetings tabs are the first-class way to capture speech on this machine.", 12.5));
+            if (caps.Count == 0)
+            {
+                host.Children.Add(Subtle("No captures recorded in VoiceBox yet.", 12.5));
+                return;
+            }
+            var list = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
+            foreach (var c in caps)
+            {
+                var row = new DockPanel { Margin = new Thickness(20, 10, 12, 10) };
+                var id = c.Id;
+                var del = PageChrome.IconButton("", "Delete capture", async () =>
+                {
+                    try { await VoiceBoxApi.DeleteCaptureAsync(id); } catch { }
+                    Rebuild();
+                });
+                DockPanel.SetDock(del, Dock.Right);
+                row.Children.Add(del);
+                var text = c.TranscriptRefined ?? c.TranscriptRaw ?? "(no transcript)";
+                var tb = new TextBlock { Text = text.Length > 140 ? text[..140] + "…" : text, FontSize = 13, Foreground = Theme.TextBrush, TextWrapping = TextWrapping.Wrap };
+                row.Children.Add(tb);
+                list.Children.Add(row);
+                if (c != caps[^1]) list.Children.Add(Theme.Divider());
+            }
+            host.Children.Add(new Border
+            {
+                Background = Theme.SurfaceBrush,
+                BorderBrush = new SolidColorBrush(Theme.CardBorder),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(12),
+                Child = list,
+            });
+        }
+        catch (Exception ex)
+        {
+            host.Children.Clear();
+            host.Children.Add(Subtle($"Couldn't load captures: {ex.Message}"));
+        }
+    }
+
     // ── Models ─────────────────────────────────────────────────────────────
 
     private async Task BuildModelsAsync()
@@ -598,6 +947,11 @@ public sealed class VoiceBoxStudioView : StackPanel
         try
         {
             var models = await VoiceBoxApi.GetModelsAsync();
+            // Chatterbox/LuxTTS/TADA need torchaudio (no ARM64 wheels) — emulation only.
+            static bool EmulatedOnly(string n) =>
+                n.StartsWith("chatterbox") || n.StartsWith("luxtts") || n.StartsWith("tada");
+            if (Settings.Current.VoiceBoxNativeOnly)
+                models = models.Where(m => !EmulatedOnly(m.ModelName)).ToList();
             host.Children.Clear();
             host.Children.Add(Subtle("Engines download once and run locally. Kokoro is the fast pick on this machine; the larger engines run on CPU and take noticeably longer per generation.", 12.5));
 
@@ -629,7 +983,18 @@ public sealed class VoiceBoxStudioView : StackPanel
                 anyDownloading |= m.Downloading;
 
                 var act = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-                if (!m.Downloaded && !m.Downloading)
+                if (EmulatedOnly(m.ModelName))
+                {
+                    var x64Chip = Theme.Pill("x64 app", Theme.InkBrush, new SolidColorBrush(Theme.InkText), 11);
+                    x64Chip.VerticalAlignment = VerticalAlignment.Center;
+                    x64Chip.Margin = new Thickness(0, 0, 8, 0);
+                    act.Children.Add(x64Chip);
+                    var open = Theme.SecondaryButton("Use emulated app");
+                    open.Padding = new Thickness(12, 4, 12, 4);
+                    open.Click += (_, _) => SwitchToEmulated();
+                    act.Children.Add(open);
+                }
+                else if (!m.Downloaded && !m.Downloading)
                 {
                     var dl = Theme.SecondaryButton("Download");
                     dl.Padding = new Thickness(12, 4, 12, 4);
@@ -668,7 +1033,7 @@ public sealed class VoiceBoxStudioView : StackPanel
             if (anyDownloading)
             {
                 var t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
-                t.Tick += (_, _) => { t.Stop(); if (_tab == 3 && IsLoaded) Rebuild(); };
+                t.Tick += (_, _) => { t.Stop(); if (IsLoaded && _tab < CurrentTabs.Length && CurrentTabs[_tab] == "Models") Rebuild(); };
                 t.Start();
             }
             host.Children.Add(Subtle(

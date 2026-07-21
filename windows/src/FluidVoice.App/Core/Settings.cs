@@ -146,6 +146,9 @@ public sealed class Settings
     /// the native port — needed for the Chatterbox/LuxTTS engines (no ARM64 torchaudio yet).
     /// Off by default; nothing x64 is installed or loaded until this is turned on.</summary>
     public bool VoiceBoxUseEmulated { get; set; }
+    /// <summary>VoiceBox studio "Native" toggle (default on): show only fully-native
+    /// features. Off reveals Effects/Captures and the x64-emulation-only engines.</summary>
+    public bool VoiceBoxNativeOnly { get; set; } = true;
     public List<CustomDictionaryEntry> CustomDictionaryEntries { get; set; } = new();
     public bool GaavRemoveTrailingPeriodEnabled { get; set; }
     public bool GaavLowercaseFirstLetterEnabled { get; set; }

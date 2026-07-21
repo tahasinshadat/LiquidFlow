@@ -103,6 +103,92 @@ public static class VoiceBoxApi
     public static Task ToggleFavoriteAsync(string generationId, CancellationToken ct = default)
         => Http.PostAsync($"/history/{generationId}/favorite", null, ct);
 
+    // ── stories ────────────────────────────────────────────────────────────
+
+    public sealed record Story(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("description")] string? Description,
+        [property: JsonPropertyName("item_count")] int? ItemCount);
+
+    public sealed record StoryItem(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("generation_id")] string GenerationId,
+        [property: JsonPropertyName("start_time_ms")] int StartTimeMs,
+        [property: JsonPropertyName("track")] int? Track,
+        [property: JsonPropertyName("duration_ms")] int? DurationMs);
+
+    public sealed record StoryDetail(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("description")] string? Description,
+        [property: JsonPropertyName("items")] List<StoryItem> Items);
+
+    public static async Task<List<Story>> GetStoriesAsync(CancellationToken ct = default)
+        => await Http.GetFromJsonAsync<List<Story>>("/stories", ct) ?? new();
+
+    public static async Task<Story> CreateStoryAsync(string name, string? desc, CancellationToken ct = default)
+    {
+        var resp = await Http.PostAsJsonAsync("/stories", new { name, description = desc }, ct);
+        resp.EnsureSuccessStatusCode();
+        return (await resp.Content.ReadFromJsonAsync<Story>(cancellationToken: ct))!;
+    }
+
+    public static Task DeleteStoryAsync(string id, CancellationToken ct = default)
+        => Http.DeleteAsync($"/stories/{id}", ct);
+
+    public static async Task<StoryDetail?> GetStoryAsync(string id, CancellationToken ct = default)
+    {
+        try { return await Http.GetFromJsonAsync<StoryDetail>($"/stories/{id}", ct); }
+        catch { return null; }
+    }
+
+    public static async Task AddStoryItemAsync(string storyId, string generationId, CancellationToken ct = default)
+    {
+        var resp = await Http.PostAsJsonAsync($"/stories/{storyId}/items", new { generation_id = generationId }, ct);
+        resp.EnsureSuccessStatusCode();
+    }
+
+    public static Task DeleteStoryItemAsync(string storyId, string itemId, CancellationToken ct = default)
+        => Http.DeleteAsync($"/stories/{storyId}/items/{itemId}", ct);
+
+    /// <summary>Server-side mixdown of the whole story → WAV bytes.</summary>
+    public static Task<byte[]> ExportStoryAudioAsync(string storyId, CancellationToken ct = default)
+        => Http.GetByteArrayAsync($"/stories/{storyId}/export-audio", ct);
+
+    // ── effects + captures (shown when the Native toggle is off) ───────────
+
+    public sealed record EffectPreset(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("description")] string? Description);
+
+    public static async Task<List<EffectPreset>> GetEffectPresetsAsync(CancellationToken ct = default)
+        => await Http.GetFromJsonAsync<List<EffectPreset>>("/effects/presets", ct) ?? new();
+
+    public sealed record Capture(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("transcript_raw")] string? TranscriptRaw,
+        [property: JsonPropertyName("transcript_refined")] string? TranscriptRefined,
+        [property: JsonPropertyName("duration_ms")] int? DurationMs,
+        [property: JsonPropertyName("created_at")] string? CreatedAt);
+
+    private sealed record CapturePage([property: JsonPropertyName("items")] List<Capture> Items);
+
+    public static async Task<List<Capture>> GetCapturesAsync(CancellationToken ct = default)
+    {
+        // tolerate either a bare list or an {items:[…]} page
+        try { return await Http.GetFromJsonAsync<List<Capture>>("/captures", ct) ?? new(); }
+        catch
+        {
+            try { return (await Http.GetFromJsonAsync<CapturePage>("/captures", ct))?.Items ?? new(); }
+            catch { return new(); }
+        }
+    }
+
+    public static Task DeleteCaptureAsync(string id, CancellationToken ct = default)
+        => Http.DeleteAsync($"/captures/{id}", ct);
+
     public static async Task<Generation> GenerateAsync(string profileId, string text, string? engine, string? instruct, string? modelSize, CancellationToken ct = default)
     {
         var resp = await Http.PostAsJsonAsync("/generate", new
