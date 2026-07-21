@@ -197,8 +197,7 @@ public sealed class VoiceBoxHostView : Grid
     {
         _retry.Visibility = Visibility.Visible;
         _cancel.Visibility = Visibility.Collapsed;
-        _bar.IsIndeterminate = false;
-        _bar.Value = 0;
+        _bar.SetFraction(0);
     });
 
     /// <summary>Native ARM64 path: install runtime once, boot the server, show the real
