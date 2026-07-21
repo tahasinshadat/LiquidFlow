@@ -488,17 +488,10 @@ public sealed class MainWindow : Window
 
         page.Children.Add(new TextBlock
         {
-            Text = $"{Greeting()}, {FirstName()}",
+            Text = $"Welcome back, {FirstName()}",
             FontSize = 24,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(Theme.Text),
-            Margin = new Thickness(0, 0, 0, 6),
-        });
-        page.Children.Add(new TextBlock
-        {
-            Text = WelcomeMessage(),
-            FontSize = 14,
-            Foreground = Theme.SubtleBrush,
             Margin = new Thickness(0, 0, 0, 24),
         });
 
@@ -700,10 +693,10 @@ public sealed class MainWindow : Window
         row.Children.Add(new TextBlock
         {
             Text = $"Updates in {FormatCompact(Math.Max(1, 1000 - HistoryStore.TotalWords % 1000))} words",
-            FontSize = 12,
+            FontSize = 11.5,
             FontWeight = FontWeights.SemiBold,
             Foreground = Theme.TextBrush,
-            Margin = new Thickness(12, 0, 0, 0),
+            Margin = new Thickness(8, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center,
         });
         panel.Children.Add(row);

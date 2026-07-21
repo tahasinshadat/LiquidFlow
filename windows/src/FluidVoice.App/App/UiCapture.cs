@@ -61,7 +61,45 @@ public static class UiCapture
                     win.UpdateLayout();
                     Snap(win, Path.Combine(outDir, page.Replace(":", "-").ToLowerInvariant() + ".png"));
                 }
-                Console.WriteLine($"captured {pages.Length} screens -> {outDir}");
+                // Style tab post-wizard content (in-memory flag only — never saved)
+                var prevWiz = Settings.Current.StyleWizardCompleted;
+                Settings.Current.StyleWizardCompleted = true;
+                win.CaptureNavigate("Style");
+                await Task.Delay(350);
+                win.UpdateLayout();
+                Snap(win, Path.Combine(outDir, "style-content.png"));
+                Settings.Current.StyleWizardCompleted = prevWiz;
+
+                // Style wizard steps + completion
+                var wiz = new StyleWizardDialog
+                {
+                    WindowStartupLocation = WindowStartupLocation.Manual,
+                    Left = -4000,
+                    Top = 120,
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                };
+                wiz.Show();
+                for (int s = 0; s <= 4; s++)
+                {
+                    wiz.SetStepForCapture(s);
+                    await Task.Delay(250);
+                    wiz.UpdateLayout();
+                    Snap(wiz, Path.Combine(outDir, s == 4 ? "style-wizard-allset.png" : $"style-wizard-{s + 1}.png"));
+                }
+                wiz.Close();
+
+                // Floating scratchpad note popup
+                NoteWindow.OpenNote(null);
+                await Task.Delay(300);
+                if (Application.Current.Windows.OfType<NoteWindow>().FirstOrDefault() is { } nw)
+                {
+                    nw.UpdateLayout();
+                    Snap(nw, Path.Combine(outDir, "scratchpad-note.png"));
+                    nw.Close();
+                }
+
+                Console.WriteLine($"captured {pages.Length + 7} screens -> {outDir}");
             }
             catch (Exception ex)
             {

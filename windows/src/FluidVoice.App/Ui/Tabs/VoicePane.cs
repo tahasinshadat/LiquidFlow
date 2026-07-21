@@ -274,7 +274,7 @@ public static class VoicePane
         };
         string blurb = entries.Count == 0
             ? "Start dictating and LiquidFlow will sketch how your voice works — favorite words, phrasing, and where you talk the most."
-            : $"Voice helps you move faster where you work most. Whether it's steering {HistoryStore.TopApps(1).FirstOrDefault().App ?? "your apps"} or thinking out loud, your dictations often untangle technical puzzles.";
+            : $"Voice helps you move faster where you work most. Whether it's steering {HistoryStore.TopApps(1).FirstOrDefault().App ?? "your apps"} or thinking out loud, your dictations often untangle technical puzzles. The more you dictate, the sharper this profile gets.";
         return (name, blurb);
     }
 }

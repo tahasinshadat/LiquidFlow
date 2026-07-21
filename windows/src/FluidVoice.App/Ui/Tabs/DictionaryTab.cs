@@ -10,6 +10,8 @@ namespace FluidVoice.Ui;
 /// <summary>Custom dictionary editor + auto-learned corrections review.</summary>
 public sealed class DictionaryTab : StackPanel
 {
+    private bool _bannerDismissed;
+
     public DictionaryTab()
     {
         Build();
@@ -20,10 +22,9 @@ public sealed class DictionaryTab : StackPanel
         Children.Clear();
         Children.Add(PageChrome.HeaderRow("Dictionary", "Add new", AddBlankEntry));
         Children.Add(PageChrome.TabsRow(new[] { "All", "Personal" }, 0));
-        Children.Add(BuildBanner());
+        if (!_bannerDismissed) Children.Add(BuildBanner());
         var learned = BuildLearned();
         if (learned is not null) Children.Add(learned);
-        Children.Add(BuildToolbar());
         Children.Add(BuildList());
     }
 
@@ -64,15 +65,19 @@ public sealed class DictionaryTab : StackPanel
         title.Inlines.Add(new Run("you") { FontStyle = FontStyles.Italic });
         title.Inlines.Add(new Run(" do."));
         content.Children.Add(title);
-        content.Children.Add(new TextBlock
+        var body = new TextBlock
         {
-            Text = "Teach names, jargon, casing, and phrases that should always come out exactly right.",
             FontSize = 14,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)),
+            Foreground = new SolidColorBrush(Color.FromArgb(228, 255, 255, 255)),
             TextWrapping = TextWrapping.Wrap,
+            MaxWidth = 720,
+            HorizontalAlignment = HorizontalAlignment.Left,
             Margin = new Thickness(0, 0, 0, 18),
-        });
+        };
+        body.Inlines.Add(new Run("LiquidFlow learns your unique words and names — automatically or manually. "));
+        body.Inlines.Add(new Run("Add personal terms, company jargon, client names, or fixed spellings") { FontWeight = FontWeights.SemiBold });
+        body.Inlines.Add(new Run(" so they always come out exactly right."));
+        content.Children.Add(body);
         var chips = new WrapPanel();
         var addChip = PageChrome.HeroPill("Add new word");
         addChip.Margin = new Thickness(0, 0, 10, 8);
@@ -88,6 +93,27 @@ public sealed class DictionaryTab : StackPanel
         }
         content.Children.Add(chips);
         grid.Children.Add(content);
+
+        var close = new Border
+        {
+            Width = 28, Height = 28, CornerRadius = new CornerRadius(14),
+            Background = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(0, 12, 12, 0),
+            Cursor = System.Windows.Input.Cursors.Hand,
+            Child = new TextBlock
+            {
+                Text = "\uE711",
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 11,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            },
+        };
+        close.MouseLeftButtonUp += (_, _) => { _bannerDismissed = true; Build(); };
+        grid.Children.Add(close);
 
         return new Border { CornerRadius = new CornerRadius(18), Margin = new Thickness(0, 0, 0, 22), Child = grid };
     }
@@ -199,7 +225,7 @@ public sealed class DictionaryTab : StackPanel
         {
             list.Children.Add(new TextBlock
             {
-                Text = "No dictionary terms yet. Add names, jargon, or fixed spellings above.",
+                Text = "No dictionary terms yet. Use Add new to teach names, jargon, or fixed spellings.",
                 FontSize = 14,
                 Foreground = Theme.SubtleBrush,
                 Margin = new Thickness(20, 20, 20, 20),

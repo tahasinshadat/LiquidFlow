@@ -17,13 +17,41 @@ public sealed class ScratchpadTab : StackPanel
 
     public ScratchpadTab()
     {
-        Children.Add(PageChrome.HeaderRow("Scratchpad", "Open floating note", () => NoteWindow.OpenNote(null), beta: true));
+        Children.Add(BuildHeader());
         Children.Add(BuildHero());
         Children.Add(BuildRecentsHeader());
         Children.Add(_recents);
         RebuildRecents();
         Loaded += (_, _) => NotesStore.Changed += OnNotesChanged;
         Unloaded += (_, _) => NotesStore.Changed -= OnNotesChanged;
+    }
+
+    private UIElement BuildHeader()
+    {
+        var row = new DockPanel { Margin = new Thickness(0, 0, 0, 34) };
+        var open = PageChrome.HeroPill("Open floating note");
+        open.Background = new System.Windows.Media.SolidColorBrush(Theme.SidebarSelected);
+        ((System.Windows.Controls.TextBlock)open.Child).Foreground = Theme.TextBrush;
+        open.VerticalAlignment = VerticalAlignment.Center;
+        open.MouseLeftButtonUp += (_, _) => NoteWindow.OpenNote(null);
+        DockPanel.SetDock(open, Dock.Right);
+        row.Children.Add(open);
+
+        var left = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        left.Children.Add(new TextBlock
+        {
+            Text = "Scratchpad",
+            FontSize = 26,
+            FontWeight = FontWeights.SemiBold,
+            FontFamily = new System.Windows.Media.FontFamily("Segoe UI Variable Display, Segoe UI"),
+            Foreground = Theme.TextBrush,
+        });
+        var chip = Theme.Pill("Beta", Theme.InkBrush, new System.Windows.Media.SolidColorBrush(Theme.InkText), 11);
+        chip.Margin = new Thickness(12, 4, 0, 0);
+        chip.VerticalAlignment = VerticalAlignment.Center;
+        left.Children.Add(chip);
+        row.Children.Add(left);
+        return row;
     }
 
     private void OnNotesChanged() => Dispatcher.BeginInvoke(RebuildRecents);
@@ -63,7 +91,7 @@ public sealed class ScratchpadTab : StackPanel
         var dock = new DockPanel { Margin = new Thickness(2, 0, 2, 14) };
         var icons = new StackPanel { Orientation = Orientation.Horizontal };
         icons.Children.Add(PageChrome.IconButton("", "Search notes", null));
-        icons.Children.Add(PageChrome.IconButton("", "New note", () => NoteWindow.OpenNote(null)));
+        icons.Children.Add(PageChrome.IconButton("", "New note", () => NoteWindow.OpenNote(null)));
         DockPanel.SetDock(icons, Dock.Right);
         dock.Children.Add(icons);
         dock.Children.Add(new TextBlock

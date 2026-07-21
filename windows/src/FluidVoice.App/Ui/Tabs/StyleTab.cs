@@ -344,10 +344,20 @@ public sealed class StyleWizardDialog : Window
         return page;
     }
 
+    /// <summary>Capture-harness seam: jump straight to a wizard step (0-3) or 4 = all-set.</summary>
+    public void SetStepForCapture(int step)
+    {
+        _step = step;
+        Render();
+    }
+
     private UIElement RenderAllSet()
     {
-        Settings.Current.StyleWizardCompleted = true;
-        Settings.Current.Save("style");
+        if (!App.UiCapture.CaptureMode)
+        {
+            Settings.Current.StyleWizardCompleted = true;
+            Settings.Current.Save("style");
+        }
 
         var page = new StackPanel { Margin = new Thickness(56, 70, 56, 40), VerticalAlignment = VerticalAlignment.Center };
         page.Children.Add(new TextBlock

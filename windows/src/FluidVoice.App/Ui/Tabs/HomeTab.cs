@@ -23,7 +23,6 @@ public sealed class HomeTab : StackPanel
     private void Build()
     {
         Children.Clear();
-        Children.Add(BuildHistoryNotice());
         Children.Add(BuildTabs());
         if (_voice)
         {
@@ -87,7 +86,7 @@ public sealed class HomeTab : StackPanel
 
     private UIElement BuildTabs()
     {
-        var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 32) };
+        var panel = new StackPanel { Margin = new Thickness(0, 8, 0, 34) };
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         row.Children.Add(TabLabel("Your usage", !_voice, () => { _voice = false; Build(); }));
         row.Children.Add(TabLabel("Your voice", _voice, () => { _voice = true; Build(); }));
@@ -143,7 +142,7 @@ public sealed class HomeTab : StackPanel
     {
         var panel = new StackPanel();
         panel.Children.Add(StatNumber(Settings.Current.UserTypingWPM.ToString()));
-        panel.Children.Add(LabelCaps("Words per minute"));
+        panel.Children.Add(CapsWithInfo("Words per minute"));
 
         var canvas = new Canvas { Width = 210, Height = 122, Margin = new Thickness(0, 14, 0, 0) };
         canvas.Children.Add(new Path
@@ -193,8 +192,8 @@ public sealed class HomeTab : StackPanel
         panel.Children.Add(StatNumber((aiFixes + dictionaryFixes).ToString("N0")));
         panel.Children.Add(LabelCaps("Fixes made by LiquidFlow"));
         panel.Children.Add(Theme.Divider(22, 18));
-        panel.Children.Add(MiniStat($"{aiFixes:N0} AI-enhanced dictations"));
-        panel.Children.Add(MiniStat($"{dictionaryFixes:N0} dictionary entries"));
+        panel.Children.Add(MiniStatBold(aiFixes.ToString("N0"), "AI-enhanced dictations"));
+        panel.Children.Add(MiniStatBold(dictionaryFixes.ToString("N0"), "dictionary entries"));
         return DashboardCard(panel);
     }
 
@@ -322,7 +321,9 @@ public sealed class HomeTab : StackPanel
         DockPanel.SetDock(longestText, Dock.Right);
         header.Children.Add(longestText);
         panel.Children.Add(header);
+        panel.Children.Add(BuildMonthsRow());
         panel.Children.Add(BuildHeatmap());
+        panel.Children.Add(BuildLegend());
         return DashboardCard(panel);
     }
 
@@ -372,33 +373,62 @@ public sealed class HomeTab : StackPanel
     private static UIElement UsageRow(string app, int count, double ratio)
     {
         var row = new Grid { Margin = new Thickness(0, 0, 0, 16) };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
 
-        var track = new Grid { Height = 30, Margin = new Thickness(0, 0, 16, 0) };
-        track.Children.Add(new ProgressBar { Value = Math.Clamp(ratio, 0, 1) * 100, Height = 30 });
-        track.Children.Add(new TextBlock
+        var glyph = new Border
         {
-            Text = $"{Math.Round(ratio * 100):0}%",
-            FontSize = 13,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = Brushes.White,
-            HorizontalAlignment = HorizontalAlignment.Center,
+            Width = 30, Height = 30, CornerRadius = new CornerRadius(8),
+            Background = new SolidColorBrush(Theme.SidebarSelected),
             VerticalAlignment = VerticalAlignment.Center,
-        });
-        Grid.SetColumn(track, 0);
-        row.Children.Add(track);
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Child = new TextBlock
+            {
+                Text = app.Length > 0 ? app[..1].ToUpperInvariant() : "•",
+                FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = Theme.TextBrush,
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            },
+        };
+        Grid.SetColumn(glyph, 0);
+        row.Children.Add(glyph);
+
+        // the teal bar's own length encodes the share — no gray track behind it
+        var barArea = new Grid { Height = 30, Margin = new Thickness(0, 0, 16, 0) };
+        var clamped = Math.Clamp(ratio, 0.08, 1.0);
+        barArea.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(clamped, GridUnitType.Star) });
+        barArea.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(0.001, 1 - clamped), GridUnitType.Star) });
+        var fill = new Border
+        {
+            Background = Theme.GreenBrush,
+            CornerRadius = new CornerRadius(6),
+            MinWidth = 44,
+            Child = new TextBlock
+            {
+                Text = $"{Math.Round(ratio * 100):0}%",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            },
+        };
+        Grid.SetColumn(fill, 0);
+        barArea.Children.Add(fill);
+        Grid.SetColumn(barArea, 1);
+        row.Children.Add(barArea);
 
         var label = new TextBlock
         {
-            Text = $"{count:N0} {app.ToUpperInvariant()}",
             FontSize = 13,
             FontWeight = FontWeights.SemiBold,
             Foreground = Theme.TextBrush,
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis,
         };
-        Grid.SetColumn(label, 1);
+        label.Inlines.Add(new System.Windows.Documents.Run($"{count:N0} "));
+        label.Inlines.Add(new System.Windows.Documents.Run(app.ToUpperInvariant()));
+        Grid.SetColumn(label, 2);
         row.Children.Add(label);
         return row;
     }
@@ -445,9 +475,87 @@ public sealed class HomeTab : StackPanel
             Point = end,
             Size = new Size(radius, radius),
             SweepDirection = SweepDirection.Clockwise,
-            IsLargeArc = progress > 0.5,
+            IsLargeArc = false,
         });
         return new PathGeometry(new[] { figure });
+    }
+
+    private static UIElement BuildMonthsRow()
+    {
+        var days = HistoryStore.DailyWordCounts(70);
+        var grid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+        for (int i = 0; i < 10; i++)
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        string prev = "";
+        for (int col = 0; col < 10 && col * 7 < days.Count; col++)
+        {
+            var monthName = days[col * 7].Date.ToString("MMM");
+            if (monthName == prev) continue;
+            prev = monthName;
+            var label = new TextBlock { Text = monthName, FontSize = 11.5, Foreground = Theme.SubtleBrush };
+            Grid.SetColumn(label, col + 1);
+            grid.Children.Add(label);
+        }
+
+        var pagers = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        foreach (var g in new[] { "\uE76B", "\uE76C" }) // chevrons
+            pagers.Children.Add(new TextBlock
+            {
+                Text = g,
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 10,
+                Foreground = Theme.SubtleBrush,
+                Margin = new Thickness(8, 2, 0, 0),
+            });
+        Grid.SetColumn(pagers, 11);
+        grid.Children.Add(pagers);
+        return grid;
+    }
+
+    private static UIElement BuildLegend()
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(34, 14, 0, 0) };
+        row.Children.Add(new TextBlock { Text = "More", FontSize = 11.5, Foreground = Theme.SubtleBrush, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center });
+        foreach (var c in new[] { Theme.Green, Theme.Teal2, Color.FromRgb(111, 196, 187), Theme.SidebarSelected })
+            row.Children.Add(new Border { Width = 14, Height = 14, CornerRadius = new CornerRadius(3), Background = new SolidColorBrush(c), Margin = new Thickness(0, 0, 5, 0) });
+        row.Children.Add(new TextBlock { Text = "Less", FontSize = 11.5, Foreground = Theme.SubtleBrush, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
+        return row;
+    }
+
+    private static UIElement CapsWithInfo(string text)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        row.Children.Add(LabelCaps(text));
+        row.Children.Add(new TextBlock
+        {
+            Text = "\uE946",
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+            FontSize = 11,
+            Foreground = Theme.SubtleBrush,
+            Margin = new Thickness(6, 1, 0, 0),
+        });
+        return row;
+    }
+
+    private static UIElement MiniStatBold(string number, string rest)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
+        var text = new TextBlock { FontSize = 15, Foreground = Theme.TextBrush };
+        text.Inlines.Add(new System.Windows.Documents.Run(number) { FontWeight = FontWeights.SemiBold });
+        text.Inlines.Add(new System.Windows.Documents.Run(" " + rest));
+        row.Children.Add(text);
+        row.Children.Add(new TextBlock
+        {
+            Text = "\uE946",
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+            FontSize = 10.5,
+            Foreground = Theme.SubtleBrush,
+            Margin = new Thickness(6, 3, 0, 0),
+        });
+        return row;
     }
 
     private static Color UsageColor(int words) => words switch

@@ -48,6 +48,15 @@ public sealed class NoteWindow : Window
         Topmost = true;
         ShowInTaskbar = false;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        if (App.UiCapture.CaptureMode)
+        {
+            // render offscreen for the screenshot harness — never flash on the user's display
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            Left = -4000;
+            Top = 120;
+            Topmost = false;
+            ShowActivated = false;
+        }
 
         _editor = new TextBox
         {
