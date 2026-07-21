@@ -249,6 +249,18 @@ public sealed class VoiceBoxHostView : Grid
             await _web.EnsureCoreWebView2Async(env);
             _web.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
             _web.CoreWebView2.Settings.IsStatusBarEnabled = false;
+            // De-brand so this reads as part of LiquidFlow, not an embedded second app:
+            // hide the VoiceBox logo marks (sidebar + loading splash). Everything else —
+            // layout, colors, controls — stays exactly their UI. Runs before page scripts
+            // on every navigation, so it survives frontend updates.
+            await _web.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync("""
+                (function () {
+                    var style = document.createElement('style');
+                    style.textContent =
+                        'img[src*="voicebox-logo" i], img[alt="voicebox" i] { display: none !important; }';
+                    (document.head || document.documentElement).appendChild(style);
+                })();
+                """);
             _web.CoreWebView2.NavigationCompleted += (_, e) => Dispatcher.BeginInvoke(() =>
             {
                 if (e.IsSuccess)
