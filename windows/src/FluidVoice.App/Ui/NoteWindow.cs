@@ -114,24 +114,38 @@ public sealed class NoteWindow : Window
         };
         header.Children.Add(tabsScroll);
 
-        // ---- left mini-rail ----
-        var rail = new StackPanel { Margin = new Thickness(8, 6, 4, 6) };
-        rail.Children.Add(PageChrome.IconButton("", "All notes (open the Scratchpad tab)", () =>
+        // ---- left mini-rail (top: nav trio; bottom: polish + text size, per reference) ----
+        var rail = new DockPanel { Margin = new Thickness(8, 6, 4, 10), LastChildFill = false };
+        var railTop = new StackPanel();
+        railTop.Children.Add(PageChrome.IconButton("\uE700", "All notes (open the Scratchpad tab)", () =>
         {
             foreach (var n in NotesStore.All.Take(8).Reverse())
                 if (_open.All(o => o.Id != n.Id)) _open.Insert(0, n);
             RenderTabs();
         }));
-        rail.Children.Add(PageChrome.IconButton("", "New note", () => ShowNote(new Note())));
-        rail.Children.Add(PageChrome.IconButton("", "Search (use the Scratchpad tab)", null));
+        railTop.Children.Add(PageChrome.IconButton("\uE70F", "New note", () => ShowNote(new Note())));
+        railTop.Children.Add(PageChrome.IconButton("\uE721", "Search (use the Scratchpad tab)", null));
+        DockPanel.SetDock(railTop, Dock.Top);
+        rail.Children.Add(railTop);
+        var railBottom = new StackPanel();
+        railBottom.Children.Add(PageChrome.IconButton("\uE734", "Polish with Write Mode (select text + hotkey)", null));
+        railBottom.Children.Add(new Border
+        {
+            Width = 30, Height = 30, Margin = new Thickness(4, 0, 0, 0),
+            Child = new TextBlock
+            {
+                Text = "Aa", FontSize = 12.5, FontWeight = FontWeights.SemiBold, Foreground = Theme.SubtleBrush,
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            },
+        });
+        DockPanel.SetDock(railBottom, Dock.Bottom);
+        rail.Children.Add(railBottom);
 
         // ---- editor host with hint + bottom-right actions ----
         var editorHost = new Grid();
         editorHost.Children.Add(new Border
         {
             Background = Theme.SurfaceBrush,
-            BorderBrush = Theme.HairlineBrush,
-            BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(10),
             Child = _editor,
         });

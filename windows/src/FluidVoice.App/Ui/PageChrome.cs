@@ -101,7 +101,7 @@ public static class PageChrome
     /// <summary>A tab strip entry that carries a small "Beta" chip (Style → Auto cleanup).</summary>
     public static UIElement TabsRowWithBeta(string[] tabs, int betaIndex, int active, Action<int> onSelect)
     {
-        var dock = new DockPanel { Margin = new Thickness(0, 0, 0, 24) };
+        var dock = new DockPanel { Margin = new Thickness(0, 16, 0, 24) };
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         for (int i = 0; i < tabs.Length; i++)
         {
@@ -206,6 +206,42 @@ public static class PageChrome
             Foreground = new SolidColorBrush(Color.FromRgb(24, 24, 23)),
         },
     };
+
+    /// <summary>Overlapping generic colored circles + a "+" circle — the carve-out-safe
+    /// stand-in for the reference's app-logo clusters (no third-party logos).</summary>
+    public static UIElement IconCluster(double size = 44)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var colors = new[] { "#3AC8C6", "#7C37B1", "#5E81AC", "#D08770" };
+        for (int i = 0; i < colors.Length; i++)
+            row.Children.Add(new Border
+            {
+                Width = size, Height = size, CornerRadius = new CornerRadius(size / 2),
+                Background = (SolidColorBrush)new BrushConverter().ConvertFromString(colors[i])!,
+                BorderBrush = Brushes.White,
+                BorderThickness = new Thickness(2),
+                Margin = new Thickness(i == 0 ? 0 : -10, 0, 0, 0),
+                Opacity = 0.92,
+            });
+        row.Children.Add(new Border
+        {
+            Width = size, Height = size, CornerRadius = new CornerRadius(size / 2),
+            Background = Brushes.White,
+            BorderBrush = new SolidColorBrush(Theme.Hairline),
+            BorderThickness = new Thickness(1),
+            Margin = new Thickness(-10, 0, 0, 0),
+            Child = new TextBlock
+            {
+                Text = "+",
+                FontSize = size * 0.42,
+                Foreground = Theme.SubtleBrush,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, -2, 0, 0),
+            },
+        });
+        return row;
+    }
 
     /// <summary>Small hoverable MDL2 icon button.</summary>
     public static Border IconButton(string glyph, string? tooltip, Action? onClick)

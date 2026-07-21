@@ -100,7 +100,14 @@ public sealed class StyleTab : StackPanel
             Foreground = new SolidColorBrush(Color.FromArgb(210, 255, 255, 255)),
             TextWrapping = TextWrapping.Wrap,
         });
-        var hero = PageChrome.DarkHero(copy);
+        var dock = new DockPanel();
+        var cluster = (FrameworkElement)PageChrome.IconCluster(46);
+        cluster.VerticalAlignment = VerticalAlignment.Center;
+        cluster.Margin = new Thickness(0, 0, 34, 0);
+        DockPanel.SetDock(cluster, Dock.Right);
+        dock.Children.Add(cluster);
+        dock.Children.Add(copy);
+        var hero = PageChrome.DarkHero(dock);
         ((Border)hero).MinHeight = 150;
         ((Border)hero).Margin = new Thickness(0, 0, 0, 26);
         return hero;
@@ -193,42 +200,80 @@ public static class StyleCards
         return grid;
     }
 
+    /// <summary>Reference-matching preview per context: chat bubble (personal), Slack-style
+    /// message (work), email with To:-line (email), plain note text (other).</summary>
+    private static UIElement BuildPreview(string context, Option o)
+    {
+        switch (context)
+        {
+            case "work":
+            {
+                var p = new StackPanel();
+                var head = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+                head.Children.Add(new Border
+                {
+                    Width = 34, Height = 34, CornerRadius = new CornerRadius(8),
+                    Background = Theme.GreenSoftBrush, Margin = new Thickness(0, 0, 10, 0),
+                    Child = new TextBlock
+                    {
+                        Text = "J", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Theme.GreenBrush,
+                        HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                    },
+                });
+                var name = new TextBlock { VerticalAlignment = VerticalAlignment.Center };
+                name.Inlines.Add(new Run("John Doe ") { FontWeight = FontWeights.SemiBold });
+                name.Inlines.Add(new Run("9:45 AM") { Foreground = Theme.SubtleBrush, FontSize = 11.5 });
+                head.Children.Add(name);
+                p.Children.Add(head);
+                p.Children.Add(new TextBlock { Text = o.Sample, FontSize = 12.5, Foreground = Theme.TextBrush, TextWrapping = TextWrapping.Wrap });
+                return p;
+            }
+            case "email":
+            {
+                var p = new StackPanel();
+                p.Children.Add(new TextBlock { Text = "To: Alex Doe", FontSize = 12.5, Foreground = Theme.SubtleBrush });
+                p.Children.Add(new Border { Height = 1, Background = Theme.HairlineBrush, Margin = new Thickness(0, 8, 0, 10) });
+                p.Children.Add(new TextBlock { Text = o.Sample, FontSize = 12.5, Foreground = Theme.TextBrush, TextWrapping = TextWrapping.Wrap });
+                return p;
+            }
+            case "other":
+                return new TextBlock { Text = o.Sample, FontSize = 12.5, Foreground = Theme.TextBrush, TextWrapping = TextWrapping.Wrap };
+            default: // personal: chat bubble + circular avatar
+            {
+                var bubbleHost = new Grid();
+                bubbleHost.Children.Add(new Border
+                {
+                    Background = Theme.GreenSoftBrush,
+                    CornerRadius = new CornerRadius(10),
+                    Padding = new Thickness(12),
+                    Margin = new Thickness(0, 0, 26, 0),
+                    Child = new TextBlock { Text = o.Sample, FontSize = 12.5, Foreground = Theme.TextBrush, TextWrapping = TextWrapping.Wrap },
+                });
+                bubbleHost.Children.Add(new Border
+                {
+                    Width = 34, Height = 34, CornerRadius = new CornerRadius(17),
+                    Background = Theme.GreenBrush,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    Margin = new Thickness(0, 0, 0, -10),
+                    Child = new TextBlock
+                    {
+                        Text = "J", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White,
+                        HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                    },
+                });
+                return bubbleHost;
+            }
+        }
+    }
+
     private static UIElement BuildCard(string context, Option o, bool selected, bool large, Action? onPicked)
     {
         var panel = new StackPanel();
         panel.Children.Add(new TextBlock { Text = o.Title, FontSize = 15.5, FontWeight = FontWeights.SemiBold, Foreground = Theme.TextBrush });
         panel.Children.Add(new TextBlock { Text = o.Subtitle, FontSize = 13, Foreground = Theme.SubtleBrush, Margin = new Thickness(0, 4, 0, 16) });
 
-        // sample "message bubble"
-        var bubbleHost = new Grid();
-        bubbleHost.Children.Add(new Border
-        {
-            Background = Theme.GreenSoftBrush,
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(12),
-            Margin = new Thickness(0, 0, 26, 0),
-            Child = new TextBlock
-            {
-                Text = o.Sample,
-                FontSize = 12.5,
-                Foreground = Theme.TextBrush,
-                TextWrapping = TextWrapping.Wrap,
-            },
-        });
-        bubbleHost.Children.Add(new Border
-        {
-            Width = 34, Height = 34, CornerRadius = new CornerRadius(17),
-            Background = Theme.GreenBrush,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Bottom,
-            Margin = new Thickness(0, 0, 0, -10),
-            Child = new TextBlock
-            {
-                Text = "J", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White,
-                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-            },
-        });
-        panel.Children.Add(bubbleHost);
+        panel.Children.Add(BuildPreview(context, o));
 
         var card = new Border
         {
@@ -320,7 +365,6 @@ public sealed class StyleWizardDialog : Window
             FontSize = 34,
             Foreground = Theme.TextBrush,
             HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(0, 0, 0, 36),
         };
         title.Inlines.Add(new Run(context switch
         {
@@ -337,7 +381,17 @@ public sealed class StyleWizardDialog : Window
             _ => "other apps?",
         })
         { Foreground = Theme.PurpleBrush, FontStyle = FontStyles.Italic });
-        body.Children.Add(title);
+        var titleRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 0, 0, 36),
+        };
+        title.Margin = new Thickness(0, 0, 20, 0);
+        title.VerticalAlignment = VerticalAlignment.Center;
+        titleRow.Children.Add(title);
+        titleRow.Children.Add(PageChrome.IconCluster(40));
+        body.Children.Add(titleRow);
 
         body.Children.Add(StyleCards.BuildRow(context, large: true, onPicked: Render));
         page.Children.Add(body);
