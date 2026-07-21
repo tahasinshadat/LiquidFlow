@@ -26,7 +26,8 @@ public static class VoiceBoxApi
         [property: JsonPropertyName("voice_type")] string? VoiceType,
         [property: JsonPropertyName("preset_engine")] string? PresetEngine,
         [property: JsonPropertyName("preset_voice_id")] string? PresetVoiceId,
-        [property: JsonPropertyName("default_engine")] string? DefaultEngine);
+        [property: JsonPropertyName("default_engine")] string? DefaultEngine,
+        [property: JsonPropertyName("sample_count")] int? SampleCount);
 
     public sealed record Generation(
         [property: JsonPropertyName("id")] string Id,
@@ -52,6 +53,24 @@ public static class VoiceBoxApi
 
     private sealed record ModelsStatus([property: JsonPropertyName("models")] List<ModelInfo> Models);
 
+    /// <summary>EnsureSuccessStatusCode, but the exception carries the server's `detail`
+    /// message — "400 Bad Request" alone is useless in a status line.</summary>
+    private static async Task EnsureOkAsync(HttpResponseMessage resp, CancellationToken ct)
+    {
+        if (resp.IsSuccessStatusCode) return;
+        string detail = "";
+        try
+        {
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            using var doc = System.Text.Json.JsonDocument.Parse(body);
+            detail = doc.RootElement.TryGetProperty("detail", out var d) ? d.ToString() : body;
+        }
+        catch { }
+        throw new HttpRequestException(string.IsNullOrWhiteSpace(detail)
+            ? $"{(int)resp.StatusCode} {resp.ReasonPhrase}"
+            : detail);
+    }
+
     public static async Task<List<Profile>> GetProfilesAsync(CancellationToken ct = default)
         => await Http.GetFromJsonAsync<List<Profile>>("/profiles", ct) ?? new();
 
@@ -67,7 +86,7 @@ public static class VoiceBoxApi
             preset_voice_id = voiceId,
             default_engine = engine,
         }, ct);
-        resp.EnsureSuccessStatusCode();
+        await EnsureOkAsync(resp, ct);
     }
 
     public static Task DeleteProfileAsync(string id, CancellationToken ct = default)
@@ -84,7 +103,7 @@ public static class VoiceBoxApi
             voice_type = "cloned",
             default_engine = "qwen",
         }, ct);
-        resp.EnsureSuccessStatusCode();
+        await EnsureOkAsync(resp, ct);
         return (await resp.Content.ReadFromJsonAsync<Profile>(cancellationToken: ct))!;
     }
 
@@ -97,7 +116,7 @@ public static class VoiceBoxApi
         form.Add(fileContent, "file", Path.GetFileName(filePath));
         form.Add(new StringContent(referenceText), "reference_text");
         var resp = await Http.PostAsync($"/profiles/{profileId}/samples", form, ct);
-        resp.EnsureSuccessStatusCode();
+        await EnsureOkAsync(resp, ct);
     }
 
     public static Task ToggleFavoriteAsync(string generationId, CancellationToken ct = default)
@@ -130,7 +149,7 @@ public static class VoiceBoxApi
     public static async Task<Story> CreateStoryAsync(string name, string? desc, CancellationToken ct = default)
     {
         var resp = await Http.PostAsJsonAsync("/stories", new { name, description = desc }, ct);
-        resp.EnsureSuccessStatusCode();
+        await EnsureOkAsync(resp, ct);
         return (await resp.Content.ReadFromJsonAsync<Story>(cancellationToken: ct))!;
     }
 
@@ -146,7 +165,7 @@ public static class VoiceBoxApi
     public static async Task AddStoryItemAsync(string storyId, string generationId, CancellationToken ct = default)
     {
         var resp = await Http.PostAsJsonAsync($"/stories/{storyId}/items", new { generation_id = generationId }, ct);
-        resp.EnsureSuccessStatusCode();
+        await EnsureOkAsync(resp, ct);
     }
 
     public static Task DeleteStoryItemAsync(string storyId, string itemId, CancellationToken ct = default)
@@ -199,7 +218,7 @@ public static class VoiceBoxApi
             instruct = string.IsNullOrWhiteSpace(instruct) ? null : instruct,
             model_size = modelSize,
         }, ct);
-        resp.EnsureSuccessStatusCode();
+        await EnsureOkAsync(resp, ct);
         return (await resp.Content.ReadFromJsonAsync<Generation>(cancellationToken: ct))!;
     }
 
@@ -224,7 +243,7 @@ public static class VoiceBoxApi
     public static async Task DownloadModelAsync(string modelName, CancellationToken ct = default)
     {
         var resp = await Http.PostAsJsonAsync("/models/download", new { model_name = modelName }, ct);
-        resp.EnsureSuccessStatusCode();
+        await EnsureOkAsync(resp, ct);
     }
 
     public static Task UnloadModelAsync(string modelName, CancellationToken ct = default)

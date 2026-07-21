@@ -423,8 +423,8 @@ public sealed class VoiceBoxStudioView : StackPanel
                     _recTimer.Tick += (_, _) =>
                     {
                         var e = DateTime.Now - _recStart;
-                        hint.Text = $"Recording  {(int)e.TotalMinutes}:{e.Seconds:00} — click to finish (auto-stops at 1:00)";
-                        if (e.TotalSeconds >= 60) mic.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(
+                        hint.Text = $"Recording  {(int)e.TotalMinutes}:{e.Seconds:00} — click to finish (auto-stops at 0:30, the engine's limit)";
+                        if (e.TotalSeconds >= 30) mic.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(
                             System.Windows.Input.Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
                         { RoutedEvent = MouseLeftButtonUpEvent });
                     };
@@ -443,6 +443,13 @@ public sealed class VoiceBoxStudioView : StackPanel
             var seconds = (DateTime.Now - _recStart).TotalSeconds;
             var samples = _recSamples.ToArray();
             var raw = _recBytes?.ToArray() ?? Array.Empty<byte>();
+            // the cloning engine rejects reference audio over 30.0s — clip defensively
+            const int maxSamples = 16000 * 29;
+            if (samples.Length > maxSamples)
+            {
+                samples = samples[..maxSamples];
+                raw = raw[..(maxSamples * 2)];
+            }
             StopRecording(discard: false);
             mic.Background = Theme.InkBrush;
             micGlyph.Text = "";
@@ -469,9 +476,26 @@ public sealed class VoiceBoxStudioView : StackPanel
                     ? "A natural reference recording of my voice."
                     : transcript!;
 
-                var name = UniqueVoiceName(string.IsNullOrWhiteSpace(nameBox.Text) ? "My voice" : nameBox.Text.Trim());
-                st.Text = $"Creating “{name}”…";
-                var prof = await VoiceBoxApi.CreateClonedProfileAsync(name, "Cloned from a quick in-app recording");
+                _profiles = await VoiceBoxApi.GetProfilesAsync(); // fresh names — avoids stale-list conflicts
+                var wanted = string.IsNullOrWhiteSpace(nameBox.Text) ? "My voice" : nameBox.Text.Trim();
+                // a same-name cloned profile with no sample = a failed earlier attempt; adopt it
+                var orphan = _profiles.FirstOrDefault(x =>
+                    x.VoiceType == "cloned" && (x.SampleCount ?? 0) == 0 &&
+                    string.Equals(x.Name, wanted, StringComparison.OrdinalIgnoreCase));
+                VoiceBoxApi.Profile prof;
+                string name;
+                if (orphan is not null)
+                {
+                    prof = orphan;
+                    name = orphan.Name;
+                    st.Text = $"Finishing “{name}”…";
+                }
+                else
+                {
+                    name = UniqueVoiceName(wanted);
+                    st.Text = $"Creating “{name}”…";
+                    prof = await VoiceBoxApi.CreateClonedProfileAsync(name, "Cloned from a quick in-app recording");
+                }
                 st.Text = "Uploading your sample…";
                 await VoiceBoxApi.UploadSampleAsync(prof.Id, wavPath, reference);
                 _profiles = await VoiceBoxApi.GetProfilesAsync();
