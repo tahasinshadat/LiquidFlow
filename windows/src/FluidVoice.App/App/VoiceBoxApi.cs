@@ -252,4 +252,42 @@ public static class VoiceBoxApi
     /// <summary>Delete a downloaded engine from disk (unload it first if loaded).</summary>
     public static Task DeleteModelAsync(string modelName, CancellationToken ct = default)
         => Http.DeleteAsync($"/models/{modelName}", ct);
+
+    private static readonly HttpClient SseHttp = new()
+    {
+        BaseAddress = new Uri($"http://127.0.0.1:{VoiceBoxNative.Port}"),
+        Timeout = Timeout.InfiniteTimeSpan, // SSE streams stay open for the whole download
+    };
+
+    /// <summary>Stream a model's download progress (SSE /models/progress/{name}).
+    /// Calls onProgress(fraction 0..1 or -1 for unknown, phase) until complete/error.</summary>
+    public static async Task StreamModelProgressAsync(string modelName, Action<double, string> onProgress, CancellationToken ct = default)
+    {
+        using var resp = await SseHttp.GetAsync($"/models/progress/{modelName}", HttpCompletionOption.ResponseHeadersRead, ct);
+        if (!resp.IsSuccessStatusCode) return;
+        await using var stream = await resp.Content.ReadAsStreamAsync(ct);
+        using var reader = new StreamReader(stream);
+        while (!reader.EndOfStream)
+        {
+            ct.ThrowIfCancellationRequested();
+            var line = await reader.ReadLineAsync(ct);
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            if (line.StartsWith("data:")) line = line[5..].Trim();
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(line);
+                var root = doc.RootElement;
+                double pct = -1;
+                if (root.TryGetProperty("progress", out var p) && p.ValueKind == System.Text.Json.JsonValueKind.Number)
+                    pct = p.GetDouble();
+                else if (root.TryGetProperty("total", out var t) && t.ValueKind == System.Text.Json.JsonValueKind.Number && t.GetDouble() > 0
+                         && root.TryGetProperty("current", out var c) && c.ValueKind == System.Text.Json.JsonValueKind.Number)
+                    pct = c.GetDouble() / t.GetDouble() * 100.0;
+                var phase = root.TryGetProperty("status", out var s) ? s.GetString() ?? "downloading" : "downloading";
+                onProgress(pct < 0 ? -1 : Math.Clamp(pct / 100.0, 0, 1), phase);
+                if (phase is "complete" or "error") return;
+            }
+            catch { /* keepalive / non-JSON lines */ }
+        }
+    }
 }

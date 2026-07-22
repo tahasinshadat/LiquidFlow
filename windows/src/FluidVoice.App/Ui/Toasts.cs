@@ -106,22 +106,35 @@ public static class Toasts
             VerticalAlignment = VerticalAlignment.Center,
         });
 
+        // accent stripe down the left edge — reads the severity at a glance
+        var shell = new DockPanel { LastChildFill = true };
+        var stripe = new Border
+        {
+            Width = 4,
+            Background = accent,
+            CornerRadius = new CornerRadius(14, 0, 0, 14),
+        };
+        DockPanel.SetDock(stripe, Dock.Left);
+        shell.Children.Add(stripe);
+        shell.Children.Add(new Border { Padding = new Thickness(12, 11, 16, 12), Child = row });
+
         return new Border
         {
             Background = Theme.SurfaceBrush,
             BorderBrush = Theme.HairlineBrush,
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(14, 11, 16, 11),
+            CornerRadius = new CornerRadius(14),
+            Padding = new Thickness(0),
             Margin = new Thickness(0, 0, 0, 8),
             MaxWidth = 400,
-            MinWidth = 240,
+            MinWidth = 250,
             HorizontalAlignment = HorizontalAlignment.Right,
             Cursor = Cursors.Hand,
             Opacity = 0,
+            ClipToBounds = true,
             RenderTransform = new TranslateTransform(28, 0),
-            Effect = new DropShadowEffect { BlurRadius = 18, ShadowDepth = 3, Opacity = 0.16, Color = Colors.Black },
-            Child = row,
+            Effect = new DropShadowEffect { BlurRadius = 22, ShadowDepth = 3, Opacity = 0.18, Color = Colors.Black },
+            Child = shell,
         };
     }
 }

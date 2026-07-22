@@ -206,55 +206,117 @@ public sealed class VoiceBoxStudioView : StackPanel
 
     private UIElement BuildGenerate()
     {
-        // _status is a long-lived field (GenerateAsync writes it after awaits) — detach it
-        // from the previous build's card first, or WPF throws "already the logical child
-        // of another element" and the whole tab renders blank.
+        // _status is long-lived (GenerateAsync writes it after awaits) — detach from the
+        // previous build first or WPF throws "already the logical child of another element".
         (_status.Parent as Panel)?.Children.Remove(_status);
-        var p = new StackPanel();
-        p.Children.Add(Theme.Label("Voice"));
-        _voice = new ComboBox { Width = 360, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 12) };
-        foreach (var prof in _profiles)
-            _voice.Items.Add($"{prof.Name}  ·  {EngineLabel(prof.DefaultEngine ?? prof.PresetEngine)}");
-        if (_voice.Items.Count > 0) _voice.SelectedIndex = 0;
-        _voice.SelectionChanged += (_, _) => SyncInstructVisibility();
-        p.Children.Add(_voice);
+        var outer = new StackPanel();
 
-        _instructRow = new StackPanel();
-        _instructRow.Children.Add(Theme.Label("Delivery instructions (this engine supports them)"));
+        // One composite "generate box": big borderless input on top, controls beneath.
+        var box = new StackPanel();
+        var placeholder = new TextBlock
+        {
+            FontSize = 15,
+            Foreground = Theme.SubtleBrush,
+            Margin = new Thickness(19, 16, 19, 0),
+            IsHitTestVisible = false,
+        };
+        _text = new TextBox
+        {
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            MinHeight = 104,
+            MaxHeight = 260,
+            Padding = new Thickness(16, 14, 16, 12),
+            FontSize = 15,
+            BorderThickness = new Thickness(0),
+            Background = Brushes.Transparent,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+        };
+        void SyncPlaceholder()
+        {
+            var sel = SelectedProfile();
+            placeholder.Text = sel is null ? "Generate speech…" : $"Generate speech using {sel.Name}…";
+            placeholder.Visibility = _text.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        _text.TextChanged += (_, _) => SyncPlaceholder();
+        var inputHost = new Grid();
+        inputHost.Children.Add(_text);
+        inputHost.Children.Add(placeholder);
+        box.Children.Add(inputHost);
+
+        _instructRow = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(16, 0, 16, 10) };
+        _instructRow.Children.Add(new TextBlock
+        {
+            Text = "Delivery instructions (this engine supports them)",
+            FontSize = 11.5,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = Theme.SubtleBrush,
+            Margin = new Thickness(2, 0, 0, 4),
+        });
         _instruct = new TextBox
         {
-            FontSize = 13.5, Padding = new Thickness(10, 8, 10, 8), Margin = new Thickness(0, 0, 0, 12),
+            FontSize = 13,
+            Padding = new Thickness(10, 7, 10, 7),
             ToolTip = "e.g. Speak slowly with warmth · Professional, broadcast quality",
         };
         _instructRow.Children.Add(_instruct);
-        p.Children.Add(_instructRow);
+        box.Children.Add(_instructRow);
 
-        p.Children.Add(Theme.Label("Text"));
-        _text = new TextBox
-        {
-            AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
-            MinHeight = 110, MaxHeight = 240, Padding = new Thickness(10), FontSize = 14,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Text = "At your service. All systems are online and running well.",
-        };
-        p.Children.Add(_text);
+        box.Children.Add(new Border { Height = 1, Background = Theme.HairlineBrush });
 
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 14, 0, 0) };
-        _generate = Theme.PrimaryButton("Generate & play");
+        var bar = new DockPanel { Margin = new Thickness(12, 10, 12, 10) };
+        _generate = Theme.PrimaryButton("Generate");
+        _generate.Padding = new Thickness(22, 8, 22, 8);
         _generate.Click += async (_, _) => await GenerateAsync();
-        row.Children.Add(_generate);
-        var stop = Theme.SecondaryButton("Stop");
-        stop.Margin = new Thickness(8, 0, 0, 0);
-        stop.Click += (_, _) => StopPlayback();
-        row.Children.Add(stop);
+        DockPanel.SetDock(_generate, Dock.Right);
+        bar.Children.Add(_generate);
         var save = Theme.SecondaryButton("Save WAV…");
-        save.Margin = new Thickness(8, 0, 0, 0);
+        save.Margin = new Thickness(0, 0, 8, 0);
         save.Click += (_, _) => SaveLast();
-        row.Children.Add(save);
-        p.Children.Add(row);
-        p.Children.Add(_status);
+        DockPanel.SetDock(save, Dock.Right);
+        bar.Children.Add(save);
+        var stop = Theme.SecondaryButton("Stop");
+        stop.Margin = new Thickness(0, 0, 8, 0);
+        stop.Click += (_, _) => StopPlayback();
+        DockPanel.SetDock(stop, Dock.Right);
+        bar.Children.Add(stop);
+
+        var left = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        _voice = new ComboBox { MinWidth = 190, VerticalAlignment = VerticalAlignment.Center };
+        foreach (var prof in _profiles) _voice.Items.Add(prof.Name);
+        if (_voice.Items.Count > 0) _voice.SelectedIndex = 0;
+        var engineChip = Theme.Pill("engine", Theme.GreenSoftBrush, Theme.GreenBrush, 11);
+        engineChip.Margin = new Thickness(10, 0, 0, 0);
+        engineChip.VerticalAlignment = VerticalAlignment.Center;
+        void SyncEngineChip()
+        {
+            var sel = SelectedProfile();
+            if (engineChip.Child is TextBlock tb)
+                tb.Text = EngineLabel(sel?.PresetEngine ?? sel?.DefaultEngine);
+        }
+        _voice.SelectionChanged += (_, _) => { SyncInstructVisibility(); SyncEngineChip(); SyncPlaceholder(); };
+        left.Children.Add(_voice);
+        left.Children.Add(engineChip);
+        bar.Children.Add(left);
+        box.Children.Add(bar);
+
+        outer.Children.Add(new Border
+        {
+            Background = Theme.SurfaceBrush,
+            BorderBrush = Theme.HairlineBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(14),
+            ClipToBounds = true,
+            Child = box,
+            Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 14, ShadowDepth = 2, Opacity = 0.08, Color = Colors.Black },
+        });
+
+        _status.Margin = new Thickness(4, 10, 0, 0);
+        outer.Children.Add(_status);
         SyncInstructVisibility();
-        return Theme.Card2(p);
+        SyncEngineChip();
+        SyncPlaceholder();
+        return outer;
     }
 
     private VoiceBoxApi.Profile? SelectedProfile()
@@ -475,6 +537,13 @@ public sealed class VoiceBoxStudioView : StackPanel
             Margin = new Thickness(0, 10, 0, 6),
         };
         p.Children.Add(st);
+        var cloneBar = new ProgressStripe(320, 6)
+        {
+            Margin = new Thickness(0, 8, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Visibility = Visibility.Collapsed,
+        };
+        p.Children.Add(cloneBar);
 
         mic.MouseLeftButtonUp += async (_, _) =>
         {
@@ -589,6 +658,8 @@ public sealed class VoiceBoxStudioView : StackPanel
             }
 
             _cloneBusy = true;
+            cloneBar.Visibility = Visibility.Visible;
+            cloneBar.SetIndeterminate();
             try
             {
                 // write the sample wav
@@ -598,7 +669,7 @@ public sealed class VoiceBoxStudioView : StackPanel
                 await using (var writer = new WaveFileWriter(wavPath, new WaveFormat(16000, 1)))
                     writer.Write(raw, 0, raw.Length);
 
-                st.Text = "Transcribing your recording locally…";
+                st.Text = "Step 1 of 3 — transcribing your recording locally…";
                 var transcript = await TryTranscribeAsync(samples);
                 var reference = string.IsNullOrWhiteSpace(transcript)
                     ? "A natural reference recording of my voice."
@@ -616,15 +687,15 @@ public sealed class VoiceBoxStudioView : StackPanel
                 {
                     prof = orphan;
                     name = orphan.Name;
-                    st.Text = $"Finishing “{name}”…";
+                    st.Text = $"Step 2 of 3 — finishing “{name}”…";
                 }
                 else
                 {
                     name = UniqueVoiceName(wanted);
-                    st.Text = $"Creating “{name}”…";
+                    st.Text = $"Step 2 of 3 — creating “{name}”…";
                     prof = await VoiceBoxApi.CreateClonedProfileAsync(name, "Cloned from a quick in-app recording");
                 }
-                st.Text = "Uploading your sample…";
+                st.Text = "Step 3 of 3 — uploading your sample…";
                 await VoiceBoxApi.UploadSampleAsync(prof.Id, wavPath, reference);
                 _profiles = await VoiceBoxApi.GetProfilesAsync();
                 nameBox.Text = UniqueVoiceName("My voice");
@@ -651,6 +722,7 @@ public sealed class VoiceBoxStudioView : StackPanel
             }
             finally
             {
+                cloneBar.Visibility = Visibility.Collapsed;
                 _cloneBusy = false;
             }
         };
@@ -759,7 +831,7 @@ public sealed class VoiceBoxStudioView : StackPanel
                 var grid = new Grid { Margin = new Thickness(20, 12, 12, 12) };
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(76) });
 
                 var info = new StackPanel();
                 var name = new TextBlock { FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Theme.TextBrush };
@@ -783,6 +855,8 @@ public sealed class VoiceBoxStudioView : StackPanel
                 Grid.SetColumn(chip, 1);
                 grid.Children.Add(chip);
 
+                var prev = PageChrome.IconButton("\uE768", "Preview this voice", () => _ = PreviewVoiceAsync(prof));
+                prev.VerticalAlignment = VerticalAlignment.Center;
                 var del = PageChrome.IconButton("", "Delete voice", async () =>
                 {
                     try { await VoiceBoxApi.DeleteProfileAsync(prof.Id); } catch { }
@@ -791,8 +865,11 @@ public sealed class VoiceBoxStudioView : StackPanel
                     Rebuild();
                 });
                 del.VerticalAlignment = VerticalAlignment.Center;
-                Grid.SetColumn(del, 2);
-                grid.Children.Add(del);
+                var rowActions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+                rowActions.Children.Add(prev);
+                rowActions.Children.Add(del);
+                Grid.SetColumn(rowActions, 2);
+                grid.Children.Add(rowActions);
 
                 list.Children.Add(grid);
                 if (prof != _profiles[^1]) list.Children.Add(Theme.Divider());
@@ -810,6 +887,56 @@ public sealed class VoiceBoxStudioView : StackPanel
         {
             host.Children.Clear();
             host.Children.Add(Subtle($"Couldn't load voices: {ex.Message}"));
+        }
+    }
+
+    private bool _previewBusy;
+
+    /// <summary>Play a short cached sample of a voice; generates it once on first use.</summary>
+    private async Task PreviewVoiceAsync(VoiceBoxApi.Profile prof)
+    {
+        if (_previewBusy) return;
+        _previewBusy = true;
+        try
+        {
+            var dir = Path.Combine(FluidVoice.Core.AppPaths.DataDir, "Voices", "Previews");
+            Directory.CreateDirectory(dir);
+            var cached = Path.Combine(dir, prof.Id + ".wav");
+            if (!File.Exists(cached))
+            {
+                Toasts.Info($"Generating a preview of “{prof.Name}”…");
+                var engine = prof.PresetEngine ?? prof.DefaultEngine;
+                var gen = await VoiceBoxApi.GenerateAsync(prof.Id,
+                    $"Hi, I'm {prof.Name}. This is how I sound.", engine, null,
+                    engine is "qwen" or "qwen_custom_voice" ? "0.6B" : null);
+                for (int i = 0; i < 120; i++)
+                {
+                    await Task.Delay(1000);
+                    var s = await VoiceBoxApi.GetGenerationAsync(gen.Id);
+                    if (s?.Status == "completed")
+                    {
+                        await File.WriteAllBytesAsync(cached, await VoiceBoxApi.GetAudioAsync(gen.Id));
+                        break;
+                    }
+                    if (s?.Status is "failed" or "error" or "cancelled")
+                    {
+                        Toasts.Error($"Preview failed: {s.Error ?? s.Status}");
+                        return;
+                    }
+                }
+                if (!File.Exists(cached)) { Toasts.Error("Preview timed out."); return; }
+                Invalidate("History");
+            }
+            StopPlayback();
+            Play(cached);
+        }
+        catch (Exception ex)
+        {
+            Toasts.Error($"Preview failed: {ex.Message}");
+        }
+        finally
+        {
+            _previewBusy = false;
         }
     }
 
@@ -1370,12 +1497,8 @@ public sealed class VoiceBoxStudioView : StackPanel
         try
         {
             var models = await VoiceBoxApi.GetModelsAsync();
-            // Chatterbox/LuxTTS/TADA need torchaudio (no ARM64 wheels) — emulation only.
             static bool EmulatedOnly(string n) =>
                 n.StartsWith("chatterbox") || n.StartsWith("luxtts") || n.StartsWith("tada");
-            // Whisper/Qwen3 here exist only for VoiceBox's Captures/refine — LiquidFlow
-            // manages its own speech + AI models in Settings, so don't duplicate them.
-            // They stay visible in non-native mode, where the Captures tab can use them.
             static bool CaptureStack(string n) => n.StartsWith("whisper") || n.StartsWith("qwen3-");
             models = Settings.Current.VoiceBoxNativeOnly
                 ? models.Where(m => !EmulatedOnly(m.ModelName) && !CaptureStack(m.ModelName)).ToList()
@@ -1386,7 +1509,6 @@ public sealed class VoiceBoxStudioView : StackPanel
                 host.Children.Add(Subtle("Whisper/Qwen3 entries below serve VoiceBox's Captures feature only — LiquidFlow's own speech models live in Settings.", 11.5));
 
             var list = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
-            var anyDownloading = false;
             foreach (var m in models)
             {
                 var grid = new Grid { Margin = new Thickness(20, 12, 12, 12) };
@@ -1396,11 +1518,45 @@ public sealed class VoiceBoxStudioView : StackPanel
 
                 var info = new StackPanel();
                 info.Children.Add(new TextBlock { Text = m.DisplayName, FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Theme.TextBrush });
-                var meta = m.Downloaded ? $"downloaded{(m.SizeMb is > 0 ? $" · {m.SizeMb / 1024.0:0.0} GB".Replace("0.3 GB", "313 MB") : "")}" : "not downloaded";
-                if (m.SizeMb is > 0 and < 1024) meta = $"downloaded · {m.SizeMb:0} MB";
-                info.Children.Add(Subtle(m.Downloading ? "downloading…" : meta, 11.5));
+                var meta = Subtle(m.Downloaded
+                    ? (m.SizeMb is > 0 ? (m.SizeMb >= 1024 ? $"downloaded · {m.SizeMb / 1024.0:0.0} GB" : $"downloaded · {m.SizeMb:0} MB") : "downloaded")
+                    : "not downloaded", 11.5);
+                info.Children.Add(meta);
+                var bar = new ProgressStripe(280, 5)
+                {
+                    Margin = new Thickness(0, 8, 0, 2),
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    Visibility = Visibility.Collapsed,
+                };
+                info.Children.Add(bar);
                 Grid.SetColumn(info, 0);
                 grid.Children.Add(info);
+
+                void WatchProgress()
+                {
+                    bar.Visibility = Visibility.Visible;
+                    bar.SetIndeterminate();
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await VoiceBoxApi.StreamModelProgressAsync(m.ModelName, (frac, phase) =>
+                                Dispatcher.BeginInvoke(() =>
+                                {
+                                    if (frac >= 0) bar.SetFraction(frac); else bar.SetIndeterminate();
+                                    meta.Text = phase == "extracting" ? "extracting…"
+                                        : frac >= 0 ? $"downloading… {frac * 100:0}%" : "downloading…";
+                                }));
+                        }
+                        catch { }
+                        _ = Dispatcher.BeginInvoke(() =>
+                        {
+                            Invalidate("Models");
+                            if (_tab < CurrentTabs.Length && CurrentTabs[_tab] == "Models") BuildStudio();
+                        });
+                    });
+                }
+                if (m.Downloading) WatchProgress();
 
                 if (m.Loaded)
                 {
@@ -1410,7 +1566,6 @@ public sealed class VoiceBoxStudioView : StackPanel
                     Grid.SetColumn(chip, 1);
                     grid.Children.Add(chip);
                 }
-                anyDownloading |= m.Downloading;
 
                 var act = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
                 if (EmulatedOnly(m.ModelName))
@@ -1430,9 +1585,10 @@ public sealed class VoiceBoxStudioView : StackPanel
                     dl.Padding = new Thickness(12, 4, 12, 4);
                     dl.Click += async (_, _) =>
                     {
-                        try { await VoiceBoxApi.DownloadModelAsync(m.ModelName); } catch { }
+                        dl.IsEnabled = false;
                         Toasts.Info($"Downloading {m.DisplayName} in the background");
-                        Rebuild();
+                        try { await VoiceBoxApi.DownloadModelAsync(m.ModelName); } catch (Exception ex) { Toasts.Error($"Download failed to start: {ex.Message}"); dl.IsEnabled = true; return; }
+                        WatchProgress();
                     };
                     act.Children.Add(dl);
                 }
@@ -1442,7 +1598,9 @@ public sealed class VoiceBoxStudioView : StackPanel
                     un.Padding = new Thickness(12, 4, 12, 4);
                     un.Click += async (_, _) =>
                     {
+                        meta.Text = "unloading…";
                         try { await VoiceBoxApi.UnloadModelAsync(m.ModelName); } catch { }
+                        Toasts.Info($"{m.DisplayName} unloaded");
                         Rebuild();
                     };
                     act.Children.Add(un);
@@ -1454,6 +1612,10 @@ public sealed class VoiceBoxStudioView : StackPanel
                     rm.ToolTip = "Delete the downloaded engine from disk (you can re-download it anytime)";
                     rm.Click += async (_, _) =>
                     {
+                        rm.IsEnabled = false;
+                        bar.Visibility = Visibility.Visible;
+                        bar.SetIndeterminate();
+                        meta.Text = "removing…";
                         try { await VoiceBoxApi.DeleteModelAsync(m.ModelName); } catch { }
                         Toasts.Info($"{m.DisplayName} removed");
                         Rebuild();
@@ -1474,12 +1636,6 @@ public sealed class VoiceBoxStudioView : StackPanel
                 CornerRadius = new CornerRadius(12),
                 Child = list,
             });
-            if (anyDownloading)
-            {
-                var t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
-                t.Tick += (_, _) => { t.Stop(); if (IsLoaded && _tab < CurrentTabs.Length && CurrentTabs[_tab] == "Models") Rebuild(); };
-                t.Start();
-            }
             host.Children.Add(Subtle(
                 $"Agent voices: an MCP server runs locally at http://127.0.0.1:{VoiceBoxNative.Port}/mcp — point Claude Code or any MCP client at it to give your agents these voices.",
                 12));
@@ -1491,4 +1647,5 @@ public sealed class VoiceBoxStudioView : StackPanel
             host.Children.Add(Subtle($"Couldn't load engines: {ex.Message}"));
         }
     }
+
 }
