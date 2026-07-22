@@ -151,20 +151,43 @@ public sealed class VoiceBoxStudioView : StackPanel
         ? new[] { "Generate", "Clone", "Voices", "Stories", "History", "Models" }
         : new[] { "Generate", "Clone", "Voices", "Stories", "History", "Effects", "Captures", "Models" };
 
+    // Tab content is cached so switching is instant — no refetch on every click.
+    // Mutations call Invalidate(...) for the tabs whose data changed.
+    private readonly Dictionary<string, UIElement> _tabCache = new();
+
+    private void Invalidate(params string[] tabs)
+    {
+        foreach (var t in tabs) _tabCache.Remove(t);
+    }
+
+    private static void FadeIn(UIElement el)
+    {
+        el.Opacity = 0;
+        el.BeginAnimation(OpacityProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(140)));
+    }
+
     private void BuildStudio()
     {
         var tabs = CurrentTabs;
         if (_tab >= tabs.Length) _tab = 0;
+        var name = tabs[_tab];
         _body.Children.Clear();
         _body.Children.Add(PageChrome.TabsRow(tabs, _tab, i =>
         {
             _tab = i;
             if (_ready) BuildStudio();
         }));
-        switch (tabs[_tab])
+        if (_tabCache.TryGetValue(name, out var cached))
         {
-            case "Generate": _body.Children.Add(BuildGenerate()); break;
-            case "Clone": _body.Children.Add(BuildClone()); break;
+            _body.Children.Add(cached);
+            FadeIn(cached);
+            return;
+        }
+        switch (name)
+        {
+            case "Generate": { var el = BuildGenerate(); _tabCache[name] = el; _body.Children.Add(el); FadeIn(el); break; }
+            case "Clone": { var el = BuildClone(); _tabCache[name] = el; _body.Children.Add(el); FadeIn(el); break; }
             case "Voices": _ = BuildVoicesAsync(); break;
             case "Stories": _ = BuildStoriesAsync(); break;
             case "History": _ = BuildHistoryAsync(); break;
@@ -278,12 +301,15 @@ public sealed class VoiceBoxStudioView : StackPanel
                     _lastWav = Path.Combine(Ai.VoiceStudio.OutputDir, $"voicebox-{DateTime.Now:yyyyMMdd-HHmmss}.wav");
                     await File.WriteAllBytesAsync(_lastWav, bytes);
                     _status.Text = $"{prof.Name}: {s.Duration:0.0}s of audio — playing. Saved to the Generated folder.";
+                    Invalidate("History", "Stories", "Models");
+                    Toasts.Success($"{prof.Name}: {s.Duration:0.0}s of audio — playing");
                     Play(_lastWav);
                     return;
                 }
                 if (s.Status is "failed" or "error" or "cancelled")
                 {
                     _status.Text = $"Generation {s.Status}: {s.Error ?? "unknown error"}";
+                    Toasts.Error(_status.Text);
                     return;
                 }
                 _status.Text = s.Status == "loading_model"
@@ -296,6 +322,7 @@ public sealed class VoiceBoxStudioView : StackPanel
         {
             Log.Error("voicebox", "Native studio generation failed", ex);
             _status.Text = $"Couldn't generate: {ex.Message}";
+            Toasts.Error(_status.Text);
         }
         finally
         {
@@ -480,6 +507,17 @@ public sealed class VoiceBoxStudioView : StackPanel
                         Dispatcher.BeginInvoke(() => level.SetFraction(shown));
                     };
                     _rec.StartRecording();
+                    mic.RenderTransformOrigin = new Point(0.5, 0.5);
+                    var micScale = new ScaleTransform(1, 1);
+                    mic.RenderTransform = micScale;
+                    var pulse = new System.Windows.Media.Animation.DoubleAnimation(1, 1.07, TimeSpan.FromMilliseconds(600))
+                    {
+                        AutoReverse = true,
+                        RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever,
+                        EasingFunction = new System.Windows.Media.Animation.SineEase(),
+                    };
+                    micScale.BeginAnimation(ScaleTransform.ScaleXProperty, pulse);
+                    micScale.BeginAnimation(ScaleTransform.ScaleYProperty, pulse);
                     level.Visibility = Visibility.Visible;
                     level.SetFraction(0);
                     _recStart = DateTime.Now;
@@ -518,6 +556,12 @@ public sealed class VoiceBoxStudioView : StackPanel
             }
             StopRecording(discard: false);
             mic.Background = Theme.InkBrush;
+            if (mic.RenderTransform is ScaleTransform micScaleDone)
+            {
+                micScaleDone.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                micScaleDone.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                micScaleDone.ScaleX = micScaleDone.ScaleY = 1;
+            }
             micGlyph.Text = "";
             hint.Text = "Click the mic and speak naturally — 15–30 seconds is ideal. Click again to finish.";
             level.Visibility = Visibility.Collapsed;
@@ -594,6 +638,8 @@ public sealed class VoiceBoxStudioView : StackPanel
                 }
                 catch { }
                 st.Text = doneMsg;
+                Invalidate("Voices", "Generate");
+                Toasts.Success($"“{name}” is ready — pick it on the Generate tab.");
                 if (!string.IsNullOrWhiteSpace(transcript))
                     st.Text += $"\nHeard: “{(transcript!.Length > 90 ? transcript[..90] + "…" : transcript)}”";
             }
@@ -601,6 +647,7 @@ public sealed class VoiceBoxStudioView : StackPanel
             {
                 Log.Error("voicebox", "One-click clone failed", ex);
                 st.Text = $"Couldn't clone: {ex.Message}";
+                Toasts.Error(st.Text);
             }
             finally
             {
@@ -684,7 +731,9 @@ public sealed class VoiceBoxStudioView : StackPanel
     private async Task BuildVoicesAsync()
     {
         var host = new StackPanel();
+        _tabCache["Voices"] = host;
         _body.Children.Add(host);
+        FadeIn(host);
         host.Children.Add(Subtle("Loading voices…"));
         try
         {
@@ -737,6 +786,8 @@ public sealed class VoiceBoxStudioView : StackPanel
                 var del = PageChrome.IconButton("", "Delete voice", async () =>
                 {
                     try { await VoiceBoxApi.DeleteProfileAsync(prof.Id); } catch { }
+                    Invalidate("Generate");
+                    Toasts.Info("Voice removed");
                     Rebuild();
                 });
                 del.VerticalAlignment = VerticalAlignment.Center;
@@ -872,6 +923,8 @@ public sealed class VoiceBoxStudioView : StackPanel
                         await VoiceBoxApi.UploadSampleAsync(prof.Id, files[i], text);
                     }
                 }
+                Invalidate("Generate");
+                Toasts.Success($"Added “{name}”");
                 dlg.Close();
                 Rebuild();
             }
@@ -888,14 +941,21 @@ public sealed class VoiceBoxStudioView : StackPanel
         dlg.ShowDialog();
     }
 
-    private void Rebuild() => Dispatcher.BeginInvoke(BuildStudio);
+    private void Rebuild() => Dispatcher.BeginInvoke(() =>
+    {
+        var tabs = CurrentTabs;
+        if (_tab < tabs.Length) _tabCache.Remove(tabs[_tab]); // current tab refetches
+        BuildStudio();
+    });
 
     // ── History ────────────────────────────────────────────────────────────
 
     private async Task BuildHistoryAsync()
     {
         var host = new StackPanel();
+        _tabCache["History"] = host;
         _body.Children.Add(host);
+        FadeIn(host);
         host.Children.Add(Subtle("Loading history…"));
         try
         {
@@ -977,7 +1037,9 @@ public sealed class VoiceBoxStudioView : StackPanel
     private async Task BuildStoriesAsync()
     {
         var host = new StackPanel();
+        _tabCache["Stories"] = host;
         _body.Children.Add(host);
+        FadeIn(host);
         host.Children.Add(Subtle("Loading stories…"));
         try
         {
@@ -1041,6 +1103,7 @@ public sealed class VoiceBoxStudioView : StackPanel
             {
                 try { await VoiceBoxApi.DeleteStoryAsync(detail.Id); } catch { }
                 _storyId = null;
+                Toasts.Info("Story deleted");
                 Rebuild();
             };
             DockPanel.SetDock(del, Dock.Right);
@@ -1132,6 +1195,7 @@ public sealed class VoiceBoxStudioView : StackPanel
                     var bytes = await VoiceBoxApi.ExportStoryAudioAsync(detail.Id);
                     await File.WriteAllBytesAsync(dlg.FileName, bytes);
                     st.Text = $"Exported to {dlg.FileName}";
+                    Toasts.Success(st.Text);
                 }
                 catch (Exception ex) { st.Text = $"Export failed: {ex.Message}"; }
             };
@@ -1178,6 +1242,7 @@ public sealed class VoiceBoxStudioView : StackPanel
                 _storyId = s.Id;
             }
             catch (Exception ex) { MessageBox.Show(dlg, ex.Message, "Couldn't create story"); return; }
+            Toasts.Success($"Story “{nameBox.Text.Trim()}” created");
             dlg.Close();
             Rebuild();
         };
@@ -1194,7 +1259,9 @@ public sealed class VoiceBoxStudioView : StackPanel
     private async Task BuildEffectsAsync()
     {
         var host = new StackPanel();
+        _tabCache["Effects"] = host;
         _body.Children.Add(host);
+        FadeIn(host);
         host.Children.Add(Subtle("Loading effects…"));
         try
         {
@@ -1243,7 +1310,9 @@ public sealed class VoiceBoxStudioView : StackPanel
     private async Task BuildCapturesAsync()
     {
         var host = new StackPanel();
+        _tabCache["Captures"] = host;
         _body.Children.Add(host);
+        FadeIn(host);
         host.Children.Add(Subtle("Loading captures…"));
         try
         {
@@ -1294,7 +1363,9 @@ public sealed class VoiceBoxStudioView : StackPanel
     private async Task BuildModelsAsync()
     {
         var host = new StackPanel();
+        _tabCache["Models"] = host;
         _body.Children.Add(host);
+        FadeIn(host);
         host.Children.Add(Subtle("Loading engines…"));
         try
         {
@@ -1360,6 +1431,7 @@ public sealed class VoiceBoxStudioView : StackPanel
                     dl.Click += async (_, _) =>
                     {
                         try { await VoiceBoxApi.DownloadModelAsync(m.ModelName); } catch { }
+                        Toasts.Info($"Downloading {m.DisplayName} in the background");
                         Rebuild();
                     };
                     act.Children.Add(dl);
@@ -1383,6 +1455,7 @@ public sealed class VoiceBoxStudioView : StackPanel
                     rm.Click += async (_, _) =>
                     {
                         try { await VoiceBoxApi.DeleteModelAsync(m.ModelName); } catch { }
+                        Toasts.Info($"{m.DisplayName} removed");
                         Rebuild();
                     };
                     act.Children.Add(rm);

@@ -99,6 +99,18 @@ public sealed class MainWindow : Window
         Grid.SetColumn(sheet, 1);
         root.Children.Add(sheet);
 
+        // toast overlay: slides in at the sheet's top-right, above everything
+        var toastHost = new StackPanel
+        {
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(0, 58, 36, 0),
+        };
+        Grid.SetColumn(toastHost, 1);
+        Panel.SetZIndex(toastHost, 999);
+        root.Children.Add(toastHost);
+        Toasts.Attach(toastHost);
+
         // ----- in-app titlebar above everything (part of the design, not an appended bar) -----
         var outer = new Grid { Background = new SolidColorBrush(Theme.Bg) };
         outer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // titlebar
