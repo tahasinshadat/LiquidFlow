@@ -1133,14 +1133,14 @@ public sealed class VoiceBoxStudioView : StackPanel
                     });
                 actions.Children.Add(fav);
                 if (g.Status is "generating" or "loading_model")
-                    actions.Children.Add(PageChrome.IconButton("", "Cancel this generation", async () =>
+                    actions.Children.Add(PageChrome.IconButton("\uE711", "Cancel this generation", async () =>
                     {
                         try { await VoiceBoxApi.CancelGenerationAsync(g.Id); } catch { }
                         Toasts.Info("Generation cancelled");
                         Rebuild();
                     }));
                 if (g.Status is "failed" or "error" or "cancelled")
-                    actions.Children.Add(PageChrome.IconButton("", "Retry this generation", async () =>
+                    actions.Children.Add(PageChrome.IconButton("\uE72C", "Retry this generation", async () =>
                     {
                         try { await VoiceBoxApi.RetryGenerationAsync(g.Id); Toasts.Info("Retrying…"); }
                         catch (Exception ex) { Toasts.Error($"Retry failed: {ex.Message}"); }
