@@ -343,6 +343,15 @@ public sealed class VoiceBoxStudioView : StackPanel
         var text = _text.Text.Trim();
         if (prof is null) { _status.Text = "Add a voice first (Voices tab)."; return; }
         if (text.Length == 0) { _status.Text = "Type something to say first."; return; }
+        // Cloned voices use the qwen CLONING engine, whose reference tokenizer has no
+        // ARM64 build — a native job would just wedge the serial queue and fail. Refuse
+        // honestly instead of poisoning the queue (that's what "stuck generating" was).
+        if ((prof.PresetEngine ?? prof.DefaultEngine) == "qwen")
+        {
+            _status.Text = "Cloned voices can't speak natively yet — one piece of their engine has no ARM64 build. They work in the emulated app (Settings → General → VoiceBox); every preset voice here is fully native.";
+            Toasts.Info("Cloned voices need the emulated app for now — presets are fully native.");
+            return;
+        }
         _generate.IsEnabled = false;
         StopPlayback();
         try
@@ -700,14 +709,7 @@ public sealed class VoiceBoxStudioView : StackPanel
                 _profiles = await VoiceBoxApi.GetProfilesAsync();
                 nameBox.Text = UniqueVoiceName("My voice");
 
-                var doneMsg = $"“{name}” is ready — pick it on the Generate tab.";
-                try
-                {
-                    var qwen = (await VoiceBoxApi.GetModelsAsync()).FirstOrDefault(m => m.ModelName == "qwen-tts-0.6B");
-                    if (qwen is { Downloaded: false })
-                        doneMsg += "  One more thing: download “Qwen TTS 0.6B” under Models — cloned voices speak through it.";
-                }
-                catch { }
+                var doneMsg = $"“{name}” is saved with your sample. Honest heads-up: cloned voices can't SPEAK natively yet — one engine piece has no ARM64 build. Hear them via the emulated app (Settings → General → VoiceBox); every preset voice stays fully native.";
                 st.Text = doneMsg;
                 Invalidate("Voices", "Generate");
                 Toasts.Success($"“{name}” is ready — pick it on the Generate tab.");
@@ -899,6 +901,11 @@ public sealed class VoiceBoxStudioView : StackPanel
         _previewBusy = true;
         try
         {
+            if ((prof.PresetEngine ?? prof.DefaultEngine) == "qwen")
+            {
+                Toasts.Info("Cloned voices need the emulated app for playback (engine gap) — presets preview natively.");
+                return;
+            }
             var dir = Path.Combine(FluidVoice.Core.AppPaths.DataDir, "Voices", "Previews");
             Directory.CreateDirectory(dir);
             var cached = Path.Combine(dir, prof.Id + ".wav");
@@ -1108,6 +1115,12 @@ public sealed class VoiceBoxStudioView : StackPanel
                            (g.Duration is > 0 ? $" · {g.Duration:0.0}s" : "") +
                            (g.Status != "completed" ? $" · {g.Status}" : "");
                 info.Children.Add(Subtle(meta, 11.5));
+                if (!string.IsNullOrWhiteSpace(g.Error))
+                {
+                    var err = Subtle(g.Error!.Length > 120 ? g.Error[..120] + "…" : g.Error!, 11);
+                    err.Foreground = new SolidColorBrush(Theme.Danger);
+                    info.Children.Add(err);
+                }
                 Grid.SetColumn(info, 0);
                 grid.Children.Add(info);
 
@@ -1119,6 +1132,20 @@ public sealed class VoiceBoxStudioView : StackPanel
                         Rebuild();
                     });
                 actions.Children.Add(fav);
+                if (g.Status is "generating" or "loading_model")
+                    actions.Children.Add(PageChrome.IconButton("", "Cancel this generation", async () =>
+                    {
+                        try { await VoiceBoxApi.CancelGenerationAsync(g.Id); } catch { }
+                        Toasts.Info("Generation cancelled");
+                        Rebuild();
+                    }));
+                if (g.Status is "failed" or "error" or "cancelled")
+                    actions.Children.Add(PageChrome.IconButton("", "Retry this generation", async () =>
+                    {
+                        try { await VoiceBoxApi.RetryGenerationAsync(g.Id); Toasts.Info("Retrying…"); }
+                        catch (Exception ex) { Toasts.Error($"Retry failed: {ex.Message}"); }
+                        Rebuild();
+                    }));
                 if (g.Status == "completed")
                     actions.Children.Add(PageChrome.IconButton("", "Play", async () =>
                     {
@@ -1170,9 +1197,12 @@ public sealed class VoiceBoxStudioView : StackPanel
         host.Children.Add(Subtle("Loading stories…"));
         try
         {
-            List<VoiceBoxApi.Story> stories;
-            try { stories = await VoiceBoxApi.GetStoriesAsync(); }
-            catch { await Task.Delay(1200); stories = await VoiceBoxApi.GetStoriesAsync(); } // boot race: retry once
+            List<VoiceBoxApi.Story>? stories = null;
+            for (int attempt = 0; ; attempt++)
+            {
+                try { stories = await VoiceBoxApi.GetStoriesAsync(); break; }
+                catch when (attempt < 2) { await Task.Delay(1500); } // boot race / busy server: retry twice
+            }
             var gens = (await VoiceBoxApi.GetHistoryAsync(200)).Where(g => g.Status == "completed").ToList();
             host.Children.Clear();
 

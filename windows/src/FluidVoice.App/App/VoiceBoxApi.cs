@@ -234,6 +234,12 @@ public static class VoiceBoxApi
     public static Task DeleteGenerationAsync(string id, CancellationToken ct = default)
         => Http.DeleteAsync($"/history/{id}", ct);
 
+    public static Task CancelGenerationAsync(string id, CancellationToken ct = default)
+        => Http.PostAsync($"/generate/{id}/cancel", null, ct);
+
+    public static Task RetryGenerationAsync(string id, CancellationToken ct = default)
+        => Http.PostAsync($"/generate/{id}/retry", null, ct);
+
     public static Task<byte[]> GetAudioAsync(string generationId, CancellationToken ct = default)
         => Http.GetByteArrayAsync($"/audio/{generationId}", ct);
 
