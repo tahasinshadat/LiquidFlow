@@ -97,9 +97,11 @@ public static class VoiceBoxNative
             {
                 "fastapi uvicorn sqlalchemy pydantic httpx sse-starlette python-multipart loguru huggingface_hub pillow",
                 "numpy scipy soundfile",
-                "transformers",
+                "transformers==4.57.3", // qwen-tts pins this; whisper, qwen3 and kokoro are all fine on it
                 "--no-deps kokoro misaki",
                 "addict regex espeakng-loader num2words phonemizer-fork",
+                "einops accelerate onnxruntime", // qwen-tts deps that have ARM64 wheels
+                "--no-deps qwen-tts",            // its strict pins collide with the resolver; shims cover the gaps
                 "fastmcp",
             };
             for (int i = 0; i < layers.Length; i++)
@@ -446,7 +448,77 @@ def load(path, sr=22050, mono=True, dtype=np.float32, **_):
     return np.ascontiguousarray(y, dtype=dtype), int(orig_sr)
 
 
+def resample(y=None, orig_sr=None, target_sr=None, **_):
+    y = np.asarray(y, dtype=np.float32)
+    if int(orig_sr) == int(target_sr):
+        return y
+    g = gcd(int(target_sr), int(orig_sr))
+    out = resample_poly(y, int(target_sr) // g, int(orig_sr) // g, axis=-1)
+    return np.ascontiguousarray(out, dtype=np.float32)
+
+
 from . import effects  # noqa: E402,F401
+from . import filters  # noqa: E402,F401
+""");
+        File.WriteAllText(Path.Combine(lib, "filters.py"), """
+# librosa.filters shim: mel filterbank from the standard published formulas
+# (Slaney mel scale, triangular filters, slaney area norm). Own implementation.
+import numpy as np
+
+
+def _hz_to_mel(freq, htk=False):
+    freq = np.asanyarray(freq, dtype=float)
+    if htk:
+        return 2595.0 * np.log10(1.0 + freq / 700.0)
+    f_min, f_sp = 0.0, 200.0 / 3
+    mels = (freq - f_min) / f_sp
+    min_log_hz = 1000.0
+    min_log_mel = (min_log_hz - f_min) / f_sp
+    logstep = np.log(6.4) / 27.0
+    if mels.ndim:
+        log_t = freq >= min_log_hz
+        mels[log_t] = min_log_mel + np.log(freq[log_t] / min_log_hz) / logstep
+    elif freq >= min_log_hz:
+        mels = min_log_mel + np.log(freq / min_log_hz) / logstep
+    return mels
+
+
+def _mel_to_hz(mels, htk=False):
+    mels = np.asanyarray(mels, dtype=float)
+    if htk:
+        return 700.0 * (10.0 ** (mels / 2595.0) - 1.0)
+    f_min, f_sp = 0.0, 200.0 / 3
+    freqs = f_min + f_sp * mels
+    min_log_hz = 1000.0
+    min_log_mel = (min_log_hz - f_min) / f_sp
+    logstep = np.log(6.4) / 27.0
+    if mels.ndim:
+        log_t = mels >= min_log_mel
+        freqs[log_t] = min_log_hz * np.exp(logstep * (mels[log_t] - min_log_mel))
+    elif mels >= min_log_mel:
+        freqs = min_log_hz * np.exp(logstep * (mels - min_log_mel))
+    return freqs
+
+
+def mel(*, sr, n_fft, n_mels=128, fmin=0.0, fmax=None, htk=False, norm="slaney", dtype=np.float32):
+    if fmax is None:
+        fmax = float(sr) / 2
+    n_bins = 1 + n_fft // 2
+    fftfreqs = np.linspace(0, float(sr) / 2, n_bins, endpoint=True)
+    mel_f = _mel_to_hz(np.linspace(_hz_to_mel(fmin, htk), _hz_to_mel(fmax, htk), n_mels + 2), htk=htk)
+    fdiff = np.diff(mel_f)
+    ramps = np.subtract.outer(mel_f, fftfreqs)
+    weights = np.zeros((n_mels, n_bins), dtype=float)
+    for i in range(n_mels):
+        lower = -ramps[i] / fdiff[i]
+        upper = ramps[i + 2] / fdiff[i + 1]
+        weights[i] = np.maximum(0, np.minimum(lower, upper))
+    if norm == "slaney":
+        enorm = 2.0 / (mel_f[2 : n_mels + 2] - mel_f[:n_mels])
+        weights *= enorm[:, np.newaxis]
+    elif norm is not None:
+        raise ValueError(f"Unsupported norm: {norm}")
+    return weights.astype(dtype)
 """);
         File.WriteAllText(Path.Combine(lib, "effects.py"), """
 import numpy as np
@@ -499,6 +571,42 @@ class Pedalboard(list):
 
     def __call__(self, audio, sample_rate=None, **kwargs):
         return audio
+""");
+
+        // qwen-tts imports sox + torchaudio.compliance.kaldi at module scope, but only its
+        // CLONING tokenizer uses them. Import-safe shims keep CustomVoice fully native;
+        // the cloning path raises a clear message if reached.
+        File.WriteAllText(Path.Combine(sp, "sox.py"), """
+# sox shim (pysox needs the SoX executable). Import-safe; any use raises clearly.
+class Transformer:
+    def __getattr__(self, name):
+        def _unavailable(*args, **kwargs):
+            raise NotImplementedError(
+                "sox is unavailable in the native ARM64 runtime (voice cloning path)")
+        return _unavailable
+""");
+        var ta = Path.Combine(sp, "torchaudio", "compliance");
+        Directory.CreateDirectory(ta);
+        File.WriteAllText(Path.Combine(sp, "torchaudio", "__init__.py"), """
+# torchaudio shim: no Windows-ARM64 wheel. Import-safe; only qwen's cloning
+# tokenizer consumes it here, and that raises clearly if used.
+from . import compliance  # noqa: F401
+__version__ = "0.0.0+liquidflow.shim"
+""");
+        File.WriteAllText(Path.Combine(ta, "__init__.py"), """
+from . import kaldi  # noqa: F401
+""");
+        File.WriteAllText(Path.Combine(ta, "kaldi.py"), """
+def fbank(*args, **kwargs):
+    raise NotImplementedError(
+        "torchaudio is unavailable in the native ARM64 runtime (voice cloning path)")
+
+
+def __getattr__(name):
+    def _unavailable(*args, **kwargs):
+        raise NotImplementedError(
+            "torchaudio is unavailable in the native ARM64 runtime (voice cloning path)")
+    return _unavailable
 """);
     }
 

@@ -1534,21 +1534,37 @@ public sealed class VoiceBoxStudioView : StackPanel
 
                 void WatchProgress()
                 {
+                    // /tasks/active is the reliable source: percent, bytes, AND error details
+                    // (the SSE stream goes silent when a task dies — that hid real failures).
                     bar.Visibility = Visibility.Visible;
                     bar.SetIndeterminate();
                     _ = Task.Run(async () =>
                     {
-                        try
+                        for (int tick = 0; tick < 7200; tick++)
                         {
-                            await VoiceBoxApi.StreamModelProgressAsync(m.ModelName, (frac, phase) =>
-                                Dispatcher.BeginInvoke(() =>
-                                {
-                                    if (frac >= 0) bar.SetFraction(frac); else bar.SetIndeterminate();
-                                    meta.Text = phase == "extracting" ? "extracting…"
-                                        : frac >= 0 ? $"downloading… {frac * 100:0}%" : "downloading…";
-                                }));
+                            await Task.Delay(1000);
+                            List<VoiceBoxApi.DownloadTask> tasks;
+                            try { tasks = await VoiceBoxApi.GetActiveDownloadsAsync(); }
+                            catch { continue; }
+                            var t = tasks.FirstOrDefault(x => x.ModelName == m.ModelName);
+                            if (t is null) break; // finished or dismissed — refresh below
+                            if (t.Status == "error")
+                            {
+                                var err = t.Error ?? "unknown error";
+                                _ = Dispatcher.BeginInvoke(() => Toasts.Error($"{m.DisplayName} download failed: {err}"));
+                                try { await VoiceBoxApi.CancelDownloadAsync(m.ModelName); } catch { }
+                                break;
+                            }
+                            var frac = t.Total is > 0 ? (double)(t.Current ?? 0) / t.Total.Value
+                                : t.Progress is > 0 ? t.Progress.Value / 100.0 : -1;
+                            var mb = t.Total is > 0 ? $" · {(t.Current ?? 0) / 1048576} / {t.Total / 1048576} MB" : "";
+                            _ = Dispatcher.BeginInvoke(() =>
+                            {
+                                if (frac >= 0) bar.SetFraction(frac); else bar.SetIndeterminate();
+                                meta.Text = t.Status == "extracting" ? "extracting…"
+                                    : frac >= 0 ? $"downloading… {frac * 100:0}%{mb}" : "downloading…";
+                            });
                         }
-                        catch { }
                         _ = Dispatcher.BeginInvoke(() =>
                         {
                             Invalidate("Models");
@@ -1591,6 +1607,18 @@ public sealed class VoiceBoxStudioView : StackPanel
                         WatchProgress();
                     };
                     act.Children.Add(dl);
+                }
+                else if (m.Downloading)
+                {
+                    var cancelDl = Theme.SecondaryButton("Cancel");
+                    cancelDl.Padding = new Thickness(12, 4, 12, 4);
+                    cancelDl.Click += async (_, _) =>
+                    {
+                        try { await VoiceBoxApi.CancelDownloadAsync(m.ModelName); } catch { }
+                        Toasts.Info($"{m.DisplayName} download cancelled");
+                        Rebuild();
+                    };
+                    act.Children.Add(cancelDl);
                 }
                 else if (m.Loaded)
                 {

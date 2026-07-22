@@ -253,6 +253,29 @@ public static class VoiceBoxApi
     public static Task DeleteModelAsync(string modelName, CancellationToken ct = default)
         => Http.DeleteAsync($"/models/{modelName}", ct);
 
+    public sealed record DownloadTask(
+        [property: JsonPropertyName("model_name")] string ModelName,
+        [property: JsonPropertyName("status")] string? Status,
+        [property: JsonPropertyName("error")] string? Error,
+        [property: JsonPropertyName("progress")] double? Progress,
+        [property: JsonPropertyName("current")] long? Current,
+        [property: JsonPropertyName("total")] long? Total,
+        [property: JsonPropertyName("filename")] string? Filename);
+
+    private sealed record ActiveTasks([property: JsonPropertyName("downloads")] List<DownloadTask> Downloads);
+
+    /// <summary>Snapshot of running/errored downloads — the reliable progress source
+    /// (progress %, bytes, filename, and error details all live here).</summary>
+    public static async Task<List<DownloadTask>> GetActiveDownloadsAsync(CancellationToken ct = default)
+        => (await Http.GetFromJsonAsync<ActiveTasks>("/tasks/active", ct))?.Downloads ?? new();
+
+    /// <summary>Cancel a running download, or dismiss an errored/stale task.</summary>
+    public static async Task CancelDownloadAsync(string modelName, CancellationToken ct = default)
+    {
+        var resp = await Http.PostAsJsonAsync("/models/download/cancel", new { model_name = modelName }, ct);
+        await EnsureOkAsync(resp, ct);
+    }
+
     private static readonly HttpClient SseHttp = new()
     {
         BaseAddress = new Uri($"http://127.0.0.1:{VoiceBoxNative.Port}"),
