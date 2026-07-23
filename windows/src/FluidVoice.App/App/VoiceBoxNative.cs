@@ -573,17 +573,37 @@ class Pedalboard(list):
         return audio
 """);
 
-        // qwen-tts imports sox + torchaudio.compliance.kaldi at module scope, but only its
-        // CLONING tokenizer uses them. Import-safe shims keep CustomVoice fully native;
-        // the cloning path raises a clear message if reached.
+        // qwen-tts's cloning tokenizer needs sox (peak-normalize only) and kaldi-style
+        // fbank features. Both implemented for real — this is what makes voice CLONING
+        // fully native. (pysox needs the SoX exe; torchaudio has no ARM64 wheel.)
         File.WriteAllText(Path.Combine(sp, "sox.py"), """
-# sox shim (pysox needs the SoX executable). Import-safe; any use raises clearly.
+# pysox shim: the cloning tokenizer only uses Transformer().norm(db_level).build_array,
+# i.e. peak-normalization to a dB target. Implemented directly; anything else raises.
+import numpy as np
+
+
 class Transformer:
+    def __init__(self):
+        self._db = None
+
+    def norm(self, db_level=-3.0):
+        self._db = float(db_level)
+        return self
+
+    def build_array(self, input_array=None, sample_rate_in=None, **_):
+        x = np.asarray(input_array, dtype=np.float32)
+        if x.size == 0:
+            return x
+        peak = float(np.max(np.abs(x)))
+        if peak <= 0.0:
+            return x
+        target = 10.0 ** ((self._db if self._db is not None else -3.0) / 20.0)
+        return (x * (target / peak)).astype(np.float32)
+
     def __getattr__(self, name):
-        def _unavailable(*args, **kwargs):
-            raise NotImplementedError(
-                "sox is unavailable in the native ARM64 runtime (voice cloning path)")
-        return _unavailable
+        def _unsupported(*args, **kwargs):
+            raise NotImplementedError(f"sox shim: effect '{name}' not implemented")
+        return _unsupported
 """);
         var ta = Path.Combine(sp, "torchaudio", "compliance");
         Directory.CreateDirectory(ta);
@@ -597,16 +617,84 @@ __version__ = "0.0.0+liquidflow.shim"
 from . import kaldi  # noqa: F401
 """);
         File.WriteAllText(Path.Combine(ta, "kaldi.py"), """
-def fbank(*args, **kwargs):
-    raise NotImplementedError(
-        "torchaudio is unavailable in the native ARM64 runtime (voice cloning path)")
+# Kaldi-compatible fbank features, implemented from the documented Kaldi feature
+# pipeline (framing -> DC removal -> preemphasis -> povey window -> power spectrum ->
+# HTK-mel triangular banks -> log). Covers the options qwen's cloning tokenizer uses;
+# other option combinations raise so silent numeric drift can't hide.
+import math
+import torch
+
+EPSILON = torch.finfo(torch.float).eps
 
 
-def __getattr__(name):
-    def _unavailable(*args, **kwargs):
-        raise NotImplementedError(
-            "torchaudio is unavailable in the native ARM64 runtime (voice cloning path)")
-    return _unavailable
+def _next_pow2(n):
+    return 1 if n <= 1 else 2 ** (n - 1).bit_length()
+
+
+def _mel(freq):
+    return 1127.0 * math.log(1.0 + freq / 700.0)
+
+
+def _mel_banks(num_bins, n_fft, sample_freq, low_freq, high_freq):
+    if high_freq <= 0:
+        high_freq = sample_freq / 2 + high_freq
+    n_bins = n_fft // 2
+    fft_bin_width = sample_freq / n_fft
+    mel_low, mel_high = _mel(low_freq), _mel(high_freq)
+    mel_delta = (mel_high - mel_low) / (num_bins + 1)
+    banks = torch.zeros(num_bins, n_bins)
+    for b in range(num_bins):
+        left, center, right = (mel_low + d * mel_delta for d in (b, b + 1, b + 2))
+        for i in range(n_bins):
+            m = _mel(fft_bin_width * i)
+            if left < m < right:
+                banks[b, i] = (m - left) / (center - left) if m <= center else (right - m) / (right - center)
+    return banks
+
+
+def fbank(waveform, num_mel_bins=23, frame_length=25.0, frame_shift=10.0,
+          sample_frequency=16000.0, dither=0.0, preemphasis_coefficient=0.97,
+          remove_dc_offset=True, window_type="povey", use_energy=False,
+          use_power=True, use_log_fbank=True, low_freq=20.0, high_freq=0.0,
+          snip_edges=True, subtract_mean=False, energy_floor=1.0,
+          raw_energy=True, round_to_power_of_two=True, **unsupported):
+    if use_energy or not use_power or not use_log_fbank or not snip_edges or window_type != "povey":
+        raise NotImplementedError("kaldi.fbank shim: unsupported option combination")
+    if dither:
+        raise NotImplementedError("kaldi.fbank shim: dither is not implemented")
+
+    wave = torch.as_tensor(waveform, dtype=torch.float32)
+    if wave.dim() == 2:
+        wave = wave[0]
+    win_size = int(sample_frequency * frame_length / 1000.0)
+    win_shift = int(sample_frequency * frame_shift / 1000.0)
+    n_fft = _next_pow2(win_size) if round_to_power_of_two else win_size
+
+    num_frames = 0 if wave.numel() < win_size else 1 + (wave.numel() - win_size) // win_shift
+    if num_frames == 0:
+        return torch.zeros(0, num_mel_bins)
+    idx = torch.arange(win_size).unsqueeze(0) + win_shift * torch.arange(num_frames).unsqueeze(1)
+    frames = wave[idx]
+
+    if remove_dc_offset:
+        frames = frames - frames.mean(dim=1, keepdim=True)
+    if preemphasis_coefficient != 0.0:
+        prev = torch.nn.functional.pad(frames.unsqueeze(0), (1, 0), mode="replicate").squeeze(0)[:, :-1]
+        frames = frames - preemphasis_coefficient * prev
+
+    n = torch.arange(win_size, dtype=torch.float32)
+    window = (0.5 - 0.5 * torch.cos(2 * math.pi * n / (win_size - 1))).pow(0.85)
+    frames = frames * window
+
+    spectrum = torch.fft.rfft(frames, n=n_fft).abs().pow(2.0)
+
+    banks = _mel_banks(num_mel_bins, n_fft, sample_frequency, low_freq, high_freq)
+    banks = torch.nn.functional.pad(banks, (0, 1))
+    mel = spectrum @ banks.t()
+    mel = torch.log(mel.clamp(min=EPSILON))
+    if subtract_mean:
+        mel = mel - mel.mean(dim=0, keepdim=True)
+    return mel
 """);
     }
 

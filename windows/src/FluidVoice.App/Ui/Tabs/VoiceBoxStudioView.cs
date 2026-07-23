@@ -343,15 +343,6 @@ public sealed class VoiceBoxStudioView : StackPanel
         var text = _text.Text.Trim();
         if (prof is null) { _status.Text = "Add a voice first (Voices tab)."; return; }
         if (text.Length == 0) { _status.Text = "Type something to say first."; return; }
-        // Cloned voices use the qwen CLONING engine, whose reference tokenizer has no
-        // ARM64 build — a native job would just wedge the serial queue and fail. Refuse
-        // honestly instead of poisoning the queue (that's what "stuck generating" was).
-        if ((prof.PresetEngine ?? prof.DefaultEngine) == "qwen")
-        {
-            _status.Text = "Cloned voices can't speak natively yet — one piece of their engine has no ARM64 build. They work in the emulated app (Settings → General → VoiceBox); every preset voice here is fully native.";
-            Toasts.Info("Cloned voices need the emulated app for now — presets are fully native.");
-            return;
-        }
         _generate.IsEnabled = false;
         StopPlayback();
         try
@@ -709,7 +700,7 @@ public sealed class VoiceBoxStudioView : StackPanel
                 _profiles = await VoiceBoxApi.GetProfilesAsync();
                 nameBox.Text = UniqueVoiceName("My voice");
 
-                var doneMsg = $"“{name}” is saved with your sample. Honest heads-up: cloned voices can't SPEAK natively yet — one engine piece has no ARM64 build. Hear them via the emulated app (Settings → General → VoiceBox); every preset voice stays fully native.";
+                var doneMsg = $"“{name}” is ready — pick it on the Generate tab. Cloned voices speak through the Qwen engine (get “Qwen TTS 0.6B” under Models if it's missing); the first generation takes a minute while it loads.";
                 st.Text = doneMsg;
                 Invalidate("Voices", "Generate");
                 Toasts.Success($"“{name}” is ready — pick it on the Generate tab.");
@@ -901,11 +892,6 @@ public sealed class VoiceBoxStudioView : StackPanel
         _previewBusy = true;
         try
         {
-            if ((prof.PresetEngine ?? prof.DefaultEngine) == "qwen")
-            {
-                Toasts.Info("Cloned voices need the emulated app for playback (engine gap) — presets preview natively.");
-                return;
-            }
             var dir = Path.Combine(FluidVoice.Core.AppPaths.DataDir, "Voices", "Previews");
             Directory.CreateDirectory(dir);
             var cached = Path.Combine(dir, prof.Id + ".wav");
@@ -1152,9 +1138,12 @@ public sealed class VoiceBoxStudioView : StackPanel
                         try
                         {
                             StopPlayback();
-                            var bytes = await VoiceBoxApi.GetAudioAsync(g.Id);
-                            var tmp = Path.Combine(Path.GetTempPath(), $"vb-{g.Id[..8]}.wav");
-                            await File.WriteAllBytesAsync(tmp, bytes);
+                            // cache per generation — replays are instant after the first fetch
+                            var cacheDir = Path.Combine(FluidVoice.Core.AppPaths.DataDir, "Voices", "HistoryCache");
+                            Directory.CreateDirectory(cacheDir);
+                            var tmp = Path.Combine(cacheDir, $"{g.Id}.wav");
+                            if (!File.Exists(tmp))
+                                await File.WriteAllBytesAsync(tmp, await VoiceBoxApi.GetAudioAsync(g.Id));
                             Play(tmp);
                         }
                         catch { }
